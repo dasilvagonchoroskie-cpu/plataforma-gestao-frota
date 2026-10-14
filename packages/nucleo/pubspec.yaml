@@ -1,0 +1,7 @@
+name: nucleo
+description: Modelos de dados simples da plataforma de frota.
+publish_to: none
+version: 0.1.0
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
