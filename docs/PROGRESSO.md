@@ -6,14 +6,16 @@ Estado do adiantamento do Zapia, sem avançar às fases posteriores. Os rótulos
 
 - **feito mas não testado** — Estrutura separada em `plataforma-frota/`, documentos iniciais, instruções e placeholders para as etapas futuras.
 - **feito mas não testado** — Cópia Markdown da arquitetura em `docs/ARQUITETURA.md`; tratada como fonte de verdade nesta etapa.
-- **feito mas não testado** — `docs/PROGRESSO.md` e `docs/PASSAGEM.md` criados para continuidade.
+- **feito mas não testado** — `docs/PROGRESSO.md` e `docs/PASSAGEM.md` para continuidade.
 - **feito e testado** — Verificação textual com Python confirmou as 17 seções da arquitetura e a presença dos arquivos-base; não verifica conteúdo funcional.
 
 ## Fase 1 — arquivos do banco
 
-- **feito mas não testado** — Criado `supabase/migrations/20261014110000_esquema_inicial.sql`, com as 16 tabelas da seção 7, índices, políticas RLS, quatro funções auxiliares da seção 6, gatilhos de `atualizado_em`, quatro views de valores efetivos e privilégios de tabela sem `DELETE`. É apenas um arquivo; não foi aplicado a banco algum.
-- **feito e testado** — Verificação textual Python confirmou 16 tabelas, 29 políticas RLS, quatro funções, quatro views e bloqueio de escrita direta nos registros operacionais do motorista e pedidos de entrada. Isso não valida sintaxe, execução, isolamento nem segurança das políticas.
-- **não feito** — Aplicação da migration em banco local/de desenvolvimento e testes automatizados de RLS.
+- **feito mas não testado** — Revisada em lugar a migration existente `supabase/migrations/20261014110000_esquema_inicial.sql`; sem nova migration e sem aplicação em banco. Alterações e motivos estão em `docs/PASSAGEM.md`.
+- **feito mas não testado** — Escrito `supabase/tests/isolamento_rls.sql` com quatro verificações de isolamento e privilégios; depende de pgTAP, variáveis `psql` e fixtures de teste. **Não foi executado.**
+- **não feito** — Validação sintática ou execução da migration em banco local/de desenvolvimento.
+- **não feito** — Execução dos testes RLS/pgTAP e verificação de comportamento de triggers, FKs e views.
+- **não feito** — Acesso ou alteração a qualquer banco; nenhum banco foi acessado ou alterado neste trabalho.
 
 ## Esqueletos permitidos
 
@@ -24,10 +26,10 @@ Estado do adiantamento do Zapia, sem avançar às fases posteriores. Os rótulos
 ## Ambiente e verificações
 
 - **feito e testado** — Comandos de disponibilidade executados: `flutter`, `dart`, `supabase`, `psql` e `git` não estão disponíveis neste ambiente.
-- **feito e testado** — Executada verificação textual Python indicada em `docs/PASSAGEM.md`; resultado OK, com as limitações registradas.
+- **feito e testado** — Verificações textuais anteriores confirmaram contagens de tabelas, políticas, funções e views; isso não valida sintaxe, execução, isolamento ou segurança das políticas.
 - **não feito** — `flutter analyze`, testes Flutter/Dart, validação da migration com Supabase CLI/PostgreSQL e testes de RLS, pois as ferramentas necessárias não estão disponíveis.
-- **feito e testado** — Repositório privado criado e verificado na conta do usuário: [plataforma-gestao-frota](https://github.com/dasilvagonchoroskie-cpu/plataforma-gestao-frota). Branch `main`; 24 arquivos confirmados.
+- **feito e testado** — Repositório privado existente: [plataforma-gestao-frota](https://github.com/dasilvagonchoroskie-cpu/plataforma-gestao-frota), branch `main`.
 
 ## Próxima etapa
 
-- **não feito** — Claude Code deve revisar a migration e os esqueletos, esclarecer as perguntas em `docs/PASSAGEM.md`, executar testes em Supabase de desenvolvimento e só então decidir alterações. O banco de produção não deve ser tocado.
+- **não feito** — Claude Code deve rever as dúvidas registradas em `docs/PASSAGEM.md`, executar validação e testes em Supabase local/de desenvolvimento isolado e só então decidir novas alterações. O banco de produção não deve ser tocado.
