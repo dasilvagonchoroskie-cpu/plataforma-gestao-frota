@@ -26,7 +26,7 @@ Estado do adiantamento do Zapia, sem avançar às fases posteriores. Os rótulos
 - **feito e testado** — Comandos de disponibilidade executados: `flutter`, `dart`, `supabase`, `psql` e `git` não estão disponíveis neste ambiente.
 - **feito e testado** — Executada verificação textual Python indicada em `docs/PASSAGEM.md`; resultado OK, com as limitações registradas.
 - **não feito** — `flutter analyze`, testes Flutter/Dart, validação da migration com Supabase CLI/PostgreSQL e testes de RLS, pois as ferramentas necessárias não estão disponíveis.
-- **não feito** — Criação ou envio de repositório GitHub; destino e nome não foram definidos.
+- **feito e testado** — Repositório privado criado e verificado na conta do usuário: [plataforma-gestao-frota](https://github.com/dasilvagonchoroskie-cpu/plataforma-gestao-frota). Branch `main`; 24 arquivos confirmados.
 
 ## Próxima etapa
 

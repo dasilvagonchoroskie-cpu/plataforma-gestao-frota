@@ -7,7 +7,7 @@
 - **feito mas não testado** — `docs/PROGRESSO.md`: status e próximos passos.
 - **feito mas não testado** — `apps/motorista` e `apps/gestor` têm `pubspec.yaml`, `lib/main.dart`, navegação simples, tema Material 3 e dados demonstrativos fixos; sem login ou backend. O bootstrap das plataformas Android e Web não foi gerado.
 - **feito mas não testado** — Estrutura e demais documentos previamente criados permanecem, incluindo `CLAUDE.md`, `README.md`, `docs/ARQUITETURA.md`, `docs/OPERACAO.md`, `docs/referencia/meu_frete/README.md` e arquivos README/placeholders do Supabase e dos pacotes/apps.
-- **não feito** — Nenhum repositório GitHub foi criado ou enviado. O usuário não definiu nome nem destino do repositório; perguntar antes de qualquer ação remota.
+- **feito e testado** — Repositório privado criado e verificado: [plataforma-gestao-frota no GitHub](https://github.com/dasilvagonchoroskie-cpu/plataforma-gestao-frota). A branch `main` contém os 24 arquivos desta pasta; nenhum repositório antigo foi alterado.
 
 ## O que foi testado e como
 
@@ -32,6 +32,7 @@
 - **feito mas não testado** — `perfis`, `motoristas`, `empresas` e `pedidos_entrada` não permitem escrita direta por cliente autenticado nos fluxos de cadastro/aprovação. As futuras funções seguras `criar_empresa`, `pedir_entrada` e `decidir_entrada` devem validar vínculo e aprovação. Administradores da plataforma não têm política de tela no banco.
 - **feito mas não testado** — Views de valores efetivos apresentam os dados ajustados num campo JSONB `valores_efetivos`, por chave, sobrescrevendo pelo ajuste mais recente, e usam `security_invoker = true` para manter RLS. Confirmar se o formato atende às telas/consultas e à versão do Postgres.
 - **feito mas não testado** — Acesso a `acessos_autorizados` ficou restrito ao dono. Escritas de lançamentos e caminhão informado pelo motorista ficam reservadas à futura `sincronizar_lote`; decisões de entrada ficam reservadas às funções seguras futuras. A migration concede `SELECT`, `INSERT` e `UPDATE` ao papel `authenticated`, mas não concede `DELETE`; a RLS continua limitando cada operação. Essas políticas não foram validadas por teste de RLS.
+- **feito e testado** — Nome provisório do projeto: Plataforma de Gestão de Frota. Criado o slug `plataforma-gestao-frota`; a visibilidade privada foi adotada como padrão de segurança.
 
 ## Dúvidas em aberto
 
@@ -41,4 +42,3 @@
 - **não feito** — Confirmar a matriz de escrita: o rascunho reserva gravação dos lançamentos e do caminhão informado pelo motorista à futura `sincronizar_lote`, e entrada/aprovação às funções seguras; definir quais gravações do gestor serão diretas. Confirmar também quais papéis podem editar caminhões, dispositivos, categorias e dados de motorista, como validar que IDs relacionados pertencem à mesma empresa, e se motorista pode corrigir lançamento sincronizado. A seção 14 já marca esta última escolha como pendente.
 - **não feito** — Confirmar formato das views efetivas, quais campos podem ser ajustados e política completa de leitura dos ajustes; conferir compatibilidade com Postgres/Supabase alvo.
 - **não feito** — Resolver as demais decisões explícitas da seção 14 antes das fases correspondentes: gestor em mais de uma empresa, nome definitivo do produto, fechamento de período e escolhas de autenticação/e-mail indicadas naquela seção.
-- **não feito** — Definir nome e destino do repositório antes de criar ou enviar qualquer GitHub.
