@@ -1,0 +1,32 @@
+name: Esteira
+
+# A cada envio: testa o banco num Supabase local (migrations do zero + testes
+# pgTAP), o núcleo de regras e os dois apps; compila o APK do motorista e o
+# painel web do gestor.
+on:
+  push:
+    branches: [main]
+    paths-ignore: ['ferramentas/**', 'docs/**', '**.md']
+  workflow_dispatch: {}
+
+env:
+  FLUTTER_VERSION: '3.47.5'
+
+jobs:
+  banco:
+    name: Banco (migrations e testes pgTAP)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+      - name: Subir o Supabase local com as migrations
+        run: |
+          supabase --version
+          supabase start -x studio,imgproxy,realtime,storage-api,logflare,vector
+      - name: Testes do banco
+        run: BANCO_URL=postgresql://postgres:postgres@127.0.0.1:54322/postgres bash supabase/tests/local/rodar.sh
+      - name: Parar
+        if: always()
+        run: supabase stop --no-backup || true
