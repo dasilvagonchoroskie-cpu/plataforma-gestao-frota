@@ -16,9 +16,14 @@ No Supabase (SQL Editor, como dono da plataforma):
 
     select public.criar_empresa('Nome da Transportadora', 'email-do-dono@exemplo.com', null, 'piloto', 5, 'teste');
 
-A resposta traz o código da empresa. O dono abre o painel, toca em "Criar minha conta" com aquele e-mail
-e já entra como dono. Ele libera os gestores em Configurações > Donos e gestores e passa o código para
-os motoristas.
+A resposta traz o código da empresa. Depois crie o login do dono com uma senha provisória (passe para ele;
+no primeiro login ele cria a senha dele):
+
+    select public.criar_login_dono('email-do-dono@exemplo.com', 'Nome do Dono', 'SENHA123');
+
+O mesmo comando, rodado de novo, gera outra senha para um dono que esqueceu. O dono cria os gestores em
+Configurações > Donos e gestores (senha provisória) e passa o código da empresa para os motoristas, que
+criam a conta no app só com nome, CPF e senha.
 
 ## Mudar plano, limite ou suspender
 
@@ -38,7 +43,6 @@ e combinar uma exportação semanal (`supabase db dump`) guardada fora do Supaba
 
 ## Problemas comuns
 
-- Motorista não recebe o código: conferir o SMTP (PASSAGEM, pendência 1) e a caixa de spam.
 - Motorista perdeu a senha e o e-mail: painel > Motoristas > o motorista > Redefinir o acesso.
 - Motorista diz que lançou mas não aparece: o celular dele precisa de internet; o painel mostra o
   último envio de cada um. O que ele lançou fica guardado no celular até enviar.

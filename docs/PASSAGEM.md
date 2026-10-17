@@ -41,6 +41,26 @@ nela (seção 14) e anotada aqui. Qualquer item pode ser mudado.
 16. **Versões das migrations:** os arquivos foram renomeados para a versão que o Supabase gravou ao
     aplicar (20261017112902, 20261017113308, 20261017113838), para `supabase db push` não estranhar.
 
+## Piloto sem depender de e-mail (17/10/2026, pedido do usuário)
+
+O usuário pediu para deixar tudo pronto sem passos manuais. O envio de e-mail (códigos) depende de
+configurar SMTP e modelos no painel do Supabase, então o acesso do piloto passou a funcionar sem e-mail:
+
+- **Motorista** cria a conta no app só com nome, CPF e senha (Edge Function `cadastrar_motorista`). A
+  conta usa um e-mail interno derivado do CPF (`m<cpf>@motorista.fortalezadigitalsecurity.com.br`, nunca
+  recebe mensagens), para um e-mail digitado por alguém não poder virar acesso de gestor. Esqueceu a
+  senha: o gestor redefine pelo painel. Limite de 5 cadastros por hora por instalação do app e 20 por
+  endereço de internet.
+- **Gestor**: o dono cria o acesso no painel (Configurações > Donos e gestores) e recebe uma senha
+  provisória para passar (Edge Function `criar_acesso_gestor`). Esqueceu: o dono gera outra.
+- **Dono**: criado pela plataforma com `criar_login_dono` (senha provisória). O dono da empresa piloto é
+  gestaodefrota2027@gmail.com.
+- Quem entra com senha provisória cria a senha dele no primeiro login.
+- O limite de tentativas de login por aparelho usava um id fixo para todos os celulares (um erro de 5
+  senhas erradas de qualquer motorista podia bloquear todos por 15 minutos). Agora cada instalação tem o
+  seu id.
+- O cadastro por e-mail com código continua no código do servidor; volta a ser útil quando houver SMTP.
+
 ## Avisos do conselheiro do Supabase (conferidos, esperados)
 
 - "Signed-in users can execute SECURITY DEFINER function": de propósito. Cada função confere quem
@@ -54,13 +74,14 @@ nela (seção 14) e anotada aqui. Qualquer item pode ser mudado.
 
 ## Pendências que dependem do usuário
 
-1. **E-mail dos códigos (SMTP).** O envio padrão do Supabase só entrega para e-mails da equipe da conta
+1. **E-mail dos códigos (SMTP)** — não é mais necessário para o piloto (ver acima). Só para voltar o
+   cadastro por e-mail no futuro. O envio padrão do Supabase só entrega para e-mails da equipe da conta
    (gestaodefrota2027@gmail.com) e tem limite muito baixo (poucos e-mails por hora). Para motoristas criarem conta, configurar um SMTP
    próprio em Authentication > Emails > SMTP Settings. Opções: Gmail da conta do projeto com senha de
    app (grátis, até ~500 e-mails por dia) ou um serviço como Brevo ou Resend (plano grátis). Decidir.
-2. **Modelos de e-mail com o código.** Em Authentication > Emails > Templates, trocar o texto de
+2. **Modelos de e-mail com o código** (só junto com o item 1). Em Authentication > Emails > Templates, trocar o texto de
    "Confirm signup", "Magic Link" e "Reset Password" pelos modelos de `supabase/templates/` (eles têm
    `{{ .Token }}`, o código de 6 números que o app pede).
-3. **GitHub Pages:** se o endereço do painel não abrir, em Settings > Pages escolher a fonte
+3. **GitHub Pages (opcional, painel no navegador):** se o endereço do painel não abrir, em Settings > Pages escolher a fonte
    "Deploy from a branch", ramo `gh-pages`, pasta `/ (root)`.
 4. Nome definitivo do produto.

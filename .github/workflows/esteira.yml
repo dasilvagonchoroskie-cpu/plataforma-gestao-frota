@@ -191,11 +191,18 @@ jobs:
       - name: Conferir as Edge Functions na nuvem
         continue-on-error: true
         run: |
-          CODIGO=$(curl -s -o resposta.json -w '%{http_code}' -X POST \
-            https://uinvhwhqhudniipobslu.supabase.co/functions/v1/entrar_com_cpf \
-            -H 'Content-Type: application/json' -H 'apikey: sb_publishable_nM7GeKdmBtrk7VxUBk6s3A_e9Yc9Mdn' \
-            -d '{"cpf":"123","senha":"x","aparelho":"esteira"}')
-          echo "entrar_com_cpf (CPF incompleto) respondeu $CODIGO: $(cat resposta.json)" | tee -a registros/gestor.log
+          F=https://uinvhwhqhudniipobslu.supabase.co/functions/v1
+          K='apikey: sb_publishable_nM7GeKdmBtrk7VxUBk6s3A_e9Yc9Mdn'
+          conferir() { # nome corpo esperado
+            CODIGO=$(curl -s -o resposta.json -w '%{http_code}' -X POST "$F/$1" -H 'Content-Type: application/json' -H "$K" -d "$2")
+            [ "$CODIGO" = "$3" ] && R=ok || R=FALHOU
+            echo "$R: $1 respondeu $CODIGO (esperado $3): $(cat resposta.json)" | tee -a registros/gestor.log
+          }
+          # Só pedidos recusados na validação: nada é gravado no banco.
+          conferir entrar_com_cpf '{"cpf":"123","senha":"x","aparelho":"esteira"}' 401
+          conferir cadastrar_motorista '{"nome":"Teste","cpf":"123","senha":"x","aparelho":"esteira"}' 400
+          conferir redefinir_acesso '{}' 401
+          conferir criar_acesso_gestor '{}' 401
       - name: Guardar o registro
         if: always()
         env:

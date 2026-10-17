@@ -69,6 +69,16 @@ abaixo rodou e passou; o resto está marcado como não testado.
   Achado abrindo os APKs num emulador Android 14 na esteira. R8 desligado, tela de erro no lugar de
   travar e job "aparelho" na esteira que instala e abre os dois APKs e falha se algum não abrir.
 
+## Piloto pronto sem e-mail e ícones (17/10/2026)
+
+- **feito e testado** — Cadastro do motorista sem e-mail, acesso de gestor com senha provisória criado
+  pelo dono, login do dono criado pela plataforma, troca obrigatória da senha provisória. pgTAP: 156
+  verificações; Edge Functions na esteira: 33 verificações de ponta a ponta (incluindo login de verdade
+  no Supabase Auth). Motorista: 22 testes; gestor: 22 testes.
+- **feito** — Aplicado na nuvem: migration `login_do_dono` (hash conferido) e Edge Functions
+  `cadastrar_motorista` e `criar_acesso_gestor`. Login do dono da empresa piloto criado.
+- **feito** — Ícones próprios (fontes em `ferramentas/icones/`, gerados por `gerar.py`).
+
 ## Fase 7 — acabamento e piloto
 
 - **não feito** — SMTP próprio, Sentry, chave de assinatura definitiva, teste fechado no Google Play,
