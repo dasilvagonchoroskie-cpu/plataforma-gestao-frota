@@ -850,7 +850,7 @@ begin
     select count(*) into v_erros from public.tentativas_acesso t
     where t.tipo = 'login_cpf' and t.chave = v_chave and not t.sucesso
       and t.criado_em > greatest(pg_catalog.now() - interval '15 minutes',
-                                            coalesce(v_ultimo_ok, '-infinity'::timestamptz));
+                                 coalesce(v_ultimo_ok, '-infinity'::timestamptz));
     if v_erros >= 5 then
       return pg_catalog.jsonb_build_object('bloqueado', true);
     end if;
