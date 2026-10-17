@@ -1,64 +1,62 @@
-# Passagem — revisão da migration da Plataforma de Gestão de Frota
+# Passagem — decisões tomadas e pendências
 
-## Escopo e situação
+Atualizado em 17/10/2026 pelo Claude Code. O usuário pediu para corrigir o que estava pronto e
+terminar o resto. Onde a arquitetura deixava ponto em aberto, foi seguida a **proposta** escrita
+nela (seção 14) e anotada aqui. Qualquer item pode ser mudado.
 
-Revisão crítica **somente** de `supabase/migrations/20261014110000_esquema_inicial.sql`, sem criar outra migration nem alterar o escopo do produto. Foi criado `supabase/tests/isolamento_rls.sql` como rascunho de testes, por solicitação. Nenhum banco foi acessado ou alterado.
+## Decisões provisórias (seguindo as propostas da arquitetura)
 
-**Status: revisado por leitura; não testado em banco.** O arquivo de testes foi escrito, mas não executado. Não há confirmação de sintaxe SQL, execução, comportamento de triggers ou isolamento real. A execução futura requer banco local/de desenvolvimento, pgTAP habilitado e fixtures dedicadas; nunca usar dados de produção.
+1. **Dono e gestor entram com e-mail e senha.** Motorista entra com CPF e senha (Edge Function).
+2. **Motorista sem e-mail ou que perdeu o acesso:** o gestor redefine pelo painel (Edge Function
+   `redefinir_acesso`); a senha provisória aparece só para o gestor e o motorista troca no primeiro login.
+3. **Motorista pode editar ou apagar o próprio lançamento até o gestor corrigir.** Depois de corrigido,
+   o servidor recusa mudanças do motorista (motivo `ajustado`) e o app mostra o aviso.
+4. **Um gestor em uma empresa só** na versão 1.
+5. **Código da empresa:** a função `situacao_acesso` só devolve o código para dono e gestor. A linha
+   da empresa (com o código) continua legível por motorista já vinculado pelo RLS; risco baixo, porque
+   quem usar o código ainda precisa da aprovação do gestor.
+6. **Placa:** formatos brasileiros ABC1234 e ABC1D23, guardados sem hífen e em maiúsculas.
+7. **Regras de acerto** (comissão padrão, base da comissão, gastos e vale) ficam na tabela `empresas` e
+   só o dono muda. O motorista pode mudar a comissão em cada frete.
+8. **Painel carrega todos os dados da empresa de uma vez** (piloto com até 5 caminhões). Se ficar
+   lento, carregar por período (arquitetura, seção 5).
+9. **Relatório por embarcador:** diesel e gastos entram só quando o motorista ligou ao frete; vale não
+   entra em relatório de caminhão nem de embarcador (vale é do motorista).
+10. **Km rodados do caminhão** = pelo odômetro das abastecidas (do último registro antes do período até
+    o maior km do período). Média de diesel continua de tanque cheio a tanque cheio, por caminhão.
+11. **Painel web no GitHub Pages** (ramo `gh-pages`) enquanto o repositório estiver público. A arquitetura
+    previa Cloudflare Pages; ele precisa de conta e token que não dá para configurar daqui. Quando o
+    repositório voltar a ser privado, o GitHub Pages gratuito para de servir: aí migrar para Cloudflare
+    Pages (o build é o mesmo, `apps/gestor/build/web`).
+12. **APKs assinados com chave de teste** guardada no repositório (`android/app/chave-teste.jks`), para
+    atualizar sem desinstalar durante o piloto. Trocar pela chave definitiva antes do Google Play.
+13. **Sentry ainda não ligado** (precisa de conta; fica para a Fase 7).
+14. **Empresa piloto:** "Empresa Teste (piloto)", dono gestaodefrota2027@gmail.com, código CODIGO-TROCADO,
+    plano piloto com 5 caminhões, status teste. Para a empresa real do piloto, rodar `criar_empresa` com
+    o nome e o e-mail do dono.
+15. **Versões das migrations:** os arquivos foram renomeados para a versão que o Supabase gravou ao
+    aplicar (20261017112902, 20261017113308, 20261017113838), para `supabase db push` não estranhar.
 
-## Registro das nove áreas revisadas
+## Avisos do conselheiro do Supabase (conferidos, esperados)
 
-1. **Isolamento de tenant nas relações:** chaves únicas compostas `(empresa_id, id)` e FKs compostas foram adicionadas às relações entre empresa, perfil, motorista, caminhão, frete, categoria, pedido e demais registros relacionados. Motivo: impedir que uma linha de uma empresa aponte para entidade de outra empresa mesmo se a política de aplicação falhar. A raiz `empresas` mantém `empresa_id = id` e FK autorreferente diferida.
-2. **Exceções que não aceitam FK composta direta:** `pedidos_entrada.perfil_id` aceita perfil motorista ainda sem empresa; trigger valida perfil ativo, papel motorista e empresa nula ou coincidente, mantendo bloqueio `FOR KEY SHARE` durante a transação para evitar corrida de vinculação. `ajustes_gestor.registro_id` é polimórfico; trigger com allowlist valida existência do alvo na mesma empresa, bloqueia campos de identidade/tenant/sistema e valida valores de centavos, percentual e UUIDs relacionados. Essas exceções exigem os testes de concorrência e integridade ainda pendentes.
-3. **RLS e privilégios:** RLS é habilitado nas 16 tabelas, com políticas por tabela e privilégios separados. `authenticated` não recebe `DELETE` físico; `anon` não recebe acesso às tabelas. As permissões efetivas estão detalhadas na matriz abaixo. RLS e privilégios não foram exercitados em banco.
-4. **Escrita do motorista e lançamentos originais:** inserções do motorista em `fretes`, `abastecimentos`, `gastos_viagem`, `vales`, `ajustes_km` e `uso_caminhao` exigem empresa do perfil e motorista próprio, além dos vínculos compostos; novos lançamentos operacionais do motorista também são bloqueados se a empresa estiver suspensa. Dono/gestor não recebem `UPDATE` nem `DELETE` nos lançamentos originais. Ajustes ficam em tabela separada.
-5. **Proteção do perfil:** não há grant/policy de escrita direta em `perfis`, impedindo que a pessoa altere seu próprio `papel` ou `empresa_id`. Criação, vínculo, aprovação e decisão dependem das funções seguras planejadas, que ainda não foram implementadas nesta migration.
-6. **Código de entrada:** a política de `empresas` deixa ler a linha somente a perfil autenticado ativo vinculado àquela empresa; portanto `codigo_entrada` não é legível por contas sem vínculo ou de outro tenant. A política atual expõe o campo a **todos os membros ativos da empresa**, inclusive motorista; confirmar se o requisito futuro deve restringir a leitura a dono/gestor.
-7. **Funções auxiliares e triggers:** quatro helpers de autorização usam `SECURITY DEFINER` e `search_path = ''`, têm execução concedida apenas a `authenticated` e revogada de `PUBLIC`/`anon`. Funções de trigger também usam caminho vazio e não recebem execução direta por clientes. Os helpers consultam perfis sem recursão de RLS; a validação de pedido usa bloqueio de linha. A propriedade e os privilégios do papel que aplicará a migration precisam ser conferidos no ambiente de desenvolvimento.
-8. **Views de valores efetivos:** as quatro views usam `security_invoker = true`; o chamador depende do RLS e dos grants das tabelas subjacentes. O ajuste mais recente é projetado em `valores_efetivos`, sem alterar o lançamento original. A forma do JSON e a compatibilidade com a versão-alvo do Postgres ainda precisam ser testadas.
-9. **Dados e timestamps:** não há default em coluna `id`; `atualizado_em` é sempre sobrescrito pelo trigger em INSERT e UPDATE. Foram incluídas verificações de centavos não negativos e inteiros nos ajustes, comissão entre 0 e 100, CPF com 11 dígitos e uso aberto único por motorista. A placa exige exatamente sete caracteres maiúsculos alfanuméricos, compatível com placa normalizada sem hífen, mas a regra exata continua como premissa a confirmar.
+- "Signed-in users can execute SECURITY DEFINER function": de propósito. Cada função confere quem
+  chama (`auth.uid()`) e devolve erro claro; as de servidor (`criar_empresa`, login por CPF) não têm
+  execução para `authenticated`.
+- "RLS enabled no policy" em `tentativas_acesso`: de propósito, só o servidor lê e grava.
+- "Multiple permissive policies" em `ajustes_gestor` (leitura): duas políticas (gestão e motorista).
+  Juntar exige apagar e recriar política, o que a ferramenta da nuvem pede para confirmar; impacto
+  pequeno no piloto. Fazer numa migration futura.
+- "Unused index": banco novo, ainda sem uso.
 
-## Matriz de permissões RLS e grants
+## Pendências que dependem do usuário
 
-“Servidor/função segura” significa sem escrita direta pelo cliente autenticado prevista nesta migration. Nenhum papel tem `DELETE` físico. Dono e gestor são diferenciados onde as políticas realmente o fazem.
-
-| Tabela | Leitura | Inserção | Atualização | Exclusão |
-|---|---|---|---|---|
-| `empresas` | Membros autenticados da própria empresa | Servidor/função segura | Servidor/função segura | Negada |
-| `perfis` | Próprio perfil; dono/gestor leem perfis da empresa | Servidor/função segura | Servidor/função segura | Negada |
-| `motoristas` | Próprio registro; dono/gestor leem a empresa | Servidor/função segura | Dono/gestor, somente coluna `ativo` | Negada |
-| `acessos_autorizados` | Dono e gestor da empresa | Somente dono | Somente dono; colunas permitidas no grant | Negada |
-| `dispositivos` | Dono/gestor da empresa e usuário do próprio dispositivo | Usuário cria o próprio dispositivo | Usuário altera apenas o próprio; colunas permitidas no grant | Negada |
-| `caminhoes` | Dono/gestor; motorista vê os ativos não apagados da empresa | Dono/gestor; motorista pode sugerir caminhão não confirmado | Dono/gestor | Negada |
-| `fretes` | Dono/gestor da empresa; motorista vê os próprios não apagados | Motorista somente para si, na própria empresa não suspensa | Negada diretamente; ajuste separado | Negada |
-| `abastecimentos` | Dono/gestor da empresa; motorista vê os próprios não apagados | Motorista somente para si, na própria empresa não suspensa | Negada diretamente; ajuste separado | Negada |
-| `categorias_gasto` | Membros veem ativas; dono/gestor também veem inativas | Dono/gestor | Dono/gestor | Negada |
-| `gastos_viagem` | Dono/gestor da empresa; motorista vê os próprios não apagados | Motorista somente para si, na própria empresa não suspensa | Negada diretamente; ajuste separado | Negada |
-| `vales` | Dono/gestor da empresa; motorista vê os próprios não apagados | Motorista somente para si, na própria empresa não suspensa | Negada diretamente; ajuste separado | Negada |
-| `ajustes_km` | Dono/gestor da empresa; motorista vê os próprios não apagados | Motorista para si na empresa não suspensa; dono/gestor na própria empresa | Negada | Negada |
-| `ajustes_gestor` | Dono/gestor veem a empresa; motorista vê ajustes dos próprios fretes, abastecimentos, gastos e vales | Dono/gestor, com `autor_id` igual ao usuário | Negada | Negada |
-| `auditoria` | Dono/gestor da empresa, linhas não apagadas | Servidor/trigger | Negada | Negada |
-| `pedidos_entrada` | Solicitante vê os próprios; dono/gestor veem os da empresa | Função segura planejada, sem grant direto | Função segura planejada, sem grant direto | Negada |
-| `uso_caminhao` | Dono/gestor da empresa; motorista vê o próprio uso não apagado | Motorista para si ou dono/gestor na própria empresa | Motorista ou dono/gestor só fecha uso aberto, alterando somente `fim_em` | Negada |
-
-As views `fretes_efetivos`, `abastecimentos_efetivos`, `gastos_viagem_efetivos` e `vales_efetivos` usam as mesmas regras de leitura das tabelas de origem por serem invoker. Não há rota direta para modificar nelas.
-
-## Testes preparados, não executados
-
-`supabase/tests/isolamento_rls.sql` contém quatro verificações: motorista A não lê frete de B; empresa X não lê empresa Y; gestor não apaga frete; FK composta impede frete de X referenciar caminhão de Y. O script usa variáveis UUID do `psql` e precisa de fixtures previamente semeadas para empresas X/Y, motoristas, gestor, fretes e caminhão. Requer `pgTAP` e role `authenticated` no banco de teste. **Não foi executado.** Não foram acessados nem alterados banco local, de desenvolvimento ou de produção.
-
-## Dúvidas e limitações remanescentes
-
-- Confirmar se `empresas.empresa_id` deve ser igual ao próprio `id` e como a primeira empresa será criada com segurança.
-- Confirmar se o código de entrada deve ser visível também para motoristas já vinculados ou só para dono/gestor.
-- Confirmar regra de placa: a constraint atual pressupõe exatamente sete caracteres em maiúsculas, sem hífen; não valida modelo/estrutura de placa além disso.
-- O trigger de ajuste valida valores de centavos, percentual e os UUIDs relacionados explicitamente listados. Outros tipos de `valor_novo` ainda não têm validação genérica contra tipo, precisão e nulabilidade da coluna; manter o uso restrito até especificar e testar uma allowlist de campos ajustáveis.
-- Confirmar se alterações de configuração por dono/gestor devem continuar possíveis quando empresa está suspensa. As políticas de novos registros operacionais do motorista bloqueiam empresa suspensa.
-- Rever a política de leitura dos ajustes e o formato das views com consultas reais e testes RLS.
-- A migration não implementa `criar_empresa`, `pedir_entrada`, `decidir_entrada`, `sincronizar_lote` nem escrita de auditoria; dependem de funções futuras e não devem ser presumidas existentes.
-
-## Próximos passos
-
-1. Claude Code deve revisar as dúvidas acima e este SQL antes de aplicar qualquer coisa.
-2. Primeiro executar validação sintática e testes em banco Supabase local/de desenvolvimento isolado, com fixtures descartáveis; nunca tocar produção.
-3. Corrigir e repetir testes se necessário; só depois considerar aprovação para outra etapa.
+1. **E-mail dos códigos (SMTP).** O envio padrão do Supabase só entrega para e-mails da equipe da conta
+   (gestaodefrota2027@gmail.com) e tem limite baixo. Para motoristas criarem conta, configurar um SMTP
+   próprio em Authentication > Emails > SMTP Settings. Opções: Gmail da conta do projeto com senha de
+   app (grátis, até ~500 e-mails por dia) ou um serviço como Brevo ou Resend (plano grátis). Decidir.
+2. **Modelos de e-mail com o código.** Em Authentication > Emails > Templates, trocar o texto de
+   "Confirm signup", "Magic Link" e "Reset Password" pelos modelos de `supabase/templates/` (eles têm
+   `{{ .Token }}`, o código de 6 números que o app pede).
+3. **GitHub Pages:** se o endereço do painel não abrir, em Settings > Pages escolher a fonte
+   "Deploy from a branch", ramo `gh-pages`, pasta `/ (root)`.
+4. Nome definitivo do produto.

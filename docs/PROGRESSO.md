@@ -1,35 +1,69 @@
 # Progresso — Plataforma de Gestão de Frota
 
-Estado do adiantamento do Zapia, sem avançar às fases posteriores. Os rótulos seguem a seção 17 da arquitetura; “testado” significa somente o que foi executado e descrito abaixo.
+Atualizado em 17/10/2026 pelo Claude Code. "Testado" quer dizer que o comando
+abaixo rodou e passou; o resto está marcado como não testado.
 
-## Fase 0 — preparação
+## Resumo
 
-- **feito mas não testado** — Estrutura separada em `plataforma-frota/`, documentos iniciais, instruções e placeholders para as etapas futuras.
-- **feito mas não testado** — Cópia Markdown da arquitetura em `docs/ARQUITETURA.md`; tratada como fonte de verdade nesta etapa.
-- **feito mas não testado** — `docs/PROGRESSO.md` e `docs/PASSAGEM.md` para continuidade.
-- **feito e testado** — Verificação textual com Python confirmou as 17 seções da arquitetura e a presença dos arquivos-base; não verifica conteúdo funcional.
+| Fase | Situação |
+|---|---|
+| 0 — preparação | feita |
+| 1 — banco e segurança | feita e testada; aplicada no Supabase novo |
+| 2 — núcleo de regras | feita e testada |
+| 3 — app do motorista offline | feita e testada; APK de teste na esteira |
+| 4 — acesso e sincronização | feita e testada; falta SMTP próprio (ver PASSAGEM) |
+| 5 — app e painel do gestor | feita e testada; APK e painel web na esteira |
+| 6 — relatórios e ajustes | feita e testada |
+| 7 — acabamento e piloto | não começada |
 
-## Fase 1 — arquivos do banco
+## Fase 1 — banco e segurança
 
-- **feito mas não testado** — Revisada em lugar a migration existente `supabase/migrations/20261014110000_esquema_inicial.sql`; sem nova migration e sem aplicação em banco. Alterações e motivos estão em `docs/PASSAGEM.md`.
-- **feito mas não testado** — Escrito `supabase/tests/isolamento_rls.sql` com quatro verificações de isolamento e privilégios; depende de pgTAP, variáveis `psql` e fixtures de teste. **Não foi executado.**
-- **não feito** — Validação sintática ou execução da migration em banco local/de desenvolvimento.
-- **não feito** — Execução dos testes RLS/pgTAP e verificação de comportamento de triggers, FKs e views.
-- **não feito** — Acesso ou alteração a qualquer banco; nenhum banco foi acessado ou alterado neste trabalho.
+- **feito e testado** — 3 migrations em `supabase/migrations/` (esquema com RLS, funções seguras e
+  apoio ao painel). Os nomes dos arquivos usam a mesma versão gravada no Supabase da nuvem.
+- **feito e testado** — 148 verificações pgTAP em `supabase/tests/` (isolamento entre empresas e
+  motoristas, entrada na empresa, sincronização sem duplicar, ajustes, auditoria, limite do plano,
+  login por CPF, pedidos de entrada para o gestor).
+  Comando local: `PGTAP_SQL=... supabase/tests/local/rodar.sh` → `total de verificações que passaram: 148`.
+  Na esteira: job "Banco" com `supabase start` (Postgres 17) + o mesmo script.
+- **feito e testado** — Edge Functions `entrar_com_cpf` e `redefinir_acesso` com 15 verificações de ponta a
+  ponta (`supabase/tests/funcoes/testar.sh`, job "Banco").
+- **feito** — Aplicado no projeto `uinvhwhqhudniipobslu` (conta gestaodefrota2027): as 3 migrations
+  (conferidas por hash com os arquivos) e as 2 Edge Functions (verify_jwt desligado, a função confere
+  o acesso sozinha). Conselheiro de segurança do Supabase: só avisos esperados (ver PASSAGEM).
+- **feito** — Empresa piloto criada com `criar_empresa`: "Empresa Teste (piloto)", dono
+  gestaodefrota2027@gmail.com, código CODIGO-TROCADO.
 
-## Esqueletos permitidos
+## Fase 2 — núcleo de regras (`packages/nucleo`)
 
-- **feito mas não testado** — Esqueletos de código Flutter em `apps/motorista` e `apps/gestor` (`pubspec.yaml` e navegação em `lib/main.dart`) com dados demonstrativos fixos; sem login, nuvem, sincronização ou cálculos. Bootstrap Android/Web ainda não gerado.
-- **feito mas não testado** — `packages/nucleo` contém estrutura e 16 classes simples correspondentes às entidades; sem regras de cálculo.
-- **feito e testado** — Verificação textual Python confirmou as duas cascas de navegação e a contagem de 16 classes simples. Não é análise nem compilação Flutter/Dart.
+- **feito e testado** — Regras do Meu Frete portadas (centavos), média de diesel por caminhão,
+  períodos, ajustes, PDF e CSV. `dart test` → 38 testes passaram.
 
-## Ambiente e verificações
+## Fase 3 e 4 — app do motorista (`apps/motorista`)
 
-- **feito e testado** — Comandos de disponibilidade executados: `flutter`, `dart`, `supabase`, `psql` e `git` não estão disponíveis neste ambiente.
-- **feito e testado** — Verificações textuais anteriores confirmaram contagens de tabelas, políticas, funções e views; isso não valida sintaxe, execução, isolamento ou segurança das políticas.
-- **não feito** — `flutter analyze`, testes Flutter/Dart, validação da migration com Supabase CLI/PostgreSQL e testes de RLS, pois as ferramentas necessárias não estão disponíveis.
-- **feito e testado** — Repositório privado existente: [plataforma-gestao-frota](https://github.com/dasilvagonchoroskie-cpu/plataforma-gestao-frota), branch `main`.
+- **feito e testado** — Banco local (drift), fila de envio, sincronização em lote, cadastro com código,
+  login por CPF, esqueci a senha, entrada na empresa, troca de caminhão, resumo e PDF.
+  `flutter analyze` sem problemas; `flutter test --exclude-tags capturas` → 21 testes passaram;
+  11 imagens de tela conferidas.
+- **feito** — APK de teste no Release `motorista-teste` (assinado com a chave de teste).
+- **não feito** — SMTP próprio para os códigos por e-mail (depende de decisão do usuário).
 
-## Próxima etapa
+## Fases 5 e 6 — app e painel do gestor (`apps/gestor`)
 
-- **não feito** — Claude Code deve rever as dúvidas registradas em `docs/PASSAGEM.md`, executar validação e testes em Supabase local/de desenvolvimento isolado e só então decidir novas alterações. O banco de produção não deve ser tocado.
+- **feito e testado** — Um código para celular e web: entrar/criar conta/esqueci a senha; painel com
+  números do período e alertas; motoristas (código da empresa, aprovar/recusar, caminhão atual,
+  desligar, redefinir acesso, "como ele vê"); caminhões (cadastro, confirmar, custo por km, média,
+  resultado, quem dirigiu); lançamentos com filtros; correções com motivo e histórico; relatórios PDF
+  e CSV (frota, motorista, caminhão, embarcador); configurações (empresa, regras de acerto, categorias,
+  gestores, celulares, senha).
+  `flutter analyze` sem problemas; `flutter test --exclude-tags capturas` → 20 testes passaram;
+  12 imagens de tela (computador, celular e tema escuro) conferidas.
+- **feito e testado** — `flutter build web` compilou localmente.
+- **feito** — Esteira: job "gestor" gera o APK no Release `gestor-teste` e publica o painel web no ramo
+  `gh-pages` (endereço: https://dasilvagonchoroskie-cpu.github.io/plataforma-gestao-frota/).
+- **feito e testado** — O resumo "como ele vê" usa o mesmo componente (`CorpoResumo`, pacote `visual`)
+  do app do motorista; o teste `equipe_test.dart` confere que a conta do painel é a mesma do app.
+
+## Fase 7 — acabamento e piloto
+
+- **não feito** — SMTP próprio, Sentry, chave de assinatura definitiva, teste fechado no Google Play,
+  hospedagem do painel quando o repositório voltar a ser privado, piloto com uma empresa real.
