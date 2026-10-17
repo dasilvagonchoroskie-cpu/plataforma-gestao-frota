@@ -9,3 +9,4 @@ pubspec_overrides.yaml
 .flutter-plugins-dependencies
 *.iml
 .idea/
+apps/*/test/capturas/

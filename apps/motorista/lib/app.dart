@@ -1,0 +1,96 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:visual/visual.dart';
+
+import 'acesso/acesso.dart';
+import 'componentes/comuns.dart';
+import 'dados/dados.dart';
+import 'telas/acesso/telas_acesso.dart';
+import 'telas/caminhao/tela_caminhao.dart';
+import 'telas/casca.dart';
+
+class AplicativoMotorista extends StatelessWidget {
+  const AplicativoMotorista({super.key, this.inicio});
+
+  /// Tela inicial forçada (testes).
+  final Widget? inicio;
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      title: 'Frota Motorista',
+      debugShowCheckedModeBanner: false,
+      theme: temaClaro,
+      darkTheme: temaEscuro,
+      locale: const Locale('pt', 'BR'),
+      supportedLocales: const [Locale('pt', 'BR')],
+      localizationsDelegates: const [
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
+      builder: (context, child) {
+        final mq = MediaQuery.of(context);
+        return MediaQuery(
+          data: mq.copyWith(textScaler: mq.textScaler.clamp(minScaleFactor: 1.0, maxScaleFactor: 1.3)),
+          child: child ?? const SizedBox.shrink(),
+        );
+      },
+      home: inicio ?? const Raiz(),
+    );
+  }
+}
+
+/// Decide a primeira tela: acesso (cadastro, código, aprovação) ou as abas.
+class Raiz extends ConsumerWidget {
+  const Raiz({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final acesso = ref.watch(acessoProvider);
+    final dados = ref.watch(dadosProvider);
+    return acesso.when(
+      loading: () => const _Carregando(),
+      error: (e, _) => TelaSemInternet(mensagem: '$e'),
+      data: (a) {
+        switch (a.etapa) {
+          case Etapa.boasVindas:
+            return const TelaBoasVindas();
+          case Etapa.completarCadastro:
+            return TelaCompletarCadastro(email: a.email, voltar: false);
+          case Etapa.codigoEmpresa:
+            return TelaCodigoEmpresa(mensagem: a.mensagem);
+          case Etapa.aguardando:
+            return TelaAguardando(empresaNome: a.empresaNome);
+          case Etapa.contaDeGestor:
+            return const TelaContaGestor();
+          case Etapa.trocarSenha:
+            return const TelaTrocarSenha(voltar: false);
+          case Etapa.semInternet:
+            return TelaSemInternet(mensagem: a.mensagem);
+          case Etapa.pronto:
+            if (!dados.hasValue) return const _Carregando();
+            final d = assistirDados(ref);
+            if (d.caminhaoAtual == null && d.usos.isEmpty) return const _PrimeiroCaminhao();
+            return const Casca();
+        }
+      },
+    );
+  }
+}
+
+class _Carregando extends StatelessWidget {
+  const _Carregando();
+
+  @override
+  Widget build(BuildContext context) => const Scaffold(body: Center(child: CircularProgressIndicator()));
+}
+
+/// Primeira vez depois da aprovação: escolher o caminhão.
+class _PrimeiroCaminhao extends StatelessWidget {
+  const _PrimeiroCaminhao();
+
+  @override
+  Widget build(BuildContext context) => const TelaTrocarCaminhao(primeiraVez: true);
+}

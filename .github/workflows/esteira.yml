@@ -75,3 +75,55 @@ jobs:
           echo "commit ${GITHUB_SHA::7} | resultado ${{ job.status }}" >> registros/nucleo.log
           gh release view registros >/dev/null 2>&1 || gh release create registros --prerelease --title "Registros da esteira (uso interno)" --notes "Registros das execuções. Não é o aplicativo."
           gh release upload registros registros/nucleo.log --clobber
+
+  motorista:
+    name: App do motorista (análise, testes e APK)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+      - name: Dependências, análise e testes
+        working-directory: apps/motorista
+        run: |
+          set -o pipefail
+          mkdir -p ../../registros
+          (flutter pub get && flutter analyze --no-fatal-infos && flutter test --exclude-tags capturas) 2>&1 | tee ../../registros/motorista.log
+      - name: Imagens das telas
+        working-directory: apps/motorista
+        continue-on-error: true
+        run: flutter test --tags capturas --update-goldens 2>&1 | tail -5
+      - name: Compilar o APK de teste
+        working-directory: apps/motorista
+        run: |
+          set -o pipefail
+          NUMERO=$((100 + ${{ github.run_number }}))
+          flutter build apk --release --build-number=$NUMERO 2>&1 | tee -a ../../registros/motorista.log
+          mkdir -p ../../saida
+          cp build/app/outputs/flutter-apk/app-release.apk ../../saida/Frota-Motorista.apk
+          (cd test && zip -qr ../../../saida/telas-motorista.zip capturas) || true
+          ls -la ../../saida
+      - name: Publicar o APK de teste (Release "motorista-teste")
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release view motorista-teste >/dev/null 2>&1 || gh release create motorista-teste --prerelease \
+            --title "App do motorista - teste" --notes "APK de teste do app do motorista (chave de teste). Versão da esteira."
+          gh release upload motorista-teste saida/Frota-Motorista.apk --clobber
+          [ -f saida/telas-motorista.zip ] && gh release upload motorista-teste saida/telas-motorista.zip --clobber || true
+          echo "commit ${GITHUB_SHA::7} | APK publicado" >> registros/motorista.log
+      - name: Guardar o registro
+        if: always()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "commit ${GITHUB_SHA::7} | resultado ${{ job.status }}" >> registros/motorista.log
+          gh release view registros >/dev/null 2>&1 || gh release create registros --prerelease --title "Registros da esteira (uso interno)" --notes "Registros das execuções. Não é o aplicativo."
+          gh release upload registros registros/motorista.log --clobber
