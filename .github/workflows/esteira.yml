@@ -35,6 +35,10 @@ jobs:
         run: |
           set -o pipefail
           BANCO_URL=postgresql://postgres:postgres@127.0.0.1:54322/postgres bash supabase/tests/local/rodar.sh 2>&1 | tee -a registros/banco.log
+      - name: Testes das Edge Functions (login por CPF e redefinir acesso)
+        run: |
+          set -o pipefail
+          bash supabase/tests/funcoes/testar.sh 2>&1 | tee -a registros/banco.log
       - name: Guardar o registro
         if: always()
         env:
