@@ -2,11 +2,9 @@
 library;
 
 import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:motorista/app.dart';
-import 'package:motorista/dados/armazenamento.dart';
 import 'package:motorista/dados/dados.dart';
 import 'package:motorista/telas/acesso/telas_acesso.dart';
 import 'package:motorista/telas/caminhao/tela_caminhao.dart';
