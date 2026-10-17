@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -5,6 +7,7 @@ import 'package:motorista/app.dart';
 import 'package:motorista/dados/armazenamento.dart';
 import 'package:motorista/dados/dados.dart';
 import 'package:motorista/telas/casca.dart';
+import 'package:visual/visual.dart';
 
 import 'amostra.dart';
 import 'apoio.dart';
@@ -153,7 +156,130 @@ void main() {
     await tester.enterText(campos.at(1), '52998224725');
     await tester.tap(find.text('Criar minha conta'));
     await tester.pumpAndSettle();
+    expect(s.cadastros, isEmpty, reason: 'sem marcar o aceite dos termos não cria a conta');
+    expect(find.textContaining('marque que leu e aceita'), findsOneWidget);
+
+    await tester.tap(find.text('Li e aceito os Termos de Uso e a Política de Privacidade.'));
+    await tester.tap(find.text('Criar minha conta'));
+    await tester.pumpAndSettle();
     expect(s.cadastros, ['52998224725']);
-    expect(find.text('Código da empresa'), findsOneWidget);
+    expect(s.termosAceitos, versaoTermos);
+    expect(find.text('Código de entrada'), findsOneWidget);
+  });
+
+  Future<ServidorFalso> abrirSemDados(WidgetTester tester, Map<String, Object?> situacao) async {
+    tester.view.physicalSize = const Size(1080, 2340);
+    tester.view.devicePixelRatio = 2.75;
+    addTearDown(tester.view.reset);
+    final s = ServidorFalso()..situacaoFixa = situacao;
+    await tester.pumpWidget(ProviderScope(
+      overrides: [
+        armazenamentoProvider.overrideWithValue(ArmazenamentoMemoria()),
+        servidorProvider.overrideWithValue(s),
+        sincronizarSozinhoProvider.overrideWithValue(false),
+      ],
+      child: const AplicativoMotorista(),
+    ));
+    await tester.pumpAndSettle();
+    return s;
+  }
+
+  Map<String, Object?> semEmpresa({bool termos = true, bool recuperacao = true}) => {
+        'logado': true,
+        'perfil': {'id': 'u-novo', 'nome': 'Novo Motorista', 'papel': 'motorista', 'ativo': true},
+        'empresa': null,
+        'motorista': null,
+        'pedido': null,
+        'termos': {'versao': versaoTermos, 'aceito': termos},
+        'recuperacao': recuperacao,
+      };
+
+  testWidgets('primeiro acesso: aceitar os termos e guardar o código de recuperação', (tester) async {
+    final s = await abrirSemDados(tester, semEmpresa(termos: false, recuperacao: false));
+    expect(find.text('Termos de Uso e Privacidade'), findsOneWidget);
+    await tester.tap(find.text('Aceitar e continuar'));
+    await tester.pumpAndSettle();
+    expect(s.termosAceitos, isNull, reason: 'precisa marcar que leu');
+    await tester.tap(find.text('Li e aceito os Termos de Uso e a Política de Privacidade.'));
+    await tester.tap(find.text('Aceitar e continuar'));
+    await tester.pumpAndSettle();
+    expect(s.termosAceitos, versaoTermos);
+
+    expect(find.text('Código de recuperação'), findsOneWidget);
+    await tester.tap(find.text('Gerar o meu código'));
+    await tester.pumpAndSettle();
+    expect(find.text('ABCD-EFGH-JK11'), findsOneWidget);
+    await tester.tap(find.text('Continuar'));
+    await tester.pumpAndSettle();
+    expect(find.text('Código de recuperação'), findsOneWidget, reason: 'precisa marcar que anotou');
+    await tester.tap(find.text('Já anotei o código em lugar seguro.'));
+    await tester.tap(find.text('Continuar'));
+    await tester.pumpAndSettle();
+    expect(find.text('Código de entrada'), findsOneWidget);
+  });
+
+  testWidgets('os termos abrem para ler', (tester) async {
+    await abrirSemDados(tester, semEmpresa(termos: false));
+    await tester.tap(find.text('Política de Privacidade'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('Lei Geral de Proteção de Dados Pessoais'), findsWidgets);
+  });
+
+  testWidgets('esqueci a senha: CPF, código de recuperação e senha nova', (tester) async {
+    final s = await abrirSemDados(tester, semEmpresa());
+    s.sessao = false;
+    await tester.tap(find.text('Sair desta conta'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Esqueci a senha'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Tenho o código de recuperação'));
+    await tester.pumpAndSettle();
+    final campos = find.byType(TextField);
+    await tester.enterText(campos.at(0), '52998224725');
+    await tester.enterText(campos.at(1), 'abcd efgh jk22');
+    await tester.enterText(campos.at(2), 'nova123');
+    await tester.pumpAndSettle();
+    expect(find.text('ABCD-EFGH-JK22'), findsOneWidget, reason: 'o código entra formatado');
+    await tester.tap(find.text('Criar a senha nova'));
+    await tester.pumpAndSettle();
+    expect(s.recuperacoes, ['52998224725:nova123']);
+    expect(find.text('NOVO-CODI-GO23'), findsOneWidget, reason: 'mostra o código novo');
+    await tester.tap(find.text('Já anotei o código em lugar seguro.'));
+    await tester.tap(find.text('Continuar'));
+    await tester.pumpAndSettle();
+    expect(s.sessao, isTrue);
+    expect(find.text('Código de entrada'), findsOneWidget);
+  });
+
+  testWidgets('empresa com o acesso encerrado: o app fecha e mostra o motivo', (tester) async {
+    final armazenamento = await celularComAmostra();
+    final situacao = situacaoDe(motoristaA);
+    await armazenamento.gravarEstado('situacao', jsonEncode({
+      ...situacao,
+      'empresa': {...situacao['empresa']! as Map, 'bloqueada': true, 'motivo_bloqueio': 'O período de teste terminou.'},
+    }));
+    final s = servidorComCadastros()
+      ..situacaoFixa = {
+        ...situacao,
+        'empresa': {...situacao['empresa']! as Map, 'bloqueada': true, 'motivo_bloqueio': 'O período de teste terminou.'},
+      };
+    await abrir(tester, a: armazenamento, s: s);
+    expect(find.text('Acesso encerrado'), findsOneWidget);
+    expect(find.text('Motivo: O período de teste terminou.'), findsOneWidget);
+    expect(find.text('Você tem para receber'), findsNothing);
+  });
+
+  testWidgets('excluir a minha conta pede para digitar EXCLUIR', (tester) async {
+    final s = await abrirSemDados(tester, semEmpresa());
+    await tester.tap(find.text('Excluir minha conta'));
+    await tester.pumpAndSettle();
+    final botao = find.widgetWithText(FilledButton, 'Excluir a conta');
+    expect(tester.widget<FilledButton>(botao).onPressed, isNull);
+    await tester.enterText(find.byType(TextField).last, 'excluir');
+    await tester.pumpAndSettle();
+    await tester.tap(botao);
+    await tester.pumpAndSettle();
+    expect(s.contaExcluida, isTrue);
+    expect(find.text('Entrar com CPF e senha'), findsOneWidget);
   });
 }

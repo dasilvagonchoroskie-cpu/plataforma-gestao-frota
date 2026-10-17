@@ -29,7 +29,23 @@ abstract class Servidor {
   Future<void> entrarComCpf(String cpf, String senha, String aparelho);
 
   /// Cadastro sem e-mail: nome, CPF e senha (Edge Function cadastrar_motorista).
-  Future<void> cadastrarMotorista(String nome, String cpf, String senha, String aparelho);
+  /// [termos] é a versão dos Termos de Uso aceita na tela de cadastro.
+  Future<void> cadastrarMotorista(String nome, String cpf, String senha, String aparelho, {String? termos});
+
+  /// Aceite dos Termos de Uso e da Política de Privacidade. Devolve a situação.
+  Future<Map<String, Object?>> aceitarTermos(String versao);
+
+  /// Gera um código de recuperação novo (o anterior para de valer).
+  Future<String> gerarCodigoRecuperacao();
+
+  /// Senha nova com CPF e código de recuperação. Devolve o código novo.
+  Future<String> recuperarAcesso(String cpf, String codigo, String senhaNova, String aparelho);
+
+  /// Exclui a conta (sem empresa: na hora; com empresa: em até 15 dias).
+  Future<Map<String, Object?>> excluirMinhaConta();
+
+  /// Registro de acesso (data, hora e IP) exigido pelo Marco Civil.
+  Future<void> registrarAcesso();
   Future<void> pedirCodigoSenha(String email);
   Future<void> confirmarCodigoSenha(String email, String codigo);
   Future<Map<String, Object?>> situacao();
@@ -147,10 +163,52 @@ class ServidorSupabase implements Servidor {
       });
 
   @override
-  Future<void> cadastrarMotorista(String nome, String cpf, String senha, String aparelho) => _tentar(() async {
-        await cliente.functions.invoke('cadastrar_motorista',
-            body: {'nome': nome.trim(), 'cpf': cpf, 'senha': senha, 'aparelho': aparelho});
+  Future<void> cadastrarMotorista(String nome, String cpf, String senha, String aparelho, {String? termos}) =>
+      _tentar(() async {
+        await cliente.functions.invoke('cadastrar_motorista', body: {
+          'nome': nome.trim(),
+          'cpf': cpf,
+          'senha': senha,
+          'aparelho': aparelho,
+          'termos': ?termos,
+        });
       });
+
+  @override
+  Future<Map<String, Object?>> aceitarTermos(String versao) =>
+      _tentar(() async => _mapa(await cliente.rpc('aceitar_termos', params: {'p_versao': versao})));
+
+  @override
+  Future<String> gerarCodigoRecuperacao() =>
+      _tentar(() async => '${await cliente.rpc('gerar_codigo_recuperacao')}');
+
+  @override
+  Future<String> recuperarAcesso(String cpf, String codigo, String senhaNova, String aparelho) => _tentar(() async {
+        final r = await cliente.functions.invoke('recuperar_acesso', body: {
+          'identificador': cpf,
+          'codigo': codigo,
+          'senha_nova': senhaNova,
+          'aparelho': aparelho,
+        });
+        final d = _mapa(r.data);
+        if (d['ok'] != true || d['codigo_novo'] == null) {
+          throw ErroServidor('${d['mensagem'] ?? 'CPF e código de recuperação não conferem.'}', codigo: '${d['codigo'] ?? ''}');
+        }
+        return d['codigo_novo'] as String;
+      });
+
+  @override
+  Future<Map<String, Object?>> excluirMinhaConta() =>
+      _tentar(() async => _mapa(await cliente.rpc('excluir_minha_conta')));
+
+  @override
+  Future<void> registrarAcesso() async {
+    try {
+      await cliente.rpc('registrar_acesso', params: {'p_app': 'motorista'}).timeout(const Duration(seconds: 20));
+    } catch (_) {
+      // Sem internet: registra na próxima vez.
+    }
+  }
 
   @override
   Future<void> pedirCodigoSenha(String email) => _tentar(() => _auth.resetPasswordForEmail(email.trim().toLowerCase()));

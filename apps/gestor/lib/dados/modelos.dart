@@ -11,6 +11,7 @@ class Empresa {
     this.plano = 'piloto',
     this.limiteCaminhoes = 5,
     this.configuracao = const ConfiguracaoEmpresa(),
+    this.acessoAte,
   });
 
   final String id;
@@ -21,6 +22,9 @@ class Empresa {
   final String plano;
   final int limiteCaminhoes;
   final ConfiguracaoEmpresa configuracao;
+
+  /// Fim do período de teste (nulo = sem prazo).
+  final DateTime? acessoAte;
 
   bool get suspensa => status == 'suspensa';
   bool get emTeste => status == 'teste';
@@ -34,18 +38,29 @@ class Empresa {
     plano: lerTexto(m['plano'], 'piloto'),
     limiteCaminhoes: lerInt(m['limite_caminhoes'], 5),
     configuracao: ConfiguracaoEmpresa.deMapa(m),
+    acessoAte: lerDataOuNula(m['acesso_ate']),
   );
 }
 
 /// Pessoa com conta (dono, gestor ou motorista).
 class Perfil {
-  const Perfil({required this.id, required this.nome, this.email = '', this.papel = 'gestor', this.ativo = true});
+  const Perfil({
+    required this.id,
+    required this.nome,
+    this.email = '',
+    this.papel = 'gestor',
+    this.ativo = true,
+    this.exclusaoPedidaEm,
+  });
 
   final String id;
   final String nome;
   final String email;
   final String papel;
   final bool ativo;
+
+  /// O motorista pediu para excluir a conta (os dados somem 15 dias depois).
+  final DateTime? exclusaoPedidaEm;
 
   bool get dono => papel == 'dono';
 
@@ -55,6 +70,41 @@ class Perfil {
     email: lerTexto(m['email']),
     papel: lerTexto(m['papel'], 'gestor'),
     ativo: lerBool(m['ativo'], true) && m['apagado_em'] == null,
+    exclusaoPedidaEm: lerDataOuNula(m['exclusao_pedida_em']),
+  );
+}
+
+/// Código individual gerado pelo gestor para um motorista entrar na empresa.
+class Convite {
+  const Convite({
+    required this.id,
+    required this.codigo,
+    required this.nome,
+    required this.cpf,
+    required this.expiraEm,
+    this.usadoEm,
+    this.canceladoEm,
+  });
+
+  final String id;
+  final String codigo;
+  final String nome;
+  final String cpf;
+  final DateTime expiraEm;
+  final DateTime? usadoEm;
+  final DateTime? canceladoEm;
+
+  /// Ainda pode ser usado (não usado, não cancelado e dentro do prazo).
+  bool valeEm(DateTime agora) => usadoEm == null && canceladoEm == null && expiraEm.isAfter(agora);
+
+  factory Convite.deMapa(Map<String, Object?> m) => Convite(
+    id: lerTexto(m['id']),
+    codigo: lerTexto(m['codigo']),
+    nome: lerTexto(m['nome']),
+    cpf: lerTexto(m['cpf']),
+    expiraEm: lerDataOuNula(m['expira_em']) ?? DateTime.fromMillisecondsSinceEpoch(0, isUtc: true),
+    usadoEm: lerDataOuNula(m['usado_em']),
+    canceladoEm: lerDataOuNula(m['cancelado_em']),
   );
 }
 

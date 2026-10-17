@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:nucleo/nucleo.dart';
 import 'package:visual/visual.dart';
 
 import '../../dados/provedores.dart';
@@ -336,22 +337,40 @@ class _TelaCompletarCadastroState extends ConsumerState<TelaCompletarCadastro> w
 
 // ----------------------------------------------------------- esqueci a senha
 
-/// Sem envio de e-mail no piloto: o dono gera uma senha nova para o gestor;
+/// Esqueci a senha: com o código de recuperação, a própria pessoa cria a
+/// senha nova. Sem o código: o dono gera uma senha provisória para o gestor;
 /// o dono fala com o suporte da plataforma.
-class TelaEsqueciSenha extends StatelessWidget {
+class TelaEsqueciSenha extends ConsumerWidget {
   const TelaEsqueciSenha({super.key});
 
   @override
-  Widget build(BuildContext context) => PaginaAcesso(
+  Widget build(BuildContext context, WidgetRef ref) => PaginaAcesso(
     titulo: 'Esqueci a senha',
-    texto:
-        'Gestor: peça ao dono da empresa para gerar uma senha nova para você no painel '
-        '(Configurações, Donos e gestores). Dono: fale com o suporte da plataforma.',
+    texto: 'Com o código de recuperação que você anotou no primeiro acesso, você mesmo cria uma senha nova.',
     filhos: const [
-      Nota('Com a senha provisória você entra normalmente e o painel pede para você criar uma senha nova.'),
+      Aviso(
+        icone: Icons.help_outline,
+        titulo: 'Não tem o código?',
+        texto:
+            'Gestor: peça ao dono da empresa uma senha provisória (Configurações, Donos e gestores). '
+            'Dono: fale com o suporte da plataforma (gestaodefrota2027@gmail.com).',
+      ),
     ],
-    botao: 'Voltar para entrar',
-    aoTocar: () => Navigator.pop(context),
+    botao: 'Tenho o código de recuperação',
+    aoTocar: () => Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => TelaRecuperarComCodigo(
+          porCpf: false,
+          recuperar: (email, codigo, senha) => ref.read(servidorProvider).recuperarAcesso(email, codigo, senha),
+          entrar: (email, senha) async {
+            await ref.read(servidorProvider).entrar(email, senha);
+            if (context.mounted) Navigator.of(context).popUntil((r) => r.isFirst);
+            await ref.read(acessoProvider.notifier).recarregar();
+          },
+        ),
+      ),
+    ),
   );
 }
 
@@ -458,4 +477,71 @@ class TelaSemInternet extends ConsumerWidget {
       TextButton(onPressed: () => ref.read(acessoProvider.notifier).sair(), child: const Text('Sair da conta')),
     ],
   );
+}
+
+// ---------------------------------------------------- acesso encerrado
+
+/// A plataforma encerrou o acesso da empresa (fim do teste ou bloqueio). O
+/// dono ainda pode excluir a conta da empresa e todos os dados.
+class TelaAcessoEncerrado extends ConsumerWidget {
+  const TelaAcessoEncerrado({super.key, required this.estado});
+  final EstadoAcesso estado;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final apagaEm = estado.excluirEm;
+    return PaginaAcesso(
+      titulo: 'Acesso encerrado',
+      texto:
+          'O acesso da ${estado.empresaNome.isEmpty ? 'empresa' : estado.empresaNome} à plataforma foi encerrado. '
+          'Para continuar usando, fale com a Fortaleza Digital Security (gestaodefrota2027@gmail.com).',
+      voltar: false,
+      filhos: [
+        if ((estado.mensagem ?? '').isNotEmpty) Aviso(icone: Icons.lock_clock_outlined, texto: 'Motivo: ${estado.mensagem}'),
+        if (apagaEm != null) ...[
+          const SizedBox(height: 12),
+          Nota(
+            'Os dados ficam guardados até ${dataTexto(apagaEm)} e depois são apagados de vez. '
+            'Para pedir uma cópia antes disso, escreva para o e-mail acima.',
+          ),
+        ],
+      ],
+      botao: 'Verificar de novo',
+      aoTocar: () => ref.read(acessoProvider.notifier).recarregar(),
+      rodape: [
+        const SizedBox(height: 8),
+        OutlinedButton(onPressed: () => ref.read(acessoProvider.notifier).sair(), child: const Text('Sair')),
+        if (estado.dono) ...[
+          const SizedBox(height: 8),
+          TextButton.icon(
+            onPressed: () => excluirEmpresa(context, ref, estado.empresaNome),
+            style: TextButton.styleFrom(foregroundColor: context.cores.negativo),
+            icon: const Icon(Icons.delete_forever_outlined),
+            label: const Text('Excluir a conta da empresa e todos os dados'),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+/// O dono exclui a empresa e todos os dados (digitando o nome da empresa).
+Future<void> excluirEmpresa(BuildContext context, WidgetRef ref, String nomeEmpresa) async {
+  final ok = await confirmarDigitando(
+    context,
+    titulo: 'Excluir a empresa e todos os dados?',
+    texto:
+        'Serão apagados de vez: lançamentos, caminhões, motoristas, gestores e o acesso de todos, inclusive o seu. '
+        'Antes, baixe os relatórios (PDF ou planilha) que a empresa precisa guardar. Não dá para desfazer.',
+    palavra: nomeEmpresa,
+    botao: 'Excluir tudo',
+  );
+  if (!ok || !context.mounted) return;
+  try {
+    Navigator.of(context).popUntil((r) => r.isFirst);
+    await ref.read(acessoProvider.notifier).excluirEmpresa(nomeEmpresa);
+    if (context.mounted) mostrarMensagem(context, 'A conta da empresa e todos os dados foram excluídos.');
+  } catch (e) {
+    if (context.mounted) mostrarMensagem(context, traduzirErro(e).mensagem);
+  }
 }

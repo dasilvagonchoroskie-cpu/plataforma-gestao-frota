@@ -62,6 +62,7 @@ class Equipe {
     required this.pedidos,
     required this.dispositivos,
     required this.acessos,
+    this.convites = const [],
     required this.brutos,
     required this.carregadoEm,
   });
@@ -83,10 +84,21 @@ class Equipe {
   final List<Dispositivo> dispositivos;
   final List<AcessoAutorizado> acessos;
 
+  /// Códigos individuais gerados para motoristas (mais novos primeiro).
+  final List<Convite> convites;
+
   /// Linha como veio do banco (valores efetivos), por tabela e id. A tela de
   /// correção lê daqui o valor atual de cada campo.
   final Map<String, Map<String, Map<String, Object?>>> brutos;
   final DateTime carregadoEm;
+
+  /// Quando o motorista pediu para excluir a conta (nulo = não pediu).
+  DateTime? exclusaoPedida(Motorista m) {
+    for (final p in perfis) {
+      if (p.id == m.perfilId) return p.exclusaoPedidaEm;
+    }
+    return null;
+  }
 
   factory Equipe.montar({
     required Map<String, Object?> situacao,
@@ -150,6 +162,10 @@ class Equipe {
         for (final m in t(Fontes.acessos))
           if (vivo(m)) AcessoAutorizado.deMapa(m),
       ]..sort((a, b) => a.email.compareTo(b.email)),
+      convites: [
+        for (final m in t(Fontes.convites))
+          if (vivo(m)) Convite.deMapa(m),
+      ]..sort((a, b) => b.expiraEm.compareTo(a.expiraEm)),
       brutos: {
         'fretes': porId(t(Fontes.fretes)),
         'abastecimentos': porId(t(Fontes.abastecimentos)),

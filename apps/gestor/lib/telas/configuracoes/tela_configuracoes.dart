@@ -56,6 +56,7 @@ class TelaConfiguracoes extends ConsumerWidget {
                   'suspensa' => 'suspensa',
                   _ => 'em teste',
                 },
+                if (emp.acessoAte != null) 'acesso até ${dataTexto(emp.acessoAte!)}',
               ].join('  ·  '),
             ),
             trailing: e.souDono ? const Icon(Icons.edit_outlined) : null,
@@ -117,6 +118,35 @@ class TelaConfiguracoes extends ConsumerWidget {
             onTap: () => abrir(const TelaNovaSenha()),
           ),
           ListTile(
+            leading: const Icon(Icons.key_outlined),
+            title: const Text('Código de recuperação'),
+            subtitle: const Text('Gerar um código novo (o anterior para de valer)'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (ctx) => TelaCodigoRecuperacao(
+                  voltar: true,
+                  comoEntrar: 'o seu e-mail',
+                  gerar: () => ref.read(servidorProvider).gerarCodigoRecuperacao(),
+                  concluir: () => Navigator.pop(ctx),
+                ),
+              ),
+            ),
+          ),
+          ListTile(
+            leading: const Icon(Icons.description_outlined),
+            title: const Text('Termos de Uso'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => Navigator.push(context, TelaTextoLegal.rota('Termos de Uso', termosDeUso)),
+          ),
+          ListTile(
+            leading: const Icon(Icons.privacy_tip_outlined),
+            title: const Text('Política de Privacidade'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => Navigator.push(context, TelaTextoLegal.rota('Política de Privacidade', politicaDePrivacidade)),
+          ),
+          ListTile(
             leading: Icon(Icons.logout, color: cores.negativo),
             title: Text('Sair', style: TextStyle(color: cores.negativo)),
             onTap: () async {
@@ -129,6 +159,15 @@ class TelaConfiguracoes extends ConsumerWidget {
               if (ok) await ref.read(acessoProvider.notifier).sair();
             },
           ),
+          if (e.souDono) ...[
+            const Padding(padding: EdgeInsets.symmetric(horizontal: 16), child: TituloSecao('Encerrar')),
+            ListTile(
+              leading: Icon(Icons.delete_forever_outlined, color: cores.negativo),
+              title: Text('Excluir a conta da empresa e todos os dados', style: TextStyle(color: cores.negativo)),
+              subtitle: const Text('Para quem não vai continuar com a plataforma. Não dá para desfazer.'),
+              onTap: () => excluirEmpresa(context, ref, emp.nome),
+            ),
+          ],
           Padding(
             padding: const EdgeInsets.fromLTRB(20, 24, 20, 0),
             child: Nota('Frota Gestor $versaoApp  ·  Plataforma de Gestão de Frota  ·  Fortaleza Digital Security'),

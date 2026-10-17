@@ -7,6 +7,7 @@ import '../../acesso/acesso.dart';
 import '../../componentes/comuns.dart';
 import '../../config.dart';
 import '../../dados/sincronizador.dart';
+import '../../dados/dados.dart';
 import '../acesso/telas_acesso.dart';
 import '../caminhao/tela_caminhao.dart';
 
@@ -82,6 +83,31 @@ class TelaConfiguracoes extends ConsumerWidget {
             title: const Text('Trocar a senha', style: TextStyle(fontSize: 17)),
             onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const TelaTrocarSenha())),
           ),
+          ListTile(
+            leading: const Icon(Icons.key_outlined),
+            title: const Text('Código de recuperação', style: TextStyle(fontSize: 17)),
+            subtitle: const Text('Gerar um código novo (o anterior para de valer)'),
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (ctx) => TelaCodigoRecuperacao(
+                  voltar: true,
+                  gerar: () => ref.read(servidorProvider).gerarCodigoRecuperacao(),
+                  concluir: () => Navigator.pop(ctx),
+                ),
+              ),
+            ),
+          ),
+          ListTile(
+            leading: const Icon(Icons.description_outlined),
+            title: const Text('Termos de Uso', style: TextStyle(fontSize: 17)),
+            onTap: () => Navigator.push(context, TelaTextoLegal.rota('Termos de Uso', termosDeUso)),
+          ),
+          ListTile(
+            leading: const Icon(Icons.privacy_tip_outlined),
+            title: const Text('Política de Privacidade', style: TextStyle(fontSize: 17)),
+            onTap: () => Navigator.push(context, TelaTextoLegal.rota('Política de Privacidade', politicaDePrivacidade)),
+          ),
           const Divider(),
           Padding(
             padding: const EdgeInsets.fromLTRB(20, 16, 20, 4),
@@ -107,6 +133,12 @@ class TelaConfiguracoes extends ConsumerWidget {
             leading: Icon(Icons.logout, color: cores.negativo),
             title: Text('Sair da conta', style: TextStyle(fontSize: 17, color: cores.negativo)),
             onTap: () => _sair(context, ref),
+          ),
+          ListTile(
+            leading: Icon(Icons.delete_forever_outlined, color: cores.negativo),
+            title: Text('Excluir minha conta', style: TextStyle(fontSize: 17, color: cores.negativo)),
+            subtitle: const Text('Apaga a sua conta e os seus dados'),
+            onTap: () => excluirMinhaConta(context, ref),
           ),
           const SizedBox(height: 12),
           Center(child: Text('Versão $versaoApp', style: TextStyle(color: cores.textoFraco))),

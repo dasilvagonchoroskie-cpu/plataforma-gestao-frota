@@ -1,3 +1,6 @@
+import 'dart:async';
+
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:nucleo/nucleo.dart';
 import 'package:uuid/uuid.dart';
@@ -16,18 +19,46 @@ String novoId() => _uuid.v4();
 // ------------------------------------------------------------------- acesso
 
 /// Em que ponto a pessoa está: sem entrar, terminando o cadastro, sem
-/// liberação do dono, com conta de motorista ou pronta para usar o painel.
-enum Etapa { entrar, completarCadastro, naoAutorizado, contaMotorista, trocarSenha, pronto }
+/// liberação do dono, com conta de motorista, com algo a fazer (senha,
+/// termos, código de recuperação), com a empresa bloqueada ou pronta.
+enum Etapa {
+  entrar,
+  completarCadastro,
+  naoAutorizado,
+  contaMotorista,
+  trocarSenha,
+  termos,
+  codigoRecuperacao,
+  bloqueada,
+  pronto,
+}
 
 class EstadoAcesso {
-  const EstadoAcesso(this.etapa, {this.email = '', this.nome = ''});
+  const EstadoAcesso(
+    this.etapa, {
+    this.email = '',
+    this.nome = '',
+    this.empresaNome = '',
+    this.mensagem,
+    this.dono = false,
+    this.excluirEm,
+  });
   final Etapa etapa;
   final String email;
   final String nome;
+  final String empresaNome;
+
+  /// Motivo do bloqueio da empresa.
+  final String? mensagem;
+  final bool dono;
+
+  /// Quando os dados da empresa bloqueada serão apagados.
+  final DateTime? excluirEm;
 }
 
 class Acesso extends AsyncNotifier<EstadoAcesso> {
   Servidor get _s => ref.read(servidorProvider);
+  bool _acessoRegistrado = false;
 
   @override
   Future<EstadoAcesso> build() => _decidir();
@@ -49,10 +80,28 @@ class Acesso extends AsyncNotifier<EstadoAcesso> {
     if (perfil == null) return EstadoAcesso(Etapa.completarCadastro, email: email);
     final nome = '${perfil['nome'] ?? ''}';
     if (perfil['papel'] == 'motorista') return EstadoAcesso(Etapa.contaMotorista, email: email, nome: nome);
-    if (s['empresa'] == null || perfil['ativo'] == false) {
+    final empresa = (s['empresa'] as Map?)?.cast<String, Object?>();
+    if (empresa == null || perfil['ativo'] == false) {
       return EstadoAcesso(Etapa.naoAutorizado, email: email, nome: nome);
     }
     if (_s.precisaTrocarSenha) return EstadoAcesso(Etapa.trocarSenha, email: email, nome: nome);
+    if ((s['termos'] as Map?)?['aceito'] == false) return EstadoAcesso(Etapa.termos, email: email, nome: nome);
+    if (empresa['bloqueada'] == true) {
+      return EstadoAcesso(
+        Etapa.bloqueada,
+        email: email,
+        nome: nome,
+        empresaNome: '${empresa['nome'] ?? ''}',
+        mensagem: '${empresa['motivo_bloqueio'] ?? ''}',
+        dono: perfil['papel'] == 'dono',
+        excluirEm: DateTime.tryParse('${empresa['excluir_em'] ?? ''}'),
+      );
+    }
+    if (s['recuperacao'] == false) return EstadoAcesso(Etapa.codigoRecuperacao, email: email, nome: nome);
+    if (!_acessoRegistrado) {
+      _acessoRegistrado = true;
+      unawaited(_s.registrarAcesso(kIsWeb ? 'web' : 'gestor'));
+    }
     return EstadoAcesso(Etapa.pronto, email: email, nome: nome);
   }
 
@@ -61,8 +110,26 @@ class Acesso extends AsyncNotifier<EstadoAcesso> {
     state = await AsyncValue.guard(_decidir);
   }
 
+  /// Aceite dos termos. Devolve a mensagem de erro ou nulo.
+  Future<String?> aceitarTermos(String versao) async {
+    try {
+      await _s.aceitarTermos(versao);
+    } on ErroServidor catch (e) {
+      return e.mensagem;
+    }
+    await recarregar();
+    return null;
+  }
+
+  /// O dono exclui a empresa e todos os dados; depois sai da conta.
+  Future<void> excluirEmpresa(String confirmacao) async {
+    await _s.excluirMinhaEmpresa(confirmacao);
+    await sair();
+  }
+
   Future<void> sair() async {
     await _s.sair();
+    _acessoRegistrado = false;
     ref.invalidate(equipeProvider);
     state = const AsyncData(EstadoAcesso(Etapa.entrar));
   }
@@ -120,6 +187,17 @@ class EquipeNotifier extends AsyncNotifier<Equipe> {
       _eRecarregar(() => _s.alterar('motoristas', motoristaId, {'ativo': ativo}));
 
   Future<Map<String, Object?>> redefinirAcesso(String motoristaId) => _s.redefinirAcesso(motoristaId);
+
+  /// Cadastra o motorista (nome e CPF) e devolve o código individual dele.
+  Future<Map<String, Object?>> gerarConvite(String nome, String cpf) async {
+    final r = await _s.gerarConvite(nome, cpf);
+    await recarregar();
+    return r;
+  }
+
+  Future<void> cancelarConvite(String id) => _eRecarregar(() => _s.cancelarConvite(id));
+
+  Future<void> excluirMotorista(String motoristaId) => _eRecarregar(() => _s.excluirMotorista(motoristaId));
 
   /// Cadastra (id nulo) ou altera um caminhão. A gestão confirma na hora.
   Future<void> salvarCaminhao({String? id, required String placa, String? numeroFrota, String modelo = '', int? ano}) {

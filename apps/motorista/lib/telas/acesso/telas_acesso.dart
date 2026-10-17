@@ -113,6 +113,7 @@ class TelaBoasVindas extends StatelessWidget {
                 onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const TelaEsqueciSenha())),
                 child: const Text('Esqueci a senha'),
               ),
+              const Center(child: LinksLegais()),
             ],
           ),
         ),
@@ -221,6 +222,8 @@ class _TelaCriarContaState extends ConsumerState<TelaCriarConta> {
   String? _erroNome;
   String? _erroCpf;
   String? _erroSenha;
+  bool _aceito = false;
+  bool _faltaAceite = false;
   bool _ocupado = false;
 
   @override
@@ -237,14 +240,19 @@ class _TelaCriarContaState extends ConsumerState<TelaCriarConta> {
       _erroNome = _nome.text.trim().length < 2 ? 'Escreva o seu nome.' : null;
       _erroCpf = cpfValido(_cpf.text) ? null : 'Confira o CPF: tem 11 números.';
       _erroSenha = _senha.text.length < 6 ? 'Pelo menos 6 letras ou números.' : null;
+      _faltaAceite = !_aceito;
     });
     if (_erroNome != null || _erroCpf != null || _erroSenha != null) return;
+    if (!_aceito) {
+      setState(() => _erro = 'Para criar a conta, marque que leu e aceita os Termos de Uso e a Política de Privacidade.');
+      return;
+    }
     setState(() => _ocupado = true);
     try {
       final s = ref.read(servidorProvider);
       final aparelho = await idDoAparelho(ref.read(armazenamentoProvider));
       final cpf = soDigitos(_cpf.text);
-      await s.cadastrarMotorista(_nome.text, cpf, _senha.text, aparelho);
+      await s.cadastrarMotorista(_nome.text, cpf, _senha.text, aparelho, termos: versaoTermos);
       await s.entrarComCpf(cpf, _senha.text, aparelho);
       await ref.read(acessoProvider.notifier).recarregar();
       if (mounted) Navigator.of(context).popUntil((r) => r.isFirst);
@@ -275,6 +283,15 @@ class _TelaCriarContaState extends ConsumerState<TelaCriarConta> {
           erro: _erroSenha,
           ajuda: 'Pelo menos 6 letras ou números. Você vai entrar com o CPF e esta senha.',
           acaoTeclado: TextInputAction.done,
+        ),
+        const SizedBox(height: 8),
+        CaixaAceite(
+          marcado: _aceito,
+          erro: _faltaAceite,
+          aoMudar: (v) => setState(() {
+            _aceito = v;
+            _faltaAceite = false;
+          }),
         ),
         MensagemErro(_erro),
       ],
@@ -362,20 +379,49 @@ class _TelaCompletarCadastroState extends ConsumerState<TelaCompletarCadastro> {
 
 // ------------------------------------------------------------ esqueci a senha
 
-/// Sem e-mail no cadastro, quem cria uma senha nova é o patrão, pelo painel.
-class TelaEsqueciSenha extends StatelessWidget {
+/// Esqueci a senha: com o código de recuperação, a própria pessoa cria a
+/// senha nova. Sem o código, o patrão cria uma senha provisória no painel.
+class TelaEsqueciSenha extends ConsumerWidget {
   const TelaEsqueciSenha({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return PaginaAcesso(
       titulo: 'Esqueci a senha',
-      texto: 'Fale com o seu patrão ou com o gestor da empresa. Ele cria uma senha provisória para você no painel '
-          '(Motoristas, o seu nome, Redefinir o acesso).',
-      botao: 'Já tenho a senha provisória',
-      aoTocar: () => Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const TelaEntrar())),
-      filhos: const [
-        Nota('Você entra com o seu CPF e a senha provisória. Em seguida o app pede para você criar uma senha nova.'),
+      texto: 'Com o código de recuperação que você anotou ao criar a conta, você mesmo cria uma senha nova.',
+      botao: 'Tenho o código de recuperação',
+      aoTocar: () => Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => TelaRecuperarComCodigo(
+            porCpf: true,
+            recuperar: (cpf, codigo, senha) async {
+              final s = ref.read(servidorProvider);
+              return s.recuperarAcesso(cpf, codigo, senha, await idDoAparelho(ref.read(armazenamentoProvider)));
+            },
+            entrar: (cpf, senha) async {
+              final s = ref.read(servidorProvider);
+              await s.entrarComCpf(cpf, senha, await idDoAparelho(ref.read(armazenamentoProvider)));
+              await ref.read(acessoProvider.notifier).recarregar(conferir: true);
+              if (context.mounted) Navigator.of(context).popUntil((r) => r.isFirst);
+            },
+            semCodigo: 'Não tem o código? Peça ao seu patrão uma senha provisória (no painel: Motoristas, o seu nome, '
+                'Redefinir o acesso).',
+          ),
+        ),
+      ),
+      filhos: [
+        const Aviso(
+          icone: Icons.help_outline,
+          titulo: 'Não tem o código?',
+          texto: 'Fale com o seu patrão ou com o gestor. Ele cria uma senha provisória para você no painel '
+              '(Motoristas, o seu nome, Redefinir o acesso).',
+        ),
+        const SizedBox(height: 12),
+        OutlinedButton(
+          onPressed: () => Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const TelaEntrar())),
+          child: const Text('Já tenho a senha provisória'),
+        ),
       ],
     );
   }
@@ -487,9 +533,10 @@ class _TelaCodigoEmpresaState extends ConsumerState<TelaCodigoEmpresa> {
   @override
   Widget build(BuildContext context) {
     return PaginaAcesso(
-      titulo: 'Código da empresa',
-      texto: 'Peça o código para o seu patrão (ele vê no painel e manda pelo WhatsApp).',
-      botao: 'Pedir para entrar',
+      titulo: 'Código de entrada',
+      texto: 'Digite o código que o seu patrão gerou para você no painel. Cada motorista tem o seu código, '
+          'que vale por 7 dias e só funciona com o seu CPF.',
+      botao: 'Entrar na empresa',
       aoTocar: _enviar,
       ocupado: _ocupado,
       voltar: false,
@@ -503,6 +550,7 @@ class _TelaCodigoEmpresaState extends ConsumerState<TelaCodigoEmpresa> {
           icon: const Icon(Icons.logout),
           label: const Text('Sair desta conta'),
         ),
+        const BotaoExcluirConta(),
       ],
     );
   }
@@ -583,4 +631,70 @@ class TelaContaGestor extends ConsumerWidget {
       filhos: const [Icon(Icons.admin_panel_settings_outlined, size: 64)],
     );
   }
+}
+
+// ------------------------------------------------- acesso encerrado e exclusão
+
+/// A empresa deixou de usar a plataforma (fim do teste ou bloqueio).
+class TelaAcessoEncerrado extends ConsumerWidget {
+  const TelaAcessoEncerrado({super.key, required this.empresaNome, this.motivo});
+  final String empresaNome;
+  final String? motivo;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return PaginaAcesso(
+      titulo: 'Acesso encerrado',
+      texto: 'A ${empresaNome.isEmpty ? 'empresa' : empresaNome} não está mais usando a plataforma. '
+          'Fale com o seu patrão.',
+      botao: 'Verificar de novo',
+      aoTocar: () => ref.read(acessoProvider.notifier).recarregar(conferir: true),
+      voltar: false,
+      filhos: [
+        const Icon(Icons.lock_clock_outlined, size: 64),
+        if (motivo != null && motivo!.isNotEmpty) ...[const SizedBox(height: 16), Nota('Motivo: $motivo')],
+        const SizedBox(height: 24),
+        TextButton.icon(
+          onPressed: () => ref.read(acessoProvider.notifier).sair(),
+          icon: const Icon(Icons.logout),
+          label: const Text('Sair desta conta'),
+        ),
+        const BotaoExcluirConta(),
+      ],
+    );
+  }
+}
+
+/// Excluir a própria conta (pede para digitar EXCLUIR).
+Future<void> excluirMinhaConta(BuildContext context, WidgetRef ref) async {
+  final ok = await confirmarDigitando(
+    context,
+    titulo: 'Excluir a sua conta?',
+    texto: 'A sua conta e os seus lançamentos serão apagados. Se você está numa empresa, o acesso fecha na hora '
+        'e a empresa tem até 15 dias para guardar o que a lei obriga; depois tudo é apagado. Não dá para desfazer.',
+    palavra: 'EXCLUIR',
+    botao: 'Excluir a conta',
+  );
+  if (!ok || !context.mounted) return;
+  try {
+    final recado = await ref.read(acessoProvider.notifier).excluirConta();
+    if (context.mounted) {
+      Navigator.of(context).popUntil((r) => r.isFirst);
+      mostrarMensagem(context, recado);
+    }
+  } on ErroServidor catch (e) {
+    if (context.mounted) mostrarMensagem(context, e.mensagem);
+  }
+}
+
+class BotaoExcluirConta extends ConsumerWidget {
+  const BotaoExcluirConta({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) => TextButton.icon(
+        onPressed: () => excluirMinhaConta(context, ref),
+        style: TextButton.styleFrom(foregroundColor: context.cores.negativo),
+        icon: const Icon(Icons.delete_forever_outlined),
+        label: const Text('Excluir minha conta'),
+      );
 }

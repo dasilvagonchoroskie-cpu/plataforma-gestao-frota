@@ -170,7 +170,7 @@ class TelaDetalheMotorista extends ConsumerWidget {
   }
 }
 
-enum _Acao { caminhao, redefinir, ativar }
+enum _Acao { caminhao, redefinir, ativar, excluir }
 
 class _MenuMotorista extends ConsumerWidget {
   const _MenuMotorista({required this.motorista});
@@ -189,6 +189,8 @@ class _MenuMotorista extends ConsumerWidget {
             redefinirAcesso(context, ref, m);
           case _Acao.ativar:
             ativarMotorista(context, ref, m);
+          case _Acao.excluir:
+            excluirMotorista(context, ref, m);
         }
       },
       itemBuilder: (_) => [
@@ -206,6 +208,10 @@ class _MenuMotorista extends ConsumerWidget {
             leading: Icon(m.ativo ? Icons.block : Icons.check_circle_outline),
             title: Text(m.ativo ? 'Desligar da empresa' : 'Religar na empresa'),
           ),
+        ),
+        const PopupMenuItem(
+          value: _Acao.excluir,
+          child: ListTile(leading: Icon(Icons.delete_forever_outlined), title: Text('Excluir motorista e dados')),
         ),
       ],
     );
@@ -341,6 +347,28 @@ Future<void> ativarMotorista(BuildContext context, WidgetRef ref, Motorista m) a
   );
 }
 
+/// Exclui o motorista e todos os lançamentos dele (digitando EXCLUIR).
+Future<void> excluirMotorista(BuildContext context, WidgetRef ref, Motorista m) async {
+  final ok = await confirmarDigitando(
+    context,
+    titulo: 'Excluir ${m.primeiroNome} e os dados dele?',
+    texto:
+        'Serão apagados de vez o cadastro dele e todos os fretes, abastecimentos, gastos e vales que ele lançou. '
+        'Antes, baixe o relatório dele (PDF ou planilha) se a empresa precisar guardar. Não dá para desfazer. '
+        'Para só tirar o acesso e guardar os dados, use "Desligar da empresa".',
+    palavra: 'EXCLUIR',
+    botao: 'Excluir',
+  );
+  if (!ok || !context.mounted) return;
+  final navegador = Navigator.of(context);
+  final feito = await executar(
+    context,
+    () => ref.read(equipeProvider.notifier).excluirMotorista(m.id),
+    sucesso: 'Motorista e dados excluídos.',
+  );
+  if (feito) navegador.popUntil((r) => r.isFirst);
+}
+
 class _Cadastro extends ConsumerWidget {
   const _Cadastro({required this.motorista});
   final Motorista motorista;
@@ -440,8 +468,25 @@ class _Cadastro extends ConsumerWidget {
                     label: Text(m.ativo ? 'Desligar da empresa' : 'Religar na empresa'),
                     style: m.ativo ? OutlinedButton.styleFrom(foregroundColor: cores.negativo) : null,
                   ),
+                  OutlinedButton.icon(
+                    onPressed: () => excluirMotorista(context, ref, m),
+                    icon: const Icon(Icons.delete_forever_outlined),
+                    label: const Text('Excluir motorista e dados'),
+                    style: OutlinedButton.styleFrom(foregroundColor: cores.negativo),
+                  ),
                 ],
               ),
+              if (e.exclusaoPedida(m) != null) ...[
+                const SizedBox(height: 12),
+                Aviso(
+                  icone: Icons.delete_outline,
+                  titulo: 'Ele pediu para excluir a conta',
+                  texto:
+                      'Pedido feito em ${dataTexto(e.exclusaoPedida(m)!)}. O acesso dele já foi encerrado e os dados '
+                      'serão apagados sozinhos em ${dataTexto(e.exclusaoPedida(m)!.add(const Duration(days: 15)))}. '
+                      'Baixe antes o que a empresa precisar guardar.',
+                ),
+              ],
               const SizedBox(height: 8),
               const Nota(
                 'Redefinir o acesso serve para quem perdeu a senha e o e-mail: você passa uma senha provisória e ele troca no primeiro login.',

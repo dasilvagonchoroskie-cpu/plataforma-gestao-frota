@@ -67,6 +67,18 @@ class Raiz extends ConsumerWidget {
             return const TelaContaGestor();
           case Etapa.trocarSenha:
             return const TelaTrocarSenha(voltar: false);
+          case Etapa.termos:
+            return TelaAceiteTermos(
+              aceitar: () => ref.read(acessoProvider.notifier).aceitarTermos(versaoTermos),
+              sair: () => ref.read(acessoProvider.notifier).sair(),
+            );
+          case Etapa.codigoRecuperacao:
+            return TelaCodigoRecuperacao(
+              gerar: () => ref.read(servidorProvider).gerarCodigoRecuperacao(),
+              concluir: () => ref.read(acessoProvider.notifier).recarregar(conferir: true),
+            );
+          case Etapa.bloqueada:
+            return TelaAcessoEncerrado(empresaNome: a.empresaNome, motivo: a.mensagem);
           case Etapa.semInternet:
             return TelaSemInternet(mensagem: a.mensagem);
           case Etapa.pronto:

@@ -6,7 +6,7 @@ import 'package:nucleo/nucleo.dart';
 import 'entrada.dart';
 import 'tema.dart';
 
-enum TipoCampo { texto, dinheiro, inteiro, decimal, decimal3, cpf, placa, codigo, email, senha, numeros }
+enum TipoCampo { texto, dinheiro, inteiro, decimal, decimal3, cpf, placa, codigo, recuperacao, email, senha, numeros }
 
 /// Campo de digitacao com o teclado e a mascara certos para cada tipo.
 class Campo extends StatefulWidget {
@@ -62,6 +62,7 @@ class _CampoState extends State<Campo> {
       case TipoCampo.texto:
       case TipoCampo.placa:
       case TipoCampo.codigo:
+      case TipoCampo.recuperacao:
       case TipoCampo.senha:
         return TextInputType.text;
       case TipoCampo.email:
@@ -91,6 +92,8 @@ class _CampoState extends State<Campo> {
         return const [FormatadorPlaca()];
       case TipoCampo.codigo:
         return const [FormatadorCodigo()];
+      case TipoCampo.recuperacao:
+        return const [FormatadorRecuperacao()];
       case TipoCampo.numeros:
         return [FilteringTextInputFormatter.digitsOnly, LengthLimitingTextInputFormatter(6)];
       case TipoCampo.dinheiro:
@@ -126,6 +129,7 @@ class _CampoState extends State<Campo> {
         TipoCampo.texto || TipoCampo.email || TipoCampo.senha => const TextStyle(fontSize: 18),
         TipoCampo.codigo || TipoCampo.placa || TipoCampo.numeros =>
           estiloNumero(24, peso: FontWeight.w700).copyWith(letterSpacing: 4),
+        TipoCampo.recuperacao => estiloNumero(22, peso: FontWeight.w700).copyWith(letterSpacing: 2),
         _ => estiloNumero(20, peso: FontWeight.w500),
       };
 

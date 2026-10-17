@@ -97,6 +97,82 @@ class ServidorFalso implements Servidor {
     return {'ok': true, 'nome': nome, 'email': e, 'senha_provisoria': 'H4QZ8WMP'};
   }
 
+  /// Campos a mais na situação (termos, recuperação, empresa bloqueada...).
+  Map<String, Object?> situacaoExtra = {};
+  Map<String, Object?> empresaExtra = {};
+  String? termosAceitos;
+  String? empresaExcluida;
+  final recuperacoes = <String>[];
+
+  @override
+  Future<Map<String, Object?>> gerarConvite(String nome, String cpf) async {
+    _rede();
+    chamadas.add('convite $nome $cpf');
+    final c = {
+      'id': 'conv-${t(Fontes.convites).length + 1}',
+      'empresa_id': empresaId,
+      'codigo': 'K7M2QX',
+      'nome': nome,
+      'cpf': cpf,
+      'expira_em': iso(DateTime.now().add(const Duration(days: 7))),
+    };
+    t(Fontes.convites).add(c);
+    return {...c};
+  }
+
+  @override
+  Future<void> cancelarConvite(String conviteId) async {
+    _rede();
+    chamadas.add('cancelar convite $conviteId');
+    for (final c in t(Fontes.convites)) {
+      if (c['id'] == conviteId) c['cancelado_em'] = iso(DateTime.now());
+    }
+  }
+
+  @override
+  Future<void> excluirMotorista(String motoristaId) async {
+    _rede();
+    chamadas.add('excluir motorista $motoristaId');
+    t(Fontes.motoristas).removeWhere((m) => m['id'] == motoristaId);
+    for (final f in [Fontes.fretes, Fontes.abastecimentos, Fontes.gastos, Fontes.vales, Fontes.usos, Fontes.ajustesKm]) {
+      t(f).removeWhere((m) => m['motorista_id'] == motoristaId);
+    }
+  }
+
+  @override
+  Future<void> excluirMinhaEmpresa(String confirmacao) async {
+    _rede();
+    chamadas.add('excluir empresa $confirmacao');
+    empresaExcluida = confirmacao;
+  }
+
+  @override
+  Future<Map<String, Object?>> aceitarTermos(String versao) async {
+    _rede();
+    termosAceitos = versao;
+    situacaoExtra = {...situacaoExtra, 'termos': {'versao': versao, 'aceito': true}};
+    return situacao();
+  }
+
+  @override
+  Future<String> gerarCodigoRecuperacao() async {
+    _rede();
+    chamadas.add('codigo recuperacao');
+    situacaoExtra = {...situacaoExtra, 'recuperacao': true};
+    return 'QWER-TYUP-ASDF';
+  }
+
+  @override
+  Future<String> recuperarAcesso(String email, String codigo, String senhaNova) async {
+    _rede();
+    recuperacoes.add('$email:$codigo:$senhaNova');
+    senhaCerta = senhaNova;
+    return 'NOVO-CODI-GO23';
+  }
+
+  @override
+  Future<void> registrarAcesso(String app) async => chamadas.add('acesso $app');
+
   @override
   Future<Map<String, Object?>> completarCadastro(String nome) async {
     chamadas.add('cadastro $nome');
@@ -116,9 +192,10 @@ class ServidorFalso implements Servidor {
     return {
       'logado': true,
       'perfil': perfilDaSessao ?? (p.isEmpty ? null : p),
-      'empresa': {...empresa},
+      'empresa': {...empresa, ...empresaExtra},
       'motorista': null,
       'pedido': null,
+      ...situacaoExtra,
     };
   }
 

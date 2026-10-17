@@ -204,4 +204,111 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Faturamento'), findsWidgets);
   });
+
+  testWidgets('cadastrar motorista: o painel gera um código só dele', (tester) async {
+    final s = servidorComAmostra();
+    await abrirApp(tester, s);
+    await tester.tap(find.text('Motoristas').first);
+    await tester.pumpAndSettle();
+    expect(find.text('Código da empresa'), findsNothing, reason: 'não existe mais código igual para todos');
+    await tester.tap(find.text('Cadastrar motorista'));
+    await tester.pumpAndSettle();
+    final campos = find.descendant(of: find.byType(AlertDialog), matching: find.byType(TextField));
+    await tester.enterText(campos.at(0), 'Antônio Pereira');
+    await tester.enterText(campos.at(1), '12345678900');
+    await tester.tap(find.text('Gerar código'));
+    await tester.pumpAndSettle();
+    expect(find.text('Confira o CPF: tem 11 números.'), findsOneWidget);
+    await tester.enterText(campos.at(1), '12345678909');
+    await tester.tap(find.text('Gerar código'));
+    await tester.pumpAndSettle();
+    expect(s.chamadas, contains('convite Antônio Pereira 12345678909'));
+    expect(find.text('K7M2QX'), findsOneWidget);
+    await tester.tap(find.text('Pronto'));
+    await tester.pumpAndSettle();
+    expect(find.text('Códigos esperando o motorista (1)'), findsOneWidget);
+    expect(find.textContaining('Código K7M2QX'), findsOneWidget);
+  });
+
+  testWidgets('excluir motorista e dados pede para digitar EXCLUIR', (tester) async {
+    final s = servidorComAmostra();
+    await abrirApp(tester, s);
+    await tester.tap(find.text('Motoristas').first);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Carlos Souza').first);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Mais ações'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Excluir motorista e dados'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.descendant(of: find.byType(AlertDialog), matching: find.byType(TextField)), 'EXCLUIR');
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(FilledButton, 'Excluir'));
+    await tester.pumpAndSettle();
+    expect(s.chamadas, contains('excluir motorista $carlos'));
+    expect(find.text('Motorista e dados excluídos.'), findsOneWidget);
+  });
+
+  testWidgets('primeiro acesso: termos e código de recuperação antes do painel', (tester) async {
+    final s = servidorComAmostra()
+      ..situacaoExtra = {
+        'termos': {'versao': '2026-10-17', 'aceito': false},
+        'recuperacao': false,
+      };
+    await abrirApp(tester, s);
+    expect(find.text('Termos de Uso e Privacidade'), findsOneWidget);
+    await tester.tap(find.text('Li e aceito os Termos de Uso e a Política de Privacidade.'));
+    await tester.tap(find.text('Aceitar e continuar'));
+    await tester.pumpAndSettle();
+    expect(s.termosAceitos, '2026-10-17');
+    await tester.tap(find.text('Gerar o meu código'));
+    await tester.pumpAndSettle();
+    expect(find.text('QWER-TYUP-ASDF'), findsOneWidget);
+    await tester.tap(find.text('Já anotei o código em lugar seguro.'));
+    await tester.tap(find.text('Continuar'));
+    await tester.pumpAndSettle();
+    expect(find.text('Faturamento'), findsWidgets);
+    expect(s.chamadas, contains('acesso gestor'), reason: 'o acesso fica registrado (Marco Civil)');
+  });
+
+  testWidgets('empresa com o acesso encerrado: não abre o painel; o dono pode excluir tudo', (tester) async {
+    final s = servidorComAmostra()
+      ..empresaExtra = {'bloqueada': true, 'motivo_bloqueio': 'O período de teste terminou.', 'excluir_em': '2026-12-01T12:00:00Z'};
+    await abrirApp(tester, s);
+    expect(find.text('Acesso encerrado'), findsOneWidget);
+    expect(find.text('Motivo: O período de teste terminou.'), findsOneWidget);
+    expect(find.text('Faturamento'), findsNothing);
+    await tester.tap(find.text('Excluir a conta da empresa e todos os dados'));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.descendant(of: find.byType(AlertDialog), matching: find.byType(TextField)),
+      'transportes goiatuba',
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(FilledButton, 'Excluir tudo'));
+    await tester.pumpAndSettle();
+    expect(s.empresaExcluida, 'Transportes Goiatuba');
+    expect(find.text('Esqueci a senha'), findsOneWidget, reason: 'volta para a tela de entrar');
+  });
+
+  testWidgets('esqueci a senha: e-mail, código de recuperação e senha nova', (tester) async {
+    final s = servidorComAmostra()..sessao = false;
+    await abrirApp(tester, s);
+    await tester.tap(find.text('Esqueci a senha'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Tenho o código de recuperação'));
+    await tester.pumpAndSettle();
+    final campos = find.byType(TextField);
+    await tester.enterText(campos.at(0), 'Dono@Teste.com');
+    await tester.enterText(campos.at(1), 'qwertyupasdf');
+    await tester.enterText(campos.at(2), 'novasenha');
+    await tester.tap(find.text('Criar a senha nova'));
+    await tester.pumpAndSettle();
+    expect(s.recuperacoes, ['dono@teste.com:QWER-TYUP-ASDF:novasenha']);
+    expect(find.text('NOVO-CODI-GO23'), findsOneWidget);
+    await tester.tap(find.text('Já anotei o código em lugar seguro.'));
+    await tester.tap(find.text('Continuar'));
+    await tester.pumpAndSettle();
+    expect(find.text('Faturamento'), findsWidgets);
+  });
 }

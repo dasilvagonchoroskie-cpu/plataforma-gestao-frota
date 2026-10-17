@@ -96,3 +96,16 @@ class FormatadorCodigo extends TextInputFormatter {
     return _comCursorNoFim(t);
   }
 }
+
+/// Código de recuperação: 12 letras e números, em grupos de 4 (ABCD-EFGH-JKLM).
+class FormatadorRecuperacao extends TextInputFormatter {
+  const FormatadorRecuperacao();
+
+  @override
+  TextEditingValue formatEditUpdate(TextEditingValue antigo, TextEditingValue novo) {
+    var t = novo.text.toUpperCase().replaceAll(RegExp(r'[^A-Z0-9]'), '');
+    if (t.length > 12) t = t.substring(0, 12);
+    final grupos = [for (var i = 0; i < t.length; i += 4) t.substring(i, i + 4 > t.length ? t.length : i + 4)];
+    return _comCursorNoFim(grupos.join('-'));
+  }
+}

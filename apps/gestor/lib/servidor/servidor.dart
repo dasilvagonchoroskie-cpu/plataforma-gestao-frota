@@ -32,6 +32,7 @@ class Fontes {
   static const ajustes = 'ajustes_gestor';
   static const dispositivos = 'dispositivos';
   static const acessos = 'acessos_autorizados';
+  static const convites = 'convites_motorista';
 
   static const todas = [
     empresa,
@@ -48,6 +49,7 @@ class Fontes {
     ajustes,
     dispositivos,
     acessos,
+    convites,
   ];
 }
 
@@ -79,6 +81,28 @@ abstract class Servidor {
 
   /// O dono cria ou renova o acesso de um gestor (senha provisória, sem e-mail).
   Future<Map<String, Object?>> criarAcessoGestor(String email, String nome);
+
+  /// Cadastra o motorista (nome e CPF) e devolve o código individual dele.
+  Future<Map<String, Object?>> gerarConvite(String nome, String cpf);
+  Future<void> cancelarConvite(String conviteId);
+
+  /// Exclui o motorista e todos os lançamentos dele.
+  Future<void> excluirMotorista(String motoristaId);
+
+  /// O dono exclui a empresa e todos os dados ([confirmacao] = nome da empresa).
+  Future<void> excluirMinhaEmpresa(String confirmacao);
+
+  /// Aceite dos Termos de Uso e da Política de Privacidade.
+  Future<Map<String, Object?>> aceitarTermos(String versao);
+
+  /// Gera um código de recuperação novo (o anterior para de valer).
+  Future<String> gerarCodigoRecuperacao();
+
+  /// Senha nova com e-mail e código de recuperação. Devolve o código novo.
+  Future<String> recuperarAcesso(String email, String codigo, String senhaNova);
+
+  /// Registro de acesso (data, hora e IP) exigido pelo Marco Civil.
+  Future<void> registrarAcesso(String app);
 
   /// Inclui uma linha (caminhões, categorias, acessos e ajustes).
   Future<void> inserir(String tabela, Map<String, Object?> dados);
@@ -289,6 +313,52 @@ class ServidorSupabase implements Servidor {
     if (d['ok'] != true) throw ErroServidor('${d['mensagem'] ?? 'Não deu para criar o acesso agora.'}');
     return d;
   });
+
+  @override
+  Future<Map<String, Object?>> gerarConvite(String nome, String cpf) => _tentar(
+    () async => _mapa(await cliente.rpc('gerar_convite_motorista', params: {'p_nome': nome.trim(), 'p_cpf': cpf})),
+  );
+
+  @override
+  Future<void> cancelarConvite(String conviteId) =>
+      _tentar(() => cliente.rpc('cancelar_convite', params: {'p_convite_id': conviteId}));
+
+  @override
+  Future<void> excluirMotorista(String motoristaId) =>
+      _tentar(() => cliente.rpc('excluir_motorista', params: {'p_motorista_id': motoristaId}));
+
+  @override
+  Future<void> excluirMinhaEmpresa(String confirmacao) =>
+      _tentar(() => cliente.rpc('excluir_minha_empresa', params: {'p_confirmacao': confirmacao}));
+
+  @override
+  Future<Map<String, Object?>> aceitarTermos(String versao) =>
+      _tentar(() async => _mapa(await cliente.rpc('aceitar_termos', params: {'p_versao': versao})));
+
+  @override
+  Future<String> gerarCodigoRecuperacao() => _tentar(() async => '${await cliente.rpc('gerar_codigo_recuperacao')}');
+
+  @override
+  Future<String> recuperarAcesso(String email, String codigo, String senhaNova) => _tentar(() async {
+    final r = await cliente.functions.invoke(
+      'recuperar_acesso',
+      body: {'identificador': _email(email), 'codigo': codigo, 'senha_nova': senhaNova, 'aparelho': 'gestor'},
+    );
+    final d = _mapa(r.data);
+    if (d['ok'] != true || d['codigo_novo'] == null) {
+      throw ErroServidor('${d['mensagem'] ?? 'E-mail e código de recuperação não conferem.'}');
+    }
+    return d['codigo_novo'] as String;
+  });
+
+  @override
+  Future<void> registrarAcesso(String app) async {
+    try {
+      await cliente.rpc('registrar_acesso', params: {'p_app': app}).timeout(const Duration(seconds: 20));
+    } catch (_) {
+      // Sem internet: registra na próxima vez.
+    }
+  }
 
   @override
   Future<void> inserir(String tabela, Map<String, Object?> dados) => _tentar(() => cliente.from(tabela).insert(dados));

@@ -3,6 +3,7 @@ import 'dart:convert';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../acesso/acesso.dart';
 import '../servidor/servidor.dart';
 import 'armazenamento.dart';
 import 'dados.dart';
@@ -44,6 +45,7 @@ class EstadoEnvio {
 class Sincronizador extends Notifier<EstadoEnvio> {
   static const tamanhoDoLote = 200;
   Future<void>? _rodando;
+  bool _acessoRegistrado = false;
 
   Armazenamento get _a => ref.read(armazenamentoProvider);
   Servidor get _s => ref.read(servidorProvider);
@@ -74,6 +76,10 @@ class Sincronizador extends Notifier<EstadoEnvio> {
       final agora = ref.read(relogioProvider)();
       await _a.gravarEstado('ultimo_envio', agora.toIso8601String());
       state = state.copyWith(ocupado: false, ultimaVez: agora, precisaEntrar: false, desligado: false);
+      if (!_acessoRegistrado) {
+        _acessoRegistrado = true;
+        unawaited(_s.registrarAcesso());
+      }
     } on ErroServidor catch (e) {
       state = state.copyWith(
         ocupado: false,
@@ -81,6 +87,10 @@ class Sincronizador extends Notifier<EstadoEnvio> {
         precisaEntrar: e.codigo == 'sessao',
         desligado: e.codigo == 'sem_vinculo' || e.codigo == 'dispositivo_revogado',
       );
+      // Empresa bloqueada, cadastro excluído ou termos novos: a tela muda.
+      if (const {'sem_vinculo', 'empresa_bloqueada', 'termos'}.contains(e.codigo)) {
+        unawaited(ref.read(acessoProvider.notifier).conferirEmSilencio());
+      }
     } catch (e) {
       state = state.copyWith(ocupado: false, erro: traduzirErro(e).mensagem);
     } finally {
@@ -164,6 +174,12 @@ class Sincronizador extends Notifier<EstadoEnvio> {
 
     final situacao = (r['situacao'] as Map?)?.cast<String, Object?>();
     if (situacao != null) await _a.gravarEstado('situacao', jsonEncode(situacao));
+    if ((situacao?['empresa'] as Map?)?['bloqueada'] == true) {
+      throw const ErroServidor('O acesso da empresa à plataforma foi encerrado.', codigo: 'empresa_bloqueada');
+    }
+    if ((situacao?['termos'] as Map?)?['aceito'] == false) {
+      throw const ErroServidor('Aceite os Termos de Uso para continuar.', codigo: 'termos');
+    }
     final motorista = situacao?['motorista'] as Map?;
     if (motorista == null || motorista['ativo'] == false) {
       throw const ErroServidor('Sua conta foi desligada da empresa. Fale com o seu patrão.', codigo: 'sem_vinculo');
