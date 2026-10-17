@@ -13,11 +13,12 @@ dependencies:
     sdk: flutter
   nucleo:
     path: ../../packages/nucleo
+  visual:
+    path: ../../packages/visual
   flutter_riverpod: any
-  go_router: any
   supabase_flutter: any
   share_plus: any
-  web: any
+  uuid: any
 
 dev_dependencies:
   flutter_test:
@@ -26,3 +27,24 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+
+  # As letras ficam no pacote nucleo (o gerador de PDF lê pelo mesmo caminho).
+  fonts:
+    - family: Barlow
+      fonts:
+        - asset: packages/nucleo/fontes/Barlow-Regular.ttf
+          weight: 400
+        - asset: packages/nucleo/fontes/Barlow-Medium.ttf
+          weight: 500
+        - asset: packages/nucleo/fontes/Barlow-SemiBold.ttf
+          weight: 600
+        - asset: packages/nucleo/fontes/Barlow-Bold.ttf
+          weight: 700
+    - family: BarlowSemiCondensed
+      fonts:
+        - asset: packages/nucleo/fontes/BarlowSemiCondensed-Medium.ttf
+          weight: 500
+        - asset: packages/nucleo/fontes/BarlowSemiCondensed-SemiBold.ttf
+          weight: 600
+        - asset: packages/nucleo/fontes/BarlowSemiCondensed-Bold.ttf
+          weight: 700

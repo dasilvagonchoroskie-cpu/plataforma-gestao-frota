@@ -1,8 +1,8 @@
 name: Esteira
 
 # A cada envio: testa o banco num Supabase local (migrations do zero + testes
-# pgTAP), o núcleo de regras e os dois apps; compila o APK do motorista e o
-# painel web do gestor. Os registros de cada parte ficam no Release
+# pgTAP), o núcleo de regras e os dois apps; compila os APKs e publica o
+# painel web do gestor no ramo gh-pages (GitHub Pages). Os registros de cada parte ficam no Release
 # "registros" (para conferir de fora do GitHub).
 on:
   push:
@@ -127,3 +127,79 @@ jobs:
           echo "commit ${GITHUB_SHA::7} | resultado ${{ job.status }}" >> registros/motorista.log
           gh release view registros >/dev/null 2>&1 || gh release create registros --prerelease --title "Registros da esteira (uso interno)" --notes "Registros das execuções. Não é o aplicativo."
           gh release upload registros registros/motorista.log --clobber
+
+  gestor:
+    name: App e painel do gestor (análise, testes, APK e site)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+      - name: Dependências, análise e testes
+        working-directory: apps/gestor
+        run: |
+          set -o pipefail
+          mkdir -p ../../registros
+          (flutter pub get && flutter analyze --no-fatal-infos && flutter test --exclude-tags capturas) 2>&1 | tee ../../registros/gestor.log
+      - name: Imagens das telas
+        working-directory: apps/gestor
+        continue-on-error: true
+        run: flutter test --tags capturas --update-goldens 2>&1 | tail -5
+      - name: Compilar o painel web
+        working-directory: apps/gestor
+        run: |
+          set -o pipefail
+          flutter build web --release --base-href /plataforma-gestao-frota/ 2>&1 | tail -5 | tee -a ../../registros/gestor.log
+      - name: Compilar o APK de teste
+        working-directory: apps/gestor
+        run: |
+          set -o pipefail
+          NUMERO=$((100 + ${{ github.run_number }}))
+          flutter build apk --release --build-number=$NUMERO 2>&1 | tail -5 | tee -a ../../registros/gestor.log
+          mkdir -p ../../saida
+          cp build/app/outputs/flutter-apk/app-release.apk ../../saida/Frota-Gestor.apk
+          (cd test && zip -qr ../../../saida/telas-gestor.zip capturas) || true
+          ls -la ../../saida
+      - name: Publicar o APK de teste (Release "gestor-teste")
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release view gestor-teste >/dev/null 2>&1 || gh release create gestor-teste --prerelease \
+            --title "App do gestor - teste" --notes "APK de teste do app do gestor e do dono (chave de teste). Versão da esteira."
+          gh release upload gestor-teste saida/Frota-Gestor.apk --clobber
+          [ -f saida/telas-gestor.zip ] && gh release upload gestor-teste saida/telas-gestor.zip --clobber || true
+          echo "commit ${GITHUB_SHA::7} | APK publicado" >> registros/gestor.log
+      - name: Publicar o painel web (ramo gh-pages)
+        run: |
+          cd apps/gestor/build/web
+          touch .nojekyll
+          git init -q -b gh-pages
+          git config user.name "esteira"
+          git config user.email "esteira@users.noreply.github.com"
+          git add -A
+          git commit -q -m "Painel web do gestor (${GITHUB_SHA::7})"
+          git push -q -f "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" gh-pages
+          echo "commit ${GITHUB_SHA::7} | painel web publicado no ramo gh-pages" >> ../../../../registros/gestor.log
+      - name: Conferir as Edge Functions na nuvem
+        continue-on-error: true
+        run: |
+          CODIGO=$(curl -s -o resposta.json -w '%{http_code}' -X POST \
+            https://uinvhwhqhudniipobslu.supabase.co/functions/v1/entrar_com_cpf \
+            -H 'Content-Type: application/json' -H 'apikey: sb_publishable_nM7GeKdmBtrk7VxUBk6s3A_e9Yc9Mdn' \
+            -d '{"cpf":"123","senha":"x","aparelho":"esteira"}')
+          echo "entrar_com_cpf (CPF incompleto) respondeu $CODIGO: $(cat resposta.json)" | tee -a registros/gestor.log
+      - name: Guardar o registro
+        if: always()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "commit ${GITHUB_SHA::7} | resultado ${{ job.status }}" >> registros/gestor.log
+          gh release view registros >/dev/null 2>&1 || gh release create registros --prerelease --title "Registros da esteira (uso interno)" --notes "Registros das execuções. Não é o aplicativo."
+          gh release upload registros registros/gestor.log --clobber

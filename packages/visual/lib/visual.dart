@@ -7,5 +7,6 @@ export 'src/entrada.dart';
 export 'src/listas.dart';
 export 'src/placa_estrada.dart';
 export 'src/placa_veiculo.dart';
+export 'src/resumo.dart';
 export 'src/seletor_periodo.dart';
 export 'src/tema.dart';
