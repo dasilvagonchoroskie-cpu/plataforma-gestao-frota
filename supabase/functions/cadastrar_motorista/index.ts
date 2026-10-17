@@ -3,7 +3,8 @@
 // O piloto não depende de envio de e-mail. A conta nasce confirmada, com um
 // e-mail interno derivado do CPF (nunca recebe mensagens); o motorista entra
 // com CPF e senha (entrar_com_cpf) e depois pede entrada na empresa com o
-// código, como antes. Quem aprova é o gestor, conferindo nome e CPF.
+// código individual que o gestor gerou para ele (entra na hora). O aceite dos
+// termos marcado no cadastro fica registrado.
 // Limite contra abuso: 5 cadastros por hora por aparelho e 20 por endereço.
 import { clienteServidor, cors, cpfValido, emailDoMotorista, resposta } from "../_compartilhado/apoio.ts";
 
@@ -70,6 +71,13 @@ Deno.serve(async (req) => {
       await servidor.auth.admin.deleteUser(criado.user.id);
       if (erroPerfil.code === "23505") return emUso();
       throw erroPerfil;
+    }
+
+    // Aceite dos Termos de Uso e da Política de Privacidade marcado na tela de
+    // cadastro (versão, data e IP). Sem aceite aqui, o app pede depois de entrar.
+    const termos = String(corpo.termos ?? "");
+    if (/^\d{4}-\d{2}-\d{2}$/.test(termos)) {
+      await servidor.from("aceites_termos").insert({ perfil_id: criado.user.id, versao: termos, ip: ip === "-" ? null : ip });
     }
     return resposta({ ok: true });
   } catch (_e) {

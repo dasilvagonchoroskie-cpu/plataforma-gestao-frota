@@ -126,6 +126,51 @@ curl -s -X PUT "$A/auth/v1/user" -H "apikey: $K" -H "Authorization: Bearer $TW" 
   -d '{"password":"novasenha1","data":{"trocar_senha":false}}' >/dev/null
 [ "$(token dono.w@teste.com novasenha1)" != "null" ] && ok "o dono troca a senha provisória pela dele" || falha "troca de senha do dono"
 
+# Código individual do motorista (gerado pelo gestor) e termos no cadastro
+CONV=$(rpc "$TD" gerar_convite_motorista '{"p_nome":"Motorista Convite","p_cpf":"246.813.579-28"}' | jq -r .codigo)
+[ ${#CONV} -eq 6 ] && ok "o painel gera o código individual do motorista" || falha "gerar_convite_motorista" "$CONV"
+VT=$(psql "$DB" -tA -c "select public.versao_termos()")
+R=$(funcao cadastrar_motorista "" "{\"nome\":\"Motorista Convite\",\"cpf\":\"24681357928\",\"senha\":\"senha321\",\"aparelho\":\"conv-1\",\"termos\":\"$VT\"}")
+igual "${R%% *}" "200" "motorista cria a conta aceitando os termos"
+R=$(funcao entrar_com_cpf "" '{"cpf":"24681357928","senha":"senha321","aparelho":"conv-1"}')
+TC=$(echo "${R#* }" | jq -r .access_token)
+igual "$(rpc "$TC" situacao_acesso '{}' | jq -r .termos.aceito)" "true" "o aceite dos termos do cadastro fica guardado"
+igual "$(rpc "$TC" pedir_entrada "{\"p_codigo\":\"$CONV\"}" | jq -r .status)" "aprovado" "com o código individual entra na empresa na hora"
+
+# Recuperar o acesso com o código de recuperação
+REC=$(rpc "$TC" gerar_codigo_recuperacao '{}' | jq -r .)
+[ ${#REC} -eq 14 ] && ok "o motorista gera o código de recuperação" || falha "gerar_codigo_recuperacao" "$REC"
+R=$(funcao recuperar_acesso "" "{\"identificador\":\"246.813.579-28\",\"codigo\":\"AAAA-BBBB-CCCC\",\"senha_nova\":\"nova123\",\"aparelho\":\"rec-1\"}")
+igual "${R%% *}" "401" "código de recuperação errado é recusado"
+R=$(funcao recuperar_acesso "" "{\"identificador\":\"246.813.579-28\",\"codigo\":\"$REC\",\"senha_nova\":\"nova123\",\"aparelho\":\"rec-1\"}")
+igual "${R%% *}" "200" "CPF e código certos: senha nova criada"
+REC2=$(echo "${R#* }" | jq -r .codigo_novo)
+[ ${#REC2} -eq 14 ] && [ "$REC2" != "$REC" ] && ok "recebe um código de recuperação novo" || falha "codigo_novo" "$REC2"
+R=$(funcao entrar_com_cpf "" '{"cpf":"24681357928","senha":"nova123","aparelho":"rec-1"}')
+igual "${R%% *}" "200" "entra com a senha nova"
+R=$(funcao recuperar_acesso "" "{\"identificador\":\"24681357928\",\"codigo\":\"$REC\",\"senha_nova\":\"outra123\",\"aparelho\":\"rec-2\"}")
+igual "${R%% *}" "401" "o código antigo deixa de valer"
+TGR=$(token gestor.novo@teste.com "$SG2")
+RECG=$(rpc "$TGR" gerar_codigo_recuperacao '{}' | jq -r .)
+R=$(funcao recuperar_acesso "" "{\"identificador\":\"Gestor.Novo@teste.com\",\"codigo\":\"$RECG\",\"senha_nova\":\"gestor789\",\"aparelho\":\"rec-3\"}")
+igual "${R%% *}" "200" "gestor recupera com o e-mail e o código"
+[ "$(token gestor.novo@teste.com gestor789)" != "null" ] && ok "e entra com a senha nova" || falha "login do gestor depois de recuperar"
+
+# Exclusões com o Supabase Auth de verdade
+MOTC=$(curl -s "$A/rest/v1/motoristas?select=id&cpf=eq.24681357928" -H "apikey: $K" -H "Authorization: Bearer $TD" | jq -r '.[0].id')
+igual "$(rpc "$TD" excluir_motorista "{\"p_motorista_id\":\"$MOTC\"}" | jq -r .ok)" "true" "o dono exclui o motorista e os dados dele"
+TC=$(token "m24681357928@motorista.fortalezadigitalsecurity.com.br" nova123)
+igual "$(rpc "$TC" excluir_minha_conta '{}' | jq -r .apagada)" "true" "o motorista, sem empresa, exclui a própria conta"
+R=$(funcao entrar_com_cpf "" '{"cpf":"24681357928","senha":"nova123","aparelho":"rec-4"}')
+igual "${R%% *}" "401" "a conta excluída não entra mais"
+R=$(funcao cadastrar_motorista "" '{"nome":"Motorista Volta","cpf":"24681357928","senha":"senha654","aparelho":"conv-2"}')
+igual "${R%% *}" "200" "o CPF fica livre para um cadastro novo"
+psql "$DB" -tA -c "select public.bloquear_empresa(e.id, 'Teste encerrado.', 30) from public.empresas e where e.nome = 'Transportes W'" >/dev/null
+igual "$(rpc "$TW" situacao_acesso '{}' | jq -r .empresa.bloqueada)" "true" "a plataforma encerra o acesso de uma empresa"
+igual "$(curl -s "$A/rest/v1/caminhoes?select=id" -H "apikey: $K" -H "Authorization: Bearer $TW" | jq -r length)" "0" "e ela não vê mais nada"
+igual "$(rpc "$TW" excluir_minha_empresa '{"p_confirmacao":"Transportes W"}' | jq -r .ok)" "true" "mesmo bloqueado, o dono exclui a empresa e os dados"
+igual "$(token dono.w@teste.com novasenha1)" "null" "o login do dono some junto"
+
 echo "1..$N"
 echo "verificações: $N, falhas: $FALHAS"
 [ "$FALHAS" -eq 0 ]

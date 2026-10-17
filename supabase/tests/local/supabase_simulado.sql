@@ -45,7 +45,7 @@ create table if not exists auth.users (
 
 create table if not exists auth.identities (
   provider_id text not null,
-  user_id uuid not null references auth.users(id),
+  user_id uuid not null references auth.users(id) on delete cascade,
   identity_data jsonb not null,
   provider text not null,
   last_sign_in_at timestamptz,

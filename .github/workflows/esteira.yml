@@ -203,6 +203,7 @@ jobs:
           conferir cadastrar_motorista '{"nome":"Teste","cpf":"123","senha":"x","aparelho":"esteira"}' 400
           conferir redefinir_acesso '{}' 401
           conferir criar_acesso_gestor '{}' 401
+          conferir recuperar_acesso '{"identificador":"123","codigo":"x","senha_nova":"x"}' 400
       - name: Guardar o registro
         if: always()
         env:

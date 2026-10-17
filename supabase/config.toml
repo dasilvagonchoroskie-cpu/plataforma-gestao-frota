@@ -77,3 +77,6 @@ verify_jwt = false
 
 [functions.criar_acesso_gestor]
 verify_jwt = false
+
+[functions.recuperar_acesso]
+verify_jwt = false
