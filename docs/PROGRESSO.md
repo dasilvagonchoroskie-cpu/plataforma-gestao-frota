@@ -63,6 +63,12 @@ abaixo rodou e passou; o resto está marcado como não testado.
 - **feito e testado** — O resumo "como ele vê" usa o mesmo componente (`CorpoResumo`, pacote `visual`)
   do app do motorista; o teste `equipe_test.dart` confere que a conta do painel é a mesma do app.
 
+## Correção de 17/10/2026 — apps não abriam
+
+- **feito e testado** — Os APKs paravam no logo ao abrir (R8 quebrava o plugin shared_preferences).
+  Achado abrindo os APKs num emulador Android 14 na esteira. R8 desligado, tela de erro no lugar de
+  travar e job "aparelho" na esteira que instala e abre os dois APKs e falha se algum não abrir.
+
 ## Fase 7 — acabamento e piloto
 
 - **não feito** — SMTP próprio, Sentry, chave de assinatura definitiva, teste fechado no Google Play,

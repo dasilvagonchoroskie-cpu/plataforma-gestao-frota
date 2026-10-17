@@ -30,11 +30,15 @@ nela (seção 14) e anotada aqui. Qualquer item pode ser mudado.
     Pages (o build é o mesmo, `apps/gestor/build/web`).
 12. **APKs assinados com chave de teste** guardada no repositório (`android/app/chave-teste.jks`), para
     atualizar sem desinstalar durante o piloto. Trocar pela chave definitiva antes do Google Play.
-13. **Sentry ainda não ligado** (precisa de conta; fica para a Fase 7).
-14. **Empresa piloto:** "Empresa Teste (piloto)", dono gestaodefrota2027@gmail.com, código CODIGO-TROCADO,
+13. **R8 desligado na versão de entrega dos APKs.** O encolhedor R8 renomeava métodos que os plugins
+    `shared_preferences` e `path_provider` chamam por JNI; os dois apps ficavam parados no logo
+    (NoSuchMethodError, achado abrindo os APKs num emulador). Sem R8 o APK fica um pouco maior.
+    A esteira agora abre os dois APKs num emulador Android a cada envio (job "aparelho").
+14. **Sentry ainda não ligado** (precisa de conta; fica para a Fase 7).
+15. **Empresa piloto:** "Empresa Teste (piloto)", dono gestaodefrota2027@gmail.com, código CODIGO-TROCADO,
     plano piloto com 5 caminhões, status teste. Para a empresa real do piloto, rodar `criar_empresa` com
     o nome e o e-mail do dono.
-15. **Versões das migrations:** os arquivos foram renomeados para a versão que o Supabase gravou ao
+16. **Versões das migrations:** os arquivos foram renomeados para a versão que o Supabase gravou ao
     aplicar (20261017112902, 20261017113308, 20261017113838), para `supabase db push` não estranhar.
 
 ## Avisos do conselheiro do Supabase (conferidos, esperados)
