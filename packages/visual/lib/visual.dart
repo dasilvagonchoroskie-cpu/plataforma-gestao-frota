@@ -1,6 +1,7 @@
 /// Tema e componentes de tela da Plataforma de Gestão de Frota.
 library;
 
+export 'src/abertura.dart';
 export 'src/basicos.dart';
 export 'src/campos.dart';
 export 'src/entrada.dart';

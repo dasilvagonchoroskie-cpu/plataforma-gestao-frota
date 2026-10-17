@@ -3,11 +3,10 @@ name: Diagnóstico no emulador
 # Abre os APKs publicados num emulador Android e guarda a foto da tela e o
 # log do Android (para ver por que um app não abre). Resultado no Release
 # "registros" como diagnostico.zip.
+# A esteira já faz esta conferência a cada envio (job "aparelho"); este
+# fica para rodar à mão pelo botão "Run workflow".
 on:
   workflow_dispatch: {}
-  push:
-    branches: [main]
-    paths: ['ferramentas/diagnostico/**', '.github/workflows/diagnostico.yml']
 
 permissions:
   contents: write

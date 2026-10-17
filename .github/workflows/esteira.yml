@@ -2,7 +2,8 @@ name: Esteira
 
 # A cada envio: testa o banco num Supabase local (migrations do zero + testes
 # pgTAP), o núcleo de regras e os dois apps; compila os APKs e publica o
-# painel web do gestor no ramo gh-pages (GitHub Pages). Os registros de cada parte ficam no Release
+# painel web do gestor no ramo gh-pages (GitHub Pages) e abre os dois APKs num
+# emulador Android para garantir que eles abrem de verdade. Os registros de cada parte ficam no Release
 # "registros" (para conferir de fora do GitHub).
 on:
   push:
@@ -203,3 +204,41 @@ jobs:
           echo "commit ${GITHUB_SHA::7} | resultado ${{ job.status }}" >> registros/gestor.log
           gh release view registros >/dev/null 2>&1 || gh release create registros --prerelease --title "Registros da esteira (uso interno)" --notes "Registros das execuções. Não é o aplicativo."
           gh release upload registros registros/gestor.log --clobber
+
+  aparelho:
+    name: Abrir os dois APKs num celular Android (emulador)
+    needs: [motorista, gestor]
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v5
+      - name: Liberar a aceleração do emulador (KVM)
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Baixar os APKs desta execução
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mkdir -p apks
+          gh release download motorista-teste -p 'Frota-Motorista.apk' -D apks
+          gh release download gestor-teste -p 'Frota-Gestor.apk' -D apks
+      - name: Abrir os apps no Android 14
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          arch: x86_64
+          target: google_apis
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -no-snapshot
+          script: bash ferramentas/diagnostico/rodar.sh
+      - name: Guardar o resultado
+        if: always()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mkdir -p diagnostico
+          echo "commit ${GITHUB_SHA::7} | resultado ${{ job.status }}" >> diagnostico/resumo.txt
+          zip -qr diagnostico.zip diagnostico
+          gh release upload registros diagnostico.zip --clobber

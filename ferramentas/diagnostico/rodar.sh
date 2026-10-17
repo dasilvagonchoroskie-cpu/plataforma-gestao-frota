@@ -21,4 +21,17 @@ for app in motorista gestor; do
   grep -E "FATAL|AndroidRuntime|flutter|E/|Exception|Error" diagnostico/$app-logcat.txt | grep -v "^--------- beginning" | head -150 > diagnostico/$app-erros.txt
   adb shell am force-stop "$pkg"
 done
-exit 0
+
+# Confere: cada app escreveu FROTA_ABRIU (primeira tela apareceu) e não teve
+# erro sem tratamento na abertura.
+FALHOU=0
+for app in motorista gestor; do
+  if grep -q "FROTA_ABRIU $app" diagnostico/$app-logcat.txt && ! grep -q "Unhandled Exception" diagnostico/$app-logcat.txt; then
+    echo "ok: o app $app abriu" | tee -a diagnostico/resumo.txt
+  else
+    echo "FALHOU: o app $app não abriu" | tee -a diagnostico/resumo.txt
+    grep -m 3 "Unhandled Exception" diagnostico/$app-logcat.txt | cut -c1-400 | tee -a diagnostico/resumo.txt
+    FALHOU=1
+  fi
+done
+exit $FALHOU

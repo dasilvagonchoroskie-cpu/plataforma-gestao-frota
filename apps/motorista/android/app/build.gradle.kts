@@ -43,6 +43,11 @@ android {
     buildTypes {
         release {
             signingConfig = signingConfigs.getByName("teste")
+            // Sem o "encolhedor" R8: ele renomeia métodos que os plugins
+            // (shared_preferences, path_provider) chamam por JNI, e o app
+            // travava na abertura (NoSuchMethodError) só na versão de entrega.
+            isMinifyEnabled = false
+            isShrinkResources = false
         }
         debug {
             signingConfig = signingConfigs.getByName("teste")
