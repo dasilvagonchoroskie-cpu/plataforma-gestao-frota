@@ -1,0 +1,53 @@
+name: Diagnóstico no emulador
+
+# Abre os APKs publicados num emulador Android e guarda a foto da tela e o
+# log do Android (para ver por que um app não abre). Resultado no Release
+# "registros" como diagnostico.zip.
+on:
+  workflow_dispatch: {}
+  push:
+    branches: [main]
+    paths: ['ferramentas/diagnostico/**', '.github/workflows/diagnostico.yml']
+
+permissions:
+  contents: write
+
+jobs:
+  emulador:
+    name: Abrir os apps no emulador
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v5
+      - name: Liberar a aceleração do emulador (KVM)
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Baixar os APKs publicados
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mkdir -p apks
+          gh release download motorista-teste -p 'Frota-Motorista.apk' -D apks
+          gh release download gestor-teste -p 'Frota-Gestor.apk' -D apks
+          ls -la apks
+      - name: Emulador Android 14
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          arch: x86_64
+          target: google_apis
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -no-snapshot
+          script: bash ferramentas/diagnostico/rodar.sh
+      - name: Guardar o resultado
+        if: always()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mkdir -p diagnostico
+          echo "commit ${GITHUB_SHA::7}" >> diagnostico/resumo.txt
+          zip -qr diagnostico.zip diagnostico
+          gh release view registros >/dev/null 2>&1 || gh release create registros --prerelease --title "Registros da esteira (uso interno)" --notes "Registros das execuções. Não é o aplicativo."
+          gh release upload registros diagnostico.zip --clobber
