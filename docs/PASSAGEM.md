@@ -51,7 +51,7 @@ nela (seção 14) e anotada aqui. Qualquer item pode ser mudado.
 ## Pendências que dependem do usuário
 
 1. **E-mail dos códigos (SMTP).** O envio padrão do Supabase só entrega para e-mails da equipe da conta
-   (gestaodefrota2027@gmail.com) e tem limite baixo. Para motoristas criarem conta, configurar um SMTP
+   (gestaodefrota2027@gmail.com) e tem limite muito baixo (poucos e-mails por hora). Para motoristas criarem conta, configurar um SMTP
    próprio em Authentication > Emails > SMTP Settings. Opções: Gmail da conta do projeto com senha de
    app (grátis, até ~500 e-mails por dia) ou um serviço como Brevo ou Resend (plano grátis). Decidir.
 2. **Modelos de e-mail com o código.** Em Authentication > Emails > Templates, trocar o texto de
