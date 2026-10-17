@@ -1,0 +1,173 @@
+-- Dados de teste comuns (incluído pelos arquivos de teste com \ir).
+-- Duas empresas (X e Y), dono e gestor de X, dono de Y, motoristas A e B em X,
+-- motorista C em Y e uma conta D sem vínculo. Tudo dentro da transação do
+-- teste, que termina em ROLLBACK. Nunca usar com dados de produção.
+
+do $$
+begin
+  if not exists (select 1 from pg_proc where proname = 'plan') then
+    create extension if not exists pgtap with schema extensions;
+  end if;
+end
+$$;
+
+-- Executa um SQL como o usuário indicado (role authenticated + token) e
+-- devolve o resultado (jsonb). O papel volta ao normal no fim.
+create or replace function pg_temp.como(p_uid uuid, p_sql text)
+returns jsonb
+language plpgsql
+as $$
+declare
+  r jsonb;
+begin
+  perform set_config('request.jwt.claims',
+    json_build_object('sub', p_uid, 'role', 'authenticated')::text, true);
+  execute 'set local role authenticated';
+  execute p_sql into r;
+  execute 'reset role';
+  perform set_config('request.jwt.claims', '', true);
+  return r;
+end;
+$$;
+
+-- Igual, mas devolve o código do erro (sqlstate) ou 'ok'.
+create or replace function pg_temp.erro_como(p_uid uuid, p_sql text)
+returns text
+language plpgsql
+as $$
+begin
+  begin
+    perform set_config('request.jwt.claims',
+      json_build_object('sub', p_uid, 'role', 'authenticated')::text, true);
+    execute 'set local role authenticated';
+    execute p_sql;
+    execute 'reset role';
+    perform set_config('request.jwt.claims', '', true);
+    return 'ok';
+  exception when others then
+    return sqlstate;
+  end;
+end;
+$$;
+
+-- Mensagem do erro (para conferir o texto que o app mostra).
+create or replace function pg_temp.mensagem_como(p_uid uuid, p_sql text)
+returns text
+language plpgsql
+as $$
+begin
+  begin
+    perform set_config('request.jwt.claims',
+      json_build_object('sub', p_uid, 'role', 'authenticated')::text, true);
+    execute 'set local role authenticated';
+    execute p_sql;
+    execute 'reset role';
+    perform set_config('request.jwt.claims', '', true);
+    return 'ok';
+  exception when others then
+    return sqlerrm;
+  end;
+end;
+$$;
+
+create temp table fx (nome text primary key, id uuid not null);
+create or replace function pg_temp.fx(p_nome text) returns uuid language sql as $$
+  select id from fx where nome = p_nome
+$$;
+
+insert into fx values
+  ('u_dono_x',   '10000000-0000-4000-8000-000000000001'),
+  ('u_gestor_x', '10000000-0000-4000-8000-000000000002'),
+  ('u_a',        '10000000-0000-4000-8000-000000000003'),
+  ('u_b',        '10000000-0000-4000-8000-000000000004'),
+  ('u_dono_y',   '10000000-0000-4000-8000-000000000005'),
+  ('u_c',        '10000000-0000-4000-8000-000000000006'),
+  ('u_d',        '10000000-0000-4000-8000-000000000007'),
+  ('cam_x1',     '20000000-0000-4000-8000-000000000001'),
+  ('cam_x2',     '20000000-0000-4000-8000-000000000002'),
+  ('cam_y1',     '20000000-0000-4000-8000-000000000003'),
+  ('frete_a',    '30000000-0000-4000-8000-000000000001'),
+  ('frete_b',    '30000000-0000-4000-8000-000000000002'),
+  ('frete_c',    '30000000-0000-4000-8000-000000000003');
+
+insert into auth.users (id, email, email_confirmed_at)
+select id, e, now() from (values
+  (pg_temp.fx('u_dono_x'), 'dono.x@teste.com'),
+  (pg_temp.fx('u_gestor_x'), 'gestor.x@teste.com'),
+  (pg_temp.fx('u_a'), 'motorista.a@teste.com'),
+  (pg_temp.fx('u_b'), 'motorista.b@teste.com'),
+  (pg_temp.fx('u_dono_y'), 'dono.y@teste.com'),
+  (pg_temp.fx('u_c'), 'motorista.c@teste.com'),
+  (pg_temp.fx('u_d'), 'sem.vinculo@teste.com')
+) as t(id, e);
+
+insert into fx select 'empresa_x', (public.criar_empresa('Transportes X', 'Dono.X@teste.com ') ->> 'empresa_id')::uuid;
+insert into fx select 'empresa_y', (public.criar_empresa('Transportes Y', 'dono.y@teste.com') ->> 'empresa_id')::uuid;
+
+-- Donos se cadastram com o e-mail autorizado e já entram na empresa.
+select pg_temp.como(pg_temp.fx('u_dono_x'), $q$select public.completar_cadastro('Dono X')$q$);
+select pg_temp.como(pg_temp.fx('u_dono_y'), $q$select public.completar_cadastro('Dono Y')$q$);
+
+-- Dono X autoriza o gestor X, que se cadastra depois.
+select pg_temp.como(pg_temp.fx('u_dono_x'), $q$
+  insert into public.acessos_autorizados (id, empresa_id, email, papel)
+  values (gen_random_uuid(), public.empresa_do_usuario(), 'gestor.x@teste.com', 'gestor')
+  returning '{}'::jsonb $q$);
+select pg_temp.como(pg_temp.fx('u_gestor_x'), $q$select public.completar_cadastro('Gestor X')$q$);
+
+-- Motoristas: cadastro com CPF, pedido com o código e aprovação.
+select pg_temp.como(pg_temp.fx('u_a'), $q$select public.completar_cadastro('Motorista A', '529.982.247-25')$q$);
+select pg_temp.como(pg_temp.fx('u_b'), $q$select public.completar_cadastro('Motorista B', '11144477735')$q$);
+select pg_temp.como(pg_temp.fx('u_c'), $q$select public.completar_cadastro('Motorista C', '39053344705')$q$);
+select pg_temp.como(pg_temp.fx('u_d'), $q$select public.completar_cadastro('Sem Vinculo', '15350946056')$q$);
+
+select pg_temp.como(pg_temp.fx('u_a'), format('select public.pedir_entrada(%L)',
+  (select lower(codigo_entrada) from public.empresas where id = pg_temp.fx('empresa_x'))));
+select pg_temp.como(pg_temp.fx('u_b'), format('select public.pedir_entrada(%L)',
+  (select codigo_entrada from public.empresas where id = pg_temp.fx('empresa_x'))));
+select pg_temp.como(pg_temp.fx('u_c'), format('select public.pedir_entrada(%L)',
+  (select codigo_entrada from public.empresas where id = pg_temp.fx('empresa_y'))));
+
+select pg_temp.como(pg_temp.fx('u_gestor_x'), format('select public.decidir_entrada(%L, true)',
+  (select id from public.pedidos_entrada where perfil_id = pg_temp.fx('u_a'))));
+select pg_temp.como(pg_temp.fx('u_dono_x'), format('select public.decidir_entrada(%L, true)',
+  (select id from public.pedidos_entrada where perfil_id = pg_temp.fx('u_b'))));
+select pg_temp.como(pg_temp.fx('u_dono_y'), format('select public.decidir_entrada(%L, true)',
+  (select id from public.pedidos_entrada where perfil_id = pg_temp.fx('u_c'))));
+
+insert into fx select 'mot_a', id from public.motoristas where perfil_id = pg_temp.fx('u_a');
+insert into fx select 'mot_b', id from public.motoristas where perfil_id = pg_temp.fx('u_b');
+insert into fx select 'mot_c', id from public.motoristas where perfil_id = pg_temp.fx('u_c');
+insert into fx select 'cat_x', id from public.categorias_gasto
+  where empresa_id = pg_temp.fx('empresa_x') and nome = 'Borracharia';
+insert into fx select 'cat_y', id from public.categorias_gasto
+  where empresa_id = pg_temp.fx('empresa_y') and nome = 'Borracharia';
+
+-- Caminhões cadastrados pela gestão.
+select pg_temp.como(pg_temp.fx('u_gestor_x'), format($q$
+  insert into public.caminhoes (id, empresa_id, placa, numero_frota, modelo, confirmado)
+  values (%L, public.empresa_do_usuario(), 'ABC1D23', '01', 'Scania R450', true),
+         (%L, public.empresa_do_usuario(), 'DEF4567', '02', 'Volvo FH', true)
+  returning '{}'::jsonb $q$, pg_temp.fx('cam_x1'), pg_temp.fx('cam_x2')));
+select pg_temp.como(pg_temp.fx('u_dono_y'), format($q$
+  insert into public.caminhoes (id, empresa_id, placa, modelo, confirmado)
+  values (%L, public.empresa_do_usuario(), 'XYZ9K87', 'DAF XF', true)
+  returning '{}'::jsonb $q$, pg_temp.fx('cam_y1')));
+
+-- Um frete de cada motorista, enviado pela sincronização.
+create or replace function pg_temp.frete(p_id uuid, p_caminhao uuid, p_extra jsonb default '{}')
+returns jsonb language sql as $$
+  select jsonb_build_object('tabela', 'fretes', 'dados', jsonb_build_object(
+    'id', p_id, 'caminhao_id', p_caminhao, 'origem', 'Goiatuba', 'destino', 'Santos',
+    'embarcador', 'Cerealista', 'data_carga', '2026-10-05T03:00:00Z', 'peso_carga_kg', 37000,
+    'valor_tonelada_centavos', 18500, 'adiantamento_centavos', 480000, 'saldo_centavos', 195000,
+    'percentual_comissao', 13, 'comissao_sobre_bruto', false, 'peso_descarga_kg', 36880,
+    'desconto_quebra_centavos', 2600) || p_extra)
+$$;
+
+select pg_temp.como(pg_temp.fx('u_a'), format('select public.sincronizar_lote(%L)',
+  jsonb_build_object('itens', jsonb_build_array(pg_temp.frete(pg_temp.fx('frete_a'), pg_temp.fx('cam_x1'))))));
+select pg_temp.como(pg_temp.fx('u_b'), format('select public.sincronizar_lote(%L)',
+  jsonb_build_object('itens', jsonb_build_array(pg_temp.frete(pg_temp.fx('frete_b'), pg_temp.fx('cam_x2'))))));
+select pg_temp.como(pg_temp.fx('u_c'), format('select public.sincronizar_lote(%L)',
+  jsonb_build_object('itens', jsonb_build_array(pg_temp.frete(pg_temp.fx('frete_c'), pg_temp.fx('cam_y1'))))));
