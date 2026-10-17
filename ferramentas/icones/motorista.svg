@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <!-- Arte do ícone Frota Motorista: caminhão branco na placa verde de estrada. -->
+  <g id="arte">
+    <!-- carreta -->
+    <rect x="176" y="372" width="420" height="250" rx="22" fill="#FFFFFF"/>
+    <!-- cavalo (cabine) -->
+    <path d="M612 452 h118 c18 0 33 10 41 26 l58 112 c5 10 7 20 7 31 v1 c0 19 -15 34 -34 34 H612 z" fill="#FFFFFF"/>
+    <!-- vidro da cabine -->
+    <path d="M660 482 h62 c10 0 19 6 23 15 l34 70 h-119 z" fill="#0B5D3B"/>
+    <!-- chassi -->
+    <rect x="176" y="640" width="660" height="26" rx="13" fill="#FFFFFF"/>
+    <!-- rodas -->
+    <g fill="#FFFFFF" stroke="#0B5D3B" stroke-width="18">
+      <circle cx="270" cy="682" r="56"/>
+      <circle cx="404" cy="682" r="56"/>
+      <circle cx="728" cy="682" r="56"/>
+    </g>
+    <g fill="#0B5D3B">
+      <circle cx="270" cy="682" r="18"/>
+      <circle cx="404" cy="682" r="18"/>
+      <circle cx="728" cy="682" r="18"/>
+    </g>
+    <!-- faixa da estrada -->
+    <g fill="#F2B300">
+      <rect x="196" y="792" width="150" height="30" rx="15"/>
+      <rect x="437" y="792" width="150" height="30" rx="15"/>
+      <rect x="678" y="792" width="150" height="30" rx="15"/>
+    </g>
+  </g>
+</svg>

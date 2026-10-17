@@ -80,6 +80,52 @@ for i in 1 2 3 4; do funcao entrar_com_cpf "" '{"cpf":"52998224725","senha":"err
 R=$(funcao entrar_com_cpf "" "{\"cpf\":\"52998224725\",\"senha\":\"$NOVA\",\"aparelho\":\"teste-4\"}")
 igual "${R%% *}" "429" "depois de 5 erros seguidos o CPF fica bloqueado, mesmo com a senha certa"
 
+# Cadastro do motorista sem e-mail (nome, CPF e senha)
+R=$(funcao cadastrar_motorista "" '{"nome":"Motorista Sem Email","cpf":"111.444.777-35","senha":"senha456","aparelho":"cad-1"}')
+igual "${R%% *}" "200" "motorista cria a conta só com nome, CPF e senha"
+R=$(funcao entrar_com_cpf "" '{"cpf":"11144477735","senha":"senha456","aparelho":"cad-1"}')
+igual "${R%% *}" "200" "e já entra com CPF e senha"
+TN=$(echo "${R#* }" | jq -r .access_token)
+igual "$(rpc "$TN" pedir_entrada "{\"p_codigo\":\"$CODIGO\"}" | jq -r .status)" "pendente" "e pede entrada na empresa com o código"
+R=$(funcao cadastrar_motorista "" '{"nome":"Fulano","cpf":"123.456.789-00","senha":"senha789","aparelho":"cad-2"}')
+igual "${R%% *} $(echo "${R#* }" | jq -r .codigo)" "400 cpf_invalido" "CPF com dígito errado é recusado"
+R=$(funcao cadastrar_motorista "" '{"nome":"Fulano","cpf":"39053344705","senha":"123","aparelho":"cad-2"}')
+igual "${R%% *} $(echo "${R#* }" | jq -r .codigo)" "400 senha_curta" "senha curta é recusada"
+for i in 1 2 3 4 5; do
+  R=$(funcao cadastrar_motorista "" '{"nome":"Outro","cpf":"11144477735","senha":"senha789","aparelho":"cad-4"}')
+done
+igual "${R%% *} $(echo "${R#* }" | jq -r .codigo)" "409 cpf_em_uso" "CPF que já tem conta não cria outra"
+R=$(funcao cadastrar_motorista "" '{"nome":"Outro","cpf":"39053344705","senha":"senha789","aparelho":"cad-4"}')
+igual "${R%% *}" "429" "mais de 5 cadastros por hora no mesmo aparelho são bloqueados"
+
+# Acesso do gestor criado pelo dono (senha provisória, sem e-mail)
+R=$(funcao criar_acesso_gestor "$TN" '{"email":"gestor.novo@teste.com","nome":"Gestor Novo"}')
+igual "${R%% *}" "403" "motorista não cria acesso de gestor"
+R=$(funcao criar_acesso_gestor "$TD" '{"email":"Gestor.Novo@teste.com","nome":"Gestor Novo"}')
+igual "${R%% *}" "200" "dono cria o acesso do gestor"
+SG=$(echo "${R#* }" | jq -r .senha_provisoria)
+TG=$(token gestor.novo@teste.com "$SG")
+igual "$(rpc "$TG" situacao_acesso '{}' | jq -r '.perfil.papel + ":" + .empresa.nome')" "gestor:Transportes Teste" "gestor entra com a senha provisória e já está na empresa"
+igual "$(curl -s "$A/auth/v1/user" -H "apikey: $K" -H "Authorization: Bearer $TG" | jq -r .user_metadata.trocar_senha)" "true" "o app pede para o gestor trocar a senha"
+R=$(funcao criar_acesso_gestor "$TG" '{"email":"outro.gestor@teste.com","nome":"Outro"}')
+igual "${R%% *}" "403" "gestor não cria outro gestor"
+R=$(funcao criar_acesso_gestor "$TD" '{"email":"gestor.novo@teste.com"}')
+igual "${R%% *}" "200" "dono gera senha nova para o gestor que esqueceu"
+SG2=$(echo "${R#* }" | jq -r .senha_provisoria)
+igual "$(token gestor.novo@teste.com "$SG")" "null" "a senha provisória anterior deixa de valer"
+[ "$(token gestor.novo@teste.com "$SG2")" != "null" ] && ok "a senha nova funciona" || falha "senha nova do gestor"
+R=$(funcao criar_acesso_gestor "$TD" '{"email":"moto@teste.com","nome":"Motorista"}')
+igual "${R%% *}" "409" "e-mail de motorista não vira gestor"
+
+# Login do dono criado pela plataforma (função criar_login_dono)
+psql "$DB" -tA -c "select public.criar_empresa('Transportes W', 'dono.w@teste.com')" >/dev/null
+psql "$DB" -tA -c "select public.criar_login_dono('dono.w@teste.com', 'Dono W', 'provisoria9')" >/dev/null
+TW=$(token dono.w@teste.com provisoria9)
+igual "$(rpc "$TW" situacao_acesso '{}' | jq -r '.perfil.papel + ":" + .empresa.nome')" "dono:Transportes W" "login do dono criado pela plataforma entra no Supabase"
+curl -s -X PUT "$A/auth/v1/user" -H "apikey: $K" -H "Authorization: Bearer $TW" -H "Content-Type: application/json" \
+  -d '{"password":"novasenha1","data":{"trocar_senha":false}}' >/dev/null
+[ "$(token dono.w@teste.com novasenha1)" != "null" ] && ok "o dono troca a senha provisória pela dele" || falha "troca de senha do dono"
+
 echo "1..$N"
 echo "verificações: $N, falhas: $FALHAS"
 [ "$FALHAS" -eq 0 ]

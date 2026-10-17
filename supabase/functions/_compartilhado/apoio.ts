@@ -47,3 +47,29 @@ export function clientePublico(token?: string): SupabaseClient {
 }
 
 export const espera = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+const ALFABETO_SENHA = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+
+/** Senha provisória de 8 caracteres sem letras que se confundem (0/O, 1/I). */
+export function senhaProvisoria(): string {
+  const bytes = crypto.getRandomValues(new Uint8Array(8));
+  return Array.from(bytes, (b) => ALFABETO_SENHA[b % ALFABETO_SENHA.length]).join("");
+}
+
+/** Confere os dois dígitos verificadores do CPF (só números). */
+export function cpfValido(cpf: string): boolean {
+  if (!/^\d{11}$/.test(cpf) || /^(\d)\1{10}$/.test(cpf)) return false;
+  const d = cpf.split("").map(Number);
+  const dv = (n: number) => {
+    let soma = 0;
+    for (let i = 0; i < n; i++) soma += d[i] * (n + 1 - i);
+    const r = (soma * 10) % 11;
+    return r === 10 ? 0 : r;
+  };
+  return dv(9) === d[9] && dv(10) === d[10];
+}
+
+/** Login interno do motorista (ele entra com CPF; este e-mail nunca recebe nada). */
+export const emailDoMotorista = (cpf: string) => `m${cpf}@motorista.fortalezadigitalsecurity.com.br`;
+
+export const emailValido = (e: string) => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e);

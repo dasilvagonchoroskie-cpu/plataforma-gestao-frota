@@ -114,4 +114,46 @@ void main() {
     await tester.scrollUntilVisible(find.text('Sua parte (13%)'), 300, scrollable: find.byType(Scrollable).last);
     expect(find.text('R\$ 877,50'), findsOneWidget);
   });
+
+  testWidgets('criar conta sem e-mail: nome, CPF e senha, e já pede o código da empresa', (tester) async {
+    tester.view.physicalSize = const Size(1080, 2340);
+    tester.view.devicePixelRatio = 2.75;
+    addTearDown(tester.view.reset);
+    final s = ServidorFalso()
+      ..sessao = false
+      ..situacaoFixa = {
+        'logado': true,
+        'perfil': {'id': 'u-novo', 'nome': 'Novo Motorista', 'papel': 'motorista', 'ativo': true},
+        'empresa': null,
+        'motorista': null,
+        'pedido': null,
+      };
+    await tester.pumpWidget(ProviderScope(
+      overrides: [
+        armazenamentoProvider.overrideWithValue(ArmazenamentoMemoria()),
+        servidorProvider.overrideWithValue(s),
+        sincronizarSozinhoProvider.overrideWithValue(false),
+      ],
+      child: const AplicativoMotorista(),
+    ));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Criar minha conta'));
+    await tester.pumpAndSettle();
+    expect(find.text('Criar conta'), findsOneWidget);
+    expect(find.textContaining('E-mail'), findsNothing, reason: 'o cadastro não pede e-mail');
+
+    final campos = find.byType(TextField);
+    await tester.enterText(campos.at(0), 'Novo Motorista');
+    await tester.enterText(campos.at(1), '12345678900');
+    await tester.enterText(campos.at(2), 'senha1');
+    await tester.tap(find.text('Criar minha conta'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('Confira o CPF'), findsOneWidget);
+
+    await tester.enterText(campos.at(1), '52998224725');
+    await tester.tap(find.text('Criar minha conta'));
+    await tester.pumpAndSettle();
+    expect(s.cadastros, ['52998224725']);
+    expect(find.text('Código da empresa'), findsOneWidget);
+  });
 }

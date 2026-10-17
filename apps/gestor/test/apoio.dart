@@ -35,6 +35,7 @@ class ServidorFalso implements Servidor {
 
   String usuario;
   bool sessao = true;
+  bool trocarSenha = false;
   bool online = true;
   String? senhaCerta = 'segredo1';
   final chamadas = <String>[];
@@ -70,7 +71,32 @@ class ServidorFalso implements Servidor {
   @override
   Future<void> confirmarCodigoCadastro(String email, String codigo) async => sessao = true;
   @override
-  Future<void> definirSenha(String senha) async => chamadas.add('senha');
+  Future<void> definirSenha(String senha) async {
+    chamadas.add('senha');
+    trocarSenha = false;
+  }
+
+  @override
+  bool get precisaTrocarSenha => trocarSenha;
+
+  @override
+  Future<Map<String, Object?>> criarAcessoGestor(String email, String nome) async {
+    _rede();
+    final e = email.trim().toLowerCase();
+    chamadas.add('acesso gestor $e');
+    if (!t(Fontes.acessos).any((a) => a['email'] == e)) {
+      t(Fontes.acessos).add({
+        'id': 'ac-${t(Fontes.acessos).length + 1}',
+        'empresa_id': empresaId,
+        'email': e,
+        'papel': 'gestor',
+        'ativo': true,
+      });
+      t(Fontes.perfis).add({'id': 'u-$e', 'nome': nome, 'email': e, 'papel': 'gestor', 'ativo': true});
+    }
+    return {'ok': true, 'nome': nome, 'email': e, 'senha_provisoria': 'H4QZ8WMP'};
+  }
+
   @override
   Future<Map<String, Object?>> completarCadastro(String nome) async {
     chamadas.add('cadastro $nome');

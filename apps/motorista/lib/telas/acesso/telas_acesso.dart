@@ -69,7 +69,6 @@ class MensagemErro extends StatelessWidget {
   }
 }
 
-String _aparelho() => 'motorista-app';
 
 // ------------------------------------------------------------------ início
 
@@ -161,7 +160,7 @@ class _TelaEntrarState extends ConsumerState<TelaEntrar> {
     setState(() => _ocupado = true);
     try {
       final s = ref.read(servidorProvider);
-      await s.entrarComCpf(soDigitos(_cpf.text), _senha.text, _aparelho());
+      await s.entrarComCpf(soDigitos(_cpf.text), _senha.text, await idDoAparelho(ref.read(armazenamentoProvider)));
       if (!mounted) return;
       if (s.precisaTrocarSenha) {
         await Navigator.push(context, MaterialPageRoute(builder: (_) => const TelaTrocarSenha()));
@@ -198,7 +197,7 @@ class _TelaEntrarState extends ConsumerState<TelaEntrar> {
             child: const Text('Esqueci a senha'),
           ),
         ),
-        const Nota('Perdeu o acesso ao e-mail? Peça para o seu patrão criar uma senha provisória pelo painel.'),
+        const Nota('Esqueceu a senha? Peça para o seu patrão criar uma senha provisória pelo painel.'),
       ],
     );
   }
@@ -206,7 +205,7 @@ class _TelaEntrarState extends ConsumerState<TelaEntrar> {
 
 // ----------------------------------------------------------- criar conta
 
-/// Cadastro em três passos: e-mail, código que chega no e-mail, nome/CPF/senha.
+/// Cadastro numa tela só: nome, CPF e senha. Não precisa de e-mail.
 class TelaCriarConta extends ConsumerStatefulWidget {
   const TelaCriarConta({super.key});
 
@@ -215,28 +214,40 @@ class TelaCriarConta extends ConsumerStatefulWidget {
 }
 
 class _TelaCriarContaState extends ConsumerState<TelaCriarConta> {
-  final _email = TextEditingController();
-  final _codigo = TextEditingController();
-  int _passo = 0;
+  final _nome = TextEditingController();
+  final _cpf = TextEditingController();
+  final _senha = TextEditingController();
   String? _erro;
+  String? _erroNome;
+  String? _erroCpf;
+  String? _erroSenha;
   bool _ocupado = false;
 
   @override
   void dispose() {
-    _email.dispose();
-    _codigo.dispose();
+    _nome.dispose();
+    _cpf.dispose();
+    _senha.dispose();
     super.dispose();
   }
 
-  bool get _emailOk => RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(_email.text.trim());
-
-  Future<void> _rodar(Future<void> Function() f) async {
+  Future<void> _criar() async {
     setState(() {
       _erro = null;
-      _ocupado = true;
+      _erroNome = _nome.text.trim().length < 2 ? 'Escreva o seu nome.' : null;
+      _erroCpf = cpfValido(_cpf.text) ? null : 'Confira o CPF: tem 11 números.';
+      _erroSenha = _senha.text.length < 6 ? 'Pelo menos 6 letras ou números.' : null;
     });
+    if (_erroNome != null || _erroCpf != null || _erroSenha != null) return;
+    setState(() => _ocupado = true);
     try {
-      await f();
+      final s = ref.read(servidorProvider);
+      final aparelho = await idDoAparelho(ref.read(armazenamentoProvider));
+      final cpf = soDigitos(_cpf.text);
+      await s.cadastrarMotorista(_nome.text, cpf, _senha.text, aparelho);
+      await s.entrarComCpf(cpf, _senha.text, aparelho);
+      await ref.read(acessoProvider.notifier).recarregar();
+      if (mounted) Navigator.of(context).popUntil((r) => r.isFirst);
     } on ErroServidor catch (e) {
       setState(() => _erro = e.mensagem);
     } finally {
@@ -244,69 +255,28 @@ class _TelaCriarContaState extends ConsumerState<TelaCriarConta> {
     }
   }
 
-  Future<void> _pedirCodigo() async {
-    if (!_emailOk) {
-      setState(() => _erro = 'Este e-mail não parece certo. Confira.');
-      return;
-    }
-    await _rodar(() async {
-      await ref.read(servidorProvider).pedirCodigoCadastro(_email.text);
-      setState(() => _passo = 1);
-    });
-  }
-
-  Future<void> _confirmar() async {
-    if (_codigo.text.trim().length < 6) {
-      setState(() => _erro = 'Digite os 6 números que chegaram no e-mail.');
-      return;
-    }
-    await _rodar(() async {
-      await ref.read(servidorProvider).confirmarCodigoCadastro(_email.text, _codigo.text);
-      if (!mounted) return;
-      await Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (_) => TelaCompletarCadastro(email: _email.text.trim().toLowerCase())),
-      );
-    });
-  }
-
   @override
   Widget build(BuildContext context) {
-    if (_passo == 0) {
-      return PaginaAcesso(
-        titulo: 'Criar conta',
-        texto: 'Digite o seu e-mail. Vamos mandar um código de 6 números para confirmar que ele é seu.',
-        botao: 'Mandar o código',
-        aoTocar: _pedirCodigo,
-        ocupado: _ocupado,
-        filhos: [
-          Campo(controle: _email, rotulo: 'E-mail', tipo: TipoCampo.email, dica: 'nome@gmail.com', autofoco: true),
-          MensagemErro(_erro),
-        ],
-      );
-    }
     return PaginaAcesso(
-      titulo: 'Digite o código',
-      texto: 'Mandamos um código para ${_email.text.trim()}. Olhe também na caixa de spam.',
-      botao: 'Confirmar',
-      aoTocar: _confirmar,
+      titulo: 'Criar conta',
+      texto: 'Só o seu nome, o CPF e uma senha. Depois você digita o código da empresa que o seu patrão mandar.',
+      botao: 'Criar minha conta',
+      aoTocar: _criar,
       ocupado: _ocupado,
       filhos: [
-        Campo(controle: _codigo, rotulo: 'Código de 6 números', tipo: TipoCampo.numeros, autofoco: true),
+        Campo(controle: _nome, rotulo: 'Seu nome', maiusculas: TextCapitalization.words, erro: _erroNome, autofoco: true),
+        const SizedBox(height: 16),
+        Campo(controle: _cpf, rotulo: 'CPF', tipo: TipoCampo.cpf, dica: '000.000.000-00', erro: _erroCpf),
+        const SizedBox(height: 16),
+        Campo(
+          controle: _senha,
+          rotulo: 'Crie uma senha',
+          tipo: TipoCampo.senha,
+          erro: _erroSenha,
+          ajuda: 'Pelo menos 6 letras ou números. Você vai entrar com o CPF e esta senha.',
+          acaoTeclado: TextInputAction.done,
+        ),
         MensagemErro(_erro),
-        const SizedBox(height: 8),
-        Align(
-          alignment: Alignment.centerLeft,
-          child: TextButton(onPressed: _ocupado ? null : _pedirCodigo, child: const Text('Mandar outro código')),
-        ),
-        TextButton(
-          onPressed: () => setState(() {
-            _passo = 0;
-            _codigo.clear();
-            _erro = null;
-          }),
-          child: const Text('Trocar o e-mail'),
-        ),
       ],
     );
   }
@@ -392,74 +362,20 @@ class _TelaCompletarCadastroState extends ConsumerState<TelaCompletarCadastro> {
 
 // ------------------------------------------------------------ esqueci a senha
 
-class TelaEsqueciSenha extends ConsumerStatefulWidget {
+/// Sem e-mail no cadastro, quem cria uma senha nova é o patrão, pelo painel.
+class TelaEsqueciSenha extends StatelessWidget {
   const TelaEsqueciSenha({super.key});
 
   @override
-  ConsumerState<TelaEsqueciSenha> createState() => _TelaEsqueciSenhaState();
-}
-
-class _TelaEsqueciSenhaState extends ConsumerState<TelaEsqueciSenha> {
-  final _email = TextEditingController();
-  final _codigo = TextEditingController();
-  int _passo = 0;
-  String? _erro;
-  bool _ocupado = false;
-
-  @override
-  void dispose() {
-    _email.dispose();
-    _codigo.dispose();
-    super.dispose();
-  }
-
-  Future<void> _rodar(Future<void> Function() f) async {
-    setState(() {
-      _erro = null;
-      _ocupado = true;
-    });
-    try {
-      await f();
-    } on ErroServidor catch (e) {
-      setState(() => _erro = e.mensagem);
-    } finally {
-      if (mounted) setState(() => _ocupado = false);
-    }
-  }
-
-  @override
   Widget build(BuildContext context) {
-    if (_passo == 0) {
-      return PaginaAcesso(
-        titulo: 'Esqueci a senha',
-        texto: 'Digite o e-mail do seu cadastro. Se ele estiver certo, chega um código para criar uma senha nova.',
-        botao: 'Mandar o código',
-        ocupado: _ocupado,
-        aoTocar: () => _rodar(() async {
-          await ref.read(servidorProvider).pedirCodigoSenha(_email.text);
-          setState(() => _passo = 1);
-        }),
-        filhos: [
-          Campo(controle: _email, rotulo: 'E-mail', tipo: TipoCampo.email, autofoco: true),
-          MensagemErro(_erro),
-          const SizedBox(height: 16),
-          const Nota('Perdeu o acesso ao e-mail? Peça para o seu patrão criar uma senha provisória pelo painel.'),
-        ],
-      );
-    }
     return PaginaAcesso(
-      titulo: 'Digite o código',
-      texto: 'Se o e-mail ${_email.text.trim()} tiver cadastro, o código chegou lá. Olhe também no spam.',
-      botao: 'Continuar',
-      ocupado: _ocupado,
-      aoTocar: () => _rodar(() async {
-        await ref.read(servidorProvider).confirmarCodigoSenha(_email.text, _codigo.text);
-        if (!mounted) return;
-        await Navigator.pushReplacement(this.context, MaterialPageRoute(builder: (_) => const TelaTrocarSenha()));
-      }),
-      filhos: [
-        Campo(controle: _codigo, rotulo: 'Código de 6 números', tipo: TipoCampo.numeros, autofoco: true),
-        MensagemErro(_erro),
+      titulo: 'Esqueci a senha',
+      texto: 'Fale com o seu patrão ou com o gestor da empresa. Ele cria uma senha provisória para você no painel '
+          '(Motoristas, o seu nome, Redefinir o acesso).',
+      botao: 'Já tenho a senha provisória',
+      aoTocar: () => Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const TelaEntrar())),
+      filhos: const [
+        Nota('Você entra com o seu CPF e a senha provisória. Em seguida o app pede para você criar uma senha nova.'),
       ],
     );
   }

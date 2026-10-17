@@ -71,3 +71,9 @@ verify_jwt = false
 
 [functions.redefinir_acesso]
 verify_jwt = false
+
+[functions.cadastrar_motorista]
+verify_jwt = false
+
+[functions.criar_acesso_gestor]
+verify_jwt = false

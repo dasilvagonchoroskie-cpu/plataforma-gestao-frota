@@ -47,7 +47,11 @@ class ServidorFalso implements Servidor {
   final placasDoGestor = <String, String>{}; // placa -> id do caminhão do gestor
   var relogio = DateTime.utc(2026, 10, 15, 12);
 
-  Map<String, Object?> situacaoAtual() => situacaoDe(motoristaId);
+  /// Situação fixa (cadastro novo, sem empresa); nula = motorista aprovado.
+  Map<String, Object?>? situacaoFixa;
+  final cadastros = <String>[];
+
+  Map<String, Object?> situacaoAtual() => situacaoFixa ?? situacaoDe(motoristaId);
 
   void _rede() {
     if (!online) throw const ErroServidor('Sem internet agora.', semInternet: true);
@@ -160,6 +164,15 @@ class ServidorFalso implements Servidor {
   Future<void> entrarComCpf(String cpf, String senha, String aparelho) async {
     _rede();
     sessao = true;
+  }
+
+  @override
+  Future<void> cadastrarMotorista(String nome, String cpf, String senha, String aparelho) async {
+    _rede();
+    if (cadastros.contains(cpf)) {
+      throw const ErroServidor('Este CPF já tem cadastro. Entre com CPF e senha.', codigo: 'cpf_em_uso');
+    }
+    cadastros.add(cpf);
   }
 
   @override

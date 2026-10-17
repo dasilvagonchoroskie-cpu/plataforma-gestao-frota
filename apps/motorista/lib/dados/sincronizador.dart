@@ -88,14 +88,7 @@ class Sincronizador extends Notifier<EstadoEnvio> {
     }
   }
 
-  Future<String> _dispositivo() async {
-    var id = await _a.lerEstado('dispositivo_id');
-    if (id == null) {
-      id = novoId();
-      await _a.gravarEstado('dispositivo_id', id);
-    }
-    return id;
-  }
+  Future<String> _dispositivo() => idDoAparelho(_a);
 
   /// Manda a fila em lotes até esvaziar. Só tira da fila o que o servidor
   /// confirmou; se a internet cair no meio, o resto vai na próxima.

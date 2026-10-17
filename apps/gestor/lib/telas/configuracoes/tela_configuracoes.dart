@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:nucleo/nucleo.dart';
 import 'package:visual/visual.dart';
@@ -383,11 +384,12 @@ class TelaGestores extends ConsumerWidget {
   const TelaGestores({super.key});
 
   Future<void> _novo(BuildContext context, WidgetRef ref) async {
-    final controle = TextEditingController();
-    final email = await showDialog<String>(
+    final nome = TextEditingController();
+    final email = TextEditingController();
+    final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Liberar um gestor'),
+        title: const Text('Criar acesso de gestor'),
         content: SizedBox(
           width: 400,
           child: Column(
@@ -395,29 +397,72 @@ class TelaGestores extends ConsumerWidget {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               const Text(
-                'Digite o e-mail da pessoa. Depois ela abre o painel, toca em "Criar minha conta" com este '
-                'e-mail e já entra na empresa.',
+                'O painel cria uma senha provisória. Você passa para a pessoa e ela entra com o e-mail '
+                'e essa senha; no primeiro login ela cria a senha dela.',
               ),
               const SizedBox(height: 14),
-              Campo(controle: controle, rotulo: 'E-mail do gestor', tipo: TipoCampo.email, autofoco: true),
+              Campo(controle: nome, rotulo: 'Nome do gestor', maiusculas: TextCapitalization.words, autofoco: true),
+              const SizedBox(height: 12),
+              Campo(controle: email, rotulo: 'E-mail do gestor', tipo: TipoCampo.email),
             ],
           ),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar')),
-          FilledButton(onPressed: () => Navigator.pop(ctx, controle.text.trim()), child: const Text('Liberar')),
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancelar')),
+          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Criar acesso')),
         ],
       ),
     );
-    if (email == null || !context.mounted) return;
-    if (!RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(email)) {
+    if (ok != true || !context.mounted) return;
+    if (nome.text.trim().length < 2) {
+      mostrarMensagem(context, 'Escreva o nome do gestor.');
+      return;
+    }
+    if (!RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(email.text.trim())) {
       mostrarMensagem(context, 'E-mail inválido.');
       return;
     }
-    await executar(
-      context,
-      () => ref.read(equipeProvider.notifier).autorizarGestor(email),
-      sucesso: 'E-mail liberado. Avise a pessoa para criar a conta.',
+    await _gerar(context, ref, email.text.trim(), nome.text.trim());
+  }
+
+  /// Cria ou renova o acesso e mostra a senha provisória (só agora).
+  Future<void> _gerar(BuildContext context, WidgetRef ref, String email, String nome) async {
+    Map<String, Object?>? r;
+    await executar(context, () async => r = await ref.read(equipeProvider.notifier).criarAcessoGestor(email, nome));
+    final senha = r?['senha_provisoria']?.toString();
+    if (senha == null || !context.mounted) return;
+    final quem = '${r?['nome'] ?? nome}'.trim();
+    final recado =
+        'Seu acesso ao painel da frota: entre no app Frota Gestor com o e-mail $email e a senha '
+        'provisória $senha. No primeiro login você cria a sua senha.';
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Senha provisória'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Passe para ${quem.isEmpty ? email : quem}. Ela aparece só agora.'),
+            const SizedBox(height: 16),
+            Center(
+              child: SelectableText(senha, style: estiloNumero(34, peso: FontWeight.w700).copyWith(letterSpacing: 4)),
+            ),
+            const SizedBox(height: 16),
+            Text('Entra com o e-mail $email e esta senha.'),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () async {
+              await Clipboard.setData(ClipboardData(text: recado));
+              if (ctx.mounted) mostrarMensagem(ctx, 'Recado copiado. Cole no WhatsApp da pessoa.');
+            },
+            child: const Text('Copiar recado'),
+          ),
+          FilledButton(onPressed: () => Navigator.pop(ctx), child: const Text('Pronto')),
+        ],
+      ),
     );
   }
 
@@ -433,7 +478,7 @@ class TelaGestores extends ConsumerWidget {
               heroTag: 'novo_gestor',
               onPressed: () => _novo(context, ref),
               icon: const Icon(Icons.person_add_alt),
-              label: const Text('Liberar gestor'),
+              label: const Text('Criar acesso de gestor'),
             )
           : null,
       body: ListaCentral(
@@ -459,12 +504,17 @@ class TelaGestores extends ConsumerWidget {
                 [
                   a.email,
                   a.papel == 'dono' ? 'dono' : 'gestor',
-                  if (!a.ativo) 'sem acesso' else if (perfisPorEmail[a.email] == null) 'ainda não criou a conta',
+                  if (!a.ativo) 'sem acesso' else if (perfisPorEmail[a.email] == null) 'ainda sem senha',
                 ].join('  ·  '),
               ),
               trailing: e.souDono && a.email != e.eu.email.toLowerCase()
-                  ? TextButton(
-                      onPressed: () async {
+                  ? PopupMenuButton<String>(
+                      tooltip: 'Opções',
+                      onSelected: (op) async {
+                        if (op == 'senha') {
+                          await _gerar(context, ref, a.email, perfisPorEmail[a.email]?.nome ?? '');
+                          return;
+                        }
                         final ok = await confirmar(
                           context,
                           titulo: a.ativo ? 'Tirar o acesso?' : 'Devolver o acesso?',
@@ -478,7 +528,11 @@ class TelaGestores extends ConsumerWidget {
                           await executar(context, () => ref.read(equipeProvider.notifier).ativarAcesso(a.id, !a.ativo));
                         }
                       },
-                      child: Text(a.ativo ? 'Tirar acesso' : 'Devolver'),
+                      itemBuilder: (_) => [
+                        if (a.ativo && a.papel == 'gestor')
+                          const PopupMenuItem(value: 'senha', child: Text('Gerar senha provisória')),
+                        PopupMenuItem(value: 'ativo', child: Text(a.ativo ? 'Tirar acesso' : 'Devolver acesso')),
+                      ],
                     )
                   : null,
             ),

@@ -9,7 +9,7 @@ void main() {
   testWidgets('entrar com e-mail e senha abre o painel da empresa', (tester) async {
     final s = servidorComAmostra()..sessao = false;
     await abrirApp(tester, s);
-    expect(find.text('Criar minha conta'), findsOneWidget);
+    expect(find.text('Esqueci a senha'), findsOneWidget);
 
     await tester.enterText(find.byType(TextField).at(0), 'dono@teste.com');
     await tester.enterText(find.byType(TextField).at(1), 'errada');
@@ -155,24 +155,43 @@ void main() {
     expect(find.text('Liberar gestor'), findsNothing);
   });
 
-  testWidgets('dono libera um gestor pelo e-mail', (tester) async {
+  testWidgets('dono cria o acesso de um gestor com senha provisória', (tester) async {
     final s = servidorComAmostra();
     await abrirApp(tester, s);
     await tester.tap(find.text('Configurações'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Donos e gestores'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Liberar gestor'));
+    await tester.tap(find.text('Criar acesso de gestor'));
     await tester.pumpAndSettle();
-    await tester.enterText(
-      find.descendant(of: find.byType(AlertDialog), matching: find.byType(TextField)),
-      'Nova.Gestora@Teste.com',
-    );
-    await tester.tap(find.text('Liberar'));
+    final campos = find.descendant(of: find.byType(AlertDialog), matching: find.byType(TextField));
+    await tester.enterText(campos.at(0), 'Nova Gestora');
+    await tester.enterText(campos.at(1), 'Nova.Gestora@Teste.com');
+    await tester.tap(find.text('Criar acesso'));
     await tester.pumpAndSettle();
-    final a = s.t('acessos_autorizados').last;
-    expect(a['email'], 'nova.gestora@teste.com');
-    expect(a['papel'], 'gestor');
+    expect(s.chamadas, contains('acesso gestor nova.gestora@teste.com'));
+    expect(find.text('Senha provisória'), findsOneWidget);
+    expect(find.text('H4QZ8WMP'), findsOneWidget);
+    await tester.tap(find.text('Pronto'));
+    await tester.pumpAndSettle();
+    expect(find.text('Nova Gestora'), findsOneWidget);
+  });
+
+  testWidgets('primeiro login com senha provisória: cria a senha antes de abrir o painel', (tester) async {
+    final s = servidorComAmostra(usuario: euGestor)..trocarSenha = true;
+    await abrirApp(tester, s);
+    expect(find.text('Crie a sua senha'), findsOneWidget);
+    await tester.enterText(find.byType(TextField), 'minhasenha');
+    await tester.tap(find.text('Salvar senha'));
+    await tester.pumpAndSettle();
+    expect(s.chamadas, contains('senha'));
+    expect(find.text('Faturamento'), findsWidgets);
+  });
+
+  testWidgets('tela de entrar não pede cadastro por e-mail', (tester) async {
+    await abrirApp(tester, servidorComAmostra()..sessao = false);
+    expect(find.text('Criar minha conta'), findsNothing);
+    expect(find.textContaining('senha provisória'), findsOneWidget);
   });
 
   testWidgets('sem internet ao abrir: mostra o aviso e deixa tentar de novo', (tester) async {

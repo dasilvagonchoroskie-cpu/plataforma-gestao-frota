@@ -63,6 +63,8 @@ class Raiz extends ConsumerWidget {
             return TelaSemAcesso(motorista: true, email: a.email);
           case Etapa.naoAutorizado:
             return TelaSemAcesso(motorista: false, email: a.email);
+          case Etapa.trocarSenha:
+            return const TelaNovaSenha(primeiroAcesso: true);
           case Etapa.pronto:
             return const _ComDados();
         }

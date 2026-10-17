@@ -17,7 +17,7 @@ String novoId() => _uuid.v4();
 
 /// Em que ponto a pessoa está: sem entrar, terminando o cadastro, sem
 /// liberação do dono, com conta de motorista ou pronta para usar o painel.
-enum Etapa { entrar, completarCadastro, naoAutorizado, contaMotorista, pronto }
+enum Etapa { entrar, completarCadastro, naoAutorizado, contaMotorista, trocarSenha, pronto }
 
 class EstadoAcesso {
   const EstadoAcesso(this.etapa, {this.email = '', this.nome = ''});
@@ -52,6 +52,7 @@ class Acesso extends AsyncNotifier<EstadoAcesso> {
     if (s['empresa'] == null || perfil['ativo'] == false) {
       return EstadoAcesso(Etapa.naoAutorizado, email: email, nome: nome);
     }
+    if (_s.precisaTrocarSenha) return EstadoAcesso(Etapa.trocarSenha, email: email, nome: nome);
     return EstadoAcesso(Etapa.pronto, email: email, nome: nome);
   }
 
@@ -188,6 +189,13 @@ class EquipeNotifier extends AsyncNotifier<Equipe> {
       () =>
           _s.inserir('acessos_autorizados', {'id': novoId(), 'empresa_id': _e.empresa.id, 'email': e, 'papel': papel}),
     );
+  }
+
+  /// Cria (ou renova) o acesso de um gestor e devolve a senha provisória.
+  Future<Map<String, Object?>> criarAcessoGestor(String email, String nome) async {
+    final r = await _s.criarAcessoGestor(email, nome);
+    await recarregar();
+    return r;
   }
 
   Future<void> ativarAcesso(String id, bool ativo) =>

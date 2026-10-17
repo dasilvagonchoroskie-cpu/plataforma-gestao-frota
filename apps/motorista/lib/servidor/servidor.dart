@@ -27,6 +27,9 @@ abstract class Servidor {
   Future<void> definirSenha(String senha);
   Future<Map<String, Object?>> completarCadastro(String nome, String cpf);
   Future<void> entrarComCpf(String cpf, String senha, String aparelho);
+
+  /// Cadastro sem e-mail: nome, CPF e senha (Edge Function cadastrar_motorista).
+  Future<void> cadastrarMotorista(String nome, String cpf, String senha, String aparelho);
   Future<void> pedirCodigoSenha(String email);
   Future<void> confirmarCodigoSenha(String email, String codigo);
   Future<Map<String, Object?>> situacao();
@@ -141,6 +144,12 @@ class ServidorSupabase implements Servidor {
           throw ErroServidor('${d['mensagem'] ?? 'CPF ou senha incorretos.'}', codigo: '${d['codigo'] ?? ''}');
         }
         await _auth.setSession(d['refresh_token'] as String);
+      });
+
+  @override
+  Future<void> cadastrarMotorista(String nome, String cpf, String senha, String aparelho) => _tentar(() async {
+        await cliente.functions.invoke('cadastrar_motorista',
+            body: {'nome': nome.trim(), 'cpf': cpf, 'senha': senha, 'aparelho': aparelho});
       });
 
   @override

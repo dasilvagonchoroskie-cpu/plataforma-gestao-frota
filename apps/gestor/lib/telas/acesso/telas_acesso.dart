@@ -157,15 +157,10 @@ class _TelaEntrarState extends ConsumerState<TelaEntrar> with _Ocupado {
                 ),
                 const Divider(height: 36),
                 Text(
-                  'Primeira vez? Use o e-mail que o dono da empresa liberou para você.',
+                  'Primeira vez? O dono da empresa cria o seu acesso no painel e passa uma senha provisória. '
+                  'No primeiro login você cria a sua senha.',
                   textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 15, color: cores.textoFraco),
-                ),
-                const SizedBox(height: 8),
-                OutlinedButton.icon(
-                  onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const TelaCriarConta())),
-                  icon: const Icon(Icons.person_add_alt),
-                  label: const Text('Criar minha conta'),
+                  style: TextStyle(fontSize: 15, height: 1.35, color: cores.textoFraco),
                 ),
               ],
             ),
@@ -341,45 +336,32 @@ class _TelaCompletarCadastroState extends ConsumerState<TelaCompletarCadastro> w
 
 // ----------------------------------------------------------- esqueci a senha
 
-class TelaEsqueciSenha extends ConsumerStatefulWidget {
+/// Sem envio de e-mail no piloto: o dono gera uma senha nova para o gestor;
+/// o dono fala com o suporte da plataforma.
+class TelaEsqueciSenha extends StatelessWidget {
   const TelaEsqueciSenha({super.key});
-
-  @override
-  ConsumerState<TelaEsqueciSenha> createState() => _TelaEsqueciSenhaState();
-}
-
-class _TelaEsqueciSenhaState extends ConsumerState<TelaEsqueciSenha> with _Ocupado {
-  final _email = TextEditingController();
-
-  Future<void> _enviar() async {
-    if (!_emailValido(_email.text)) return setState(() => erro = 'Digite o seu e-mail.');
-    final ok = await tentar(() => ref.read(servidorProvider).pedirCodigoSenha(_email.text));
-    if (ok && mounted) {
-      Navigator.push(
-        context,
-        MaterialPageRoute(builder: (_) => TelaCodigo(email: _email.text.trim().toLowerCase(), recuperar: true)),
-      );
-    }
-  }
 
   @override
   Widget build(BuildContext context) => PaginaAcesso(
     titulo: 'Esqueci a senha',
-    texto: 'Digite o seu e-mail. Se ele tiver conta, chega um código de 6 números para criar uma senha nova.',
-    filhos: [
-      Campo(controle: _email, rotulo: 'E-mail', tipo: TipoCampo.email, autofoco: true),
-      MensagemErro(erro),
+    texto:
+        'Gestor: peça ao dono da empresa para gerar uma senha nova para você no painel '
+        '(Configurações, Donos e gestores). Dono: fale com o suporte da plataforma.',
+    filhos: const [
+      Nota('Com a senha provisória você entra normalmente e o painel pede para você criar uma senha nova.'),
     ],
-    botao: 'Mandar o código',
-    aoTocar: _enviar,
-    ocupado: ocupado,
+    botao: 'Voltar para entrar',
+    aoTocar: () => Navigator.pop(context),
   );
 }
 
 /// Senha nova (depois do código de recuperação ou nas configurações).
 class TelaNovaSenha extends ConsumerStatefulWidget {
-  const TelaNovaSenha({super.key, this.depoisDeRecuperar = false});
+  const TelaNovaSenha({super.key, this.depoisDeRecuperar = false, this.primeiroAcesso = false});
   final bool depoisDeRecuperar;
+
+  /// Entrou com senha provisória: tela inicial obrigatória, sem voltar.
+  final bool primeiroAcesso;
 
   @override
   ConsumerState<TelaNovaSenha> createState() => _TelaNovaSenhaState();
@@ -392,7 +374,9 @@ class _TelaNovaSenhaState extends ConsumerState<TelaNovaSenha> with _Ocupado {
     if (_senha.text.length < 6) return setState(() => erro = 'A senha precisa ter pelo menos 6 letras ou números.');
     final ok = await tentar(() => ref.read(servidorProvider).definirSenha(_senha.text));
     if (!ok || !mounted) return;
-    if (widget.depoisDeRecuperar) {
+    if (widget.primeiroAcesso) {
+      await ref.read(acessoProvider.notifier).recarregar();
+    } else if (widget.depoisDeRecuperar) {
       Navigator.popUntil(context, (r) => r.isFirst);
       await ref.read(acessoProvider.notifier).recarregar();
     } else {
@@ -403,8 +387,11 @@ class _TelaNovaSenhaState extends ConsumerState<TelaNovaSenha> with _Ocupado {
 
   @override
   Widget build(BuildContext context) => PaginaAcesso(
-    titulo: 'Senha nova',
-    texto: 'Escolha a senha que você vai usar para entrar.',
+    titulo: widget.primeiroAcesso ? 'Crie a sua senha' : 'Senha nova',
+    texto: widget.primeiroAcesso
+        ? 'Você entrou com uma senha provisória. Escolha agora a senha que você vai usar daqui para frente.'
+        : 'Escolha a senha que você vai usar para entrar.',
+    voltar: !widget.primeiroAcesso,
     filhos: [
       Campo(
         controle: _senha,
@@ -418,6 +405,12 @@ class _TelaNovaSenhaState extends ConsumerState<TelaNovaSenha> with _Ocupado {
     botao: 'Salvar senha',
     aoTocar: _salvar,
     ocupado: ocupado,
+    rodape: [
+      if (widget.primeiroAcesso) ...[
+        const SizedBox(height: 8),
+        TextButton(onPressed: () => ref.read(acessoProvider.notifier).sair(), child: const Text('Sair')),
+      ],
+    ],
   );
 }
 

@@ -57,6 +57,9 @@ abstract class Servidor {
   String? get emailDaSessao;
   String? get usuarioId;
 
+  /// Entrou com senha provisória (criada pelo dono ou pela plataforma).
+  bool get precisaTrocarSenha;
+
   Future<void> entrar(String email, String senha);
   Future<void> pedirCodigoCadastro(String email);
   Future<void> confirmarCodigoCadastro(String email, String codigo);
@@ -73,6 +76,9 @@ abstract class Servidor {
   Future<String> gerarNovoCodigo();
   Future<void> definirCaminhaoAtual(String motoristaId, String caminhaoId);
   Future<Map<String, Object?>> redefinirAcesso(String motoristaId);
+
+  /// O dono cria ou renova o acesso de um gestor (senha provisória, sem e-mail).
+  Future<Map<String, Object?>> criarAcessoGestor(String email, String nome);
 
   /// Inclui uma linha (caminhões, categorias, acessos e ajustes).
   Future<void> inserir(String tabela, Map<String, Object?> dados);
@@ -197,6 +203,9 @@ class ServidorSupabase implements Servidor {
   @override
   String? get usuarioId => _auth.currentUser?.id;
 
+  @override
+  bool get precisaTrocarSenha => _auth.currentUser?.userMetadata?['trocar_senha'] == true;
+
   String _email(String e) => e.trim().toLowerCase();
 
   @override
@@ -212,7 +221,8 @@ class ServidorSupabase implements Servidor {
       _tentar(() => _auth.verifyOTP(email: _email(email), token: codigo.trim(), type: OtpType.email));
 
   @override
-  Future<void> definirSenha(String senha) => _tentar(() => _auth.updateUser(UserAttributes(password: senha)));
+  Future<void> definirSenha(String senha) =>
+      _tentar(() => _auth.updateUser(UserAttributes(password: senha, data: {'trocar_senha': false})));
 
   @override
   Future<Map<String, Object?>> completarCadastro(String nome) =>
@@ -269,6 +279,14 @@ class ServidorSupabase implements Servidor {
     final r = await cliente.functions.invoke('redefinir_acesso', body: {'motorista_id': motoristaId});
     final d = _mapa(r.data);
     if (d['ok'] != true) throw ErroServidor('${d['mensagem'] ?? 'Não deu para redefinir agora.'}');
+    return d;
+  });
+
+  @override
+  Future<Map<String, Object?>> criarAcessoGestor(String email, String nome) => _tentar(() async {
+    final r = await cliente.functions.invoke('criar_acesso_gestor', body: {'email': email.trim(), 'nome': nome.trim()});
+    final d = _mapa(r.data);
+    if (d['ok'] != true) throw ErroServidor('${d['mensagem'] ?? 'Não deu para criar o acesso agora.'}');
     return d;
   });
 

@@ -14,6 +14,17 @@ final relogioProvider = Provider<DateTime Function()>((ref) => DateTime.now);
 const _uuid = Uuid();
 String novoId() => _uuid.v4();
 
+/// Identificação desta instalação do app (limite de tentativas de login e
+/// cadastro por aparelho; também vai no envio dos lançamentos).
+Future<String> idDoAparelho(Armazenamento a) async {
+  var id = await a.lerEstado('dispositivo_id');
+  if (id == null) {
+    id = novoId();
+    await a.gravarEstado('dispositivo_id', id);
+  }
+  return id;
+}
+
 /// Tabelas que o motorista lança e manda para a nuvem.
 abstract final class Tabelas {
   static const fretes = 'fretes';
