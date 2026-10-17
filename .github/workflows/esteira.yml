@@ -2,12 +2,16 @@ name: Esteira
 
 # A cada envio: testa o banco num Supabase local (migrations do zero + testes
 # pgTAP), o núcleo de regras e os dois apps; compila o APK do motorista e o
-# painel web do gestor.
+# painel web do gestor. Os registros de cada parte ficam no Release
+# "registros" (para conferir de fora do GitHub).
 on:
   push:
     branches: [main]
     paths-ignore: ['ferramentas/**', 'docs/**', '**.md']
   workflow_dispatch: {}
+
+permissions:
+  contents: write
 
 env:
   FLUTTER_VERSION: '3.47.5'
@@ -23,10 +27,47 @@ jobs:
           version: latest
       - name: Subir o Supabase local com as migrations
         run: |
-          supabase --version
-          supabase start -x studio,imgproxy,realtime,storage-api,logflare,vector
+          set -o pipefail
+          mkdir -p registros
+          supabase --version 2>&1 | tee registros/banco.log
+          supabase start -x studio,imgproxy,realtime,storage-api,logflare,vector 2>&1 | tee -a registros/banco.log
       - name: Testes do banco
-        run: BANCO_URL=postgresql://postgres:postgres@127.0.0.1:54322/postgres bash supabase/tests/local/rodar.sh
+        run: |
+          set -o pipefail
+          BANCO_URL=postgresql://postgres:postgres@127.0.0.1:54322/postgres bash supabase/tests/local/rodar.sh 2>&1 | tee -a registros/banco.log
+      - name: Guardar o registro
+        if: always()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "commit ${GITHUB_SHA::7} | resultado ${{ job.status }}" >> registros/banco.log
+          gh release view registros >/dev/null 2>&1 || gh release create registros --prerelease --title "Registros da esteira (uso interno)" --notes "Registros das execuções. Não é o aplicativo."
+          gh release upload registros registros/banco.log --clobber
       - name: Parar
         if: always()
         run: supabase stop --no-backup || true
+
+  nucleo:
+    name: Núcleo de regras (análise e testes)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+      - name: Análise e testes
+        working-directory: packages/nucleo
+        run: |
+          set -o pipefail
+          mkdir -p ../../registros
+          (dart pub get && dart analyze --fatal-infos && dart test) 2>&1 | tee ../../registros/nucleo.log
+      - name: Guardar o registro
+        if: always()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "commit ${GITHUB_SHA::7} | resultado ${{ job.status }}" >> registros/nucleo.log
+          gh release view registros >/dev/null 2>&1 || gh release create registros --prerelease --title "Registros da esteira (uso interno)" --notes "Registros das execuções. Não é o aplicativo."
+          gh release upload registros registros/nucleo.log --clobber

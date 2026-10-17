@@ -4,3 +4,8 @@ build/
 .flutter-plugins
 .flutter-plugins-dependencies
 
+pubspec_overrides.yaml
+**/test/failures/
+.flutter-plugins-dependencies
+*.iml
+.idea/
