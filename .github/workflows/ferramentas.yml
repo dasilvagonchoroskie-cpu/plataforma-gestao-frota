@@ -1,0 +1,71 @@
+name: Pacote de ferramentas
+
+# Monta o Flutter e as dependencias ja baixadas para o Claude compilar e
+# testar fora da esteira (o ambiente dele nao baixa pacotes da internet).
+# Roda quando ferramentas/pedido.txt muda ou pelo botao "Run workflow".
+on:
+  workflow_dispatch: {}
+  push:
+    branches: [main]
+    paths: ['ferramentas/pedido.txt']
+
+permissions:
+  contents: write
+
+env:
+  FLUTTER_VERSION: '3.47.5'
+
+jobs:
+  pacote:
+    name: Montar Flutter e dependencias
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+
+      - name: Baixar os artefatos do Flutter (linux e web)
+        run: |
+          flutter config --no-analytics --no-cli-animations
+          flutter precache --universal --linux --web --no-android --no-ios
+          flutter --version
+
+      - name: Baixar as dependencias dos tres projetos
+        run: |
+          for d in packages/nucleo apps/motorista apps/gestor; do
+            echo "== $d"; (cd "$d" && flutter pub get)
+          done
+
+      - name: Esquentar o executor de testes
+        run: |
+          mkdir -p /tmp/aquece && cd /tmp/aquece
+          flutter create --no-pub -t app --platforms=linux,web aquece >/dev/null
+          cd aquece && flutter pub get && flutter test || true
+
+      - name: Empacotar
+        run: |
+          FL=$(dirname "$(dirname "$(readlink -f "$(which flutter)")")")
+          echo "Flutter em $FL"
+          mkdir -p saida
+          tar -C "$(dirname "$FL")" -czf saida/flutter-sdk.tar.gz "$(basename "$FL")"
+          tar -C "$HOME" -czf saida/pub-cache.tar.gz .pub-cache
+          mkdir -p saida/locks
+          cp packages/nucleo/pubspec.lock saida/locks/nucleo.lock
+          cp apps/motorista/pubspec.lock saida/locks/motorista.lock
+          cp apps/gestor/pubspec.lock saida/locks/gestor.lock
+          (cd saida && tar -czf locks.tar.gz locks)
+          echo "$FL" > saida/caminho.txt
+          ls -la saida
+
+      - name: Publicar no Release "ferramentas"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release view ferramentas -R "$GITHUB_REPOSITORY" >/dev/null 2>&1 || \
+            gh release create ferramentas -R "$GITHUB_REPOSITORY" --prerelease \
+              --title "Ferramentas (uso interno)" --notes "Flutter e dependencias para compilar fora da esteira. Nao e o aplicativo."
+          gh release upload ferramentas -R "$GITHUB_REPOSITORY" --clobber \
+            saida/flutter-sdk.tar.gz saida/pub-cache.tar.gz saida/locks.tar.gz saida/caminho.txt

@@ -1,21 +1,35 @@
 name: motorista
-description: Esqueleto do app do motorista da plataforma de frota.
+description: App do motorista da Plataforma de Gestão de Frota.
 publish_to: none
 version: 0.1.0+1
 
 environment:
-  sdk: '>=3.0.0 <4.0.0'
+  sdk: ^3.8.0
 
 dependencies:
   flutter:
     sdk: flutter
+  flutter_localizations:
+    sdk: flutter
   nucleo:
     path: ../../packages/nucleo
+  flutter_riverpod: any
+  go_router: any
+  supabase_flutter: any
+  drift: any
+  drift_flutter: any
+  path_provider: any
+  path: any
+  uuid: any
+  share_plus: any
+  connectivity_plus: any
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
-  flutter_lints: 5.0.0
+  flutter_lints: any
+  drift_dev: any
+  build_runner: any
 
 flutter:
   uses-material-design: true
