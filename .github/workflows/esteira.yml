@@ -8,7 +8,8 @@ name: Esteira
 on:
   push:
     branches: [main]
-    paths-ignore: ['ferramentas/**', 'docs/**', '**.md']
+    # Tudo menos ferramentas, documentos e textos; o script de backup entra (o job Banco testa).
+    paths: ['**', '!ferramentas/**', 'ferramentas/backup/**', '!docs/**', '!**.md']
   workflow_dispatch: {}
 
 permissions:
