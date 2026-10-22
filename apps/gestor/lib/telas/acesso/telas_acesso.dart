@@ -321,9 +321,21 @@ class _TelaLinkDoEmailState extends ConsumerState<TelaLinkDoEmail> with _Ocupado
           titulo: 'Este link não vale mais',
           texto: erro,
           voltar: false,
-          filhos: const [Nota('O link vale por 1 hora e só funciona uma vez.')],
-          botao: 'Ir para a tela de entrar',
-          aoTocar: _irParaEntrar,
+          filhos: const [
+            Aviso(
+              icone: Icons.help_outline,
+              titulo: 'Por que acontece',
+              texto:
+                  'Cada pedido novo cancela o link anterior: use só o e-mail mais novo (ele pode levar 1 ou 2 '
+                  'minutos para chegar). O link também vence em 1 hora e funciona uma vez só.',
+            ),
+          ],
+          botao: 'Pedir outro link',
+          aoTocar: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const TelaEsqueciSenha())),
+          rodape: [
+            const SizedBox(height: 8),
+            TextButton(onPressed: _irParaEntrar, child: const Text('Ir para a tela de entrar')),
+          ],
         );
       case _FaseLink.senha:
         return PaginaAcesso(

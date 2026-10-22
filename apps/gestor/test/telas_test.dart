@@ -353,6 +353,12 @@ void main() {
     final s = servidorComAmostra()..sessao = false;
     await abrirApp(tester, s, link: const LinkDoEmail('vencido12345', TipoLink.senha));
     expect(find.text('Este link não vale mais'), findsOneWidget);
+    expect(find.textContaining('use só o e-mail mais novo'), findsOneWidget);
+    await tester.tap(find.text('Pedir outro link'));
+    await tester.pumpAndSettle();
+    expect(find.text('Mandar o link'), findsOneWidget, reason: 'abre o pedido de link novo');
+    Navigator.of(tester.element(find.text('Mandar o link'))).pop();
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Ir para a tela de entrar'));
     await tester.pumpAndSettle();
     expect(find.text('Esqueci a senha'), findsOneWidget);

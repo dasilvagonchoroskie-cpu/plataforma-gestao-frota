@@ -200,7 +200,9 @@ Se a migration apagar dados, precisa da aprovação escrita do dono no começo d
 
 - Esqueceu a senha: no app, "Esqueci a senha" > e-mail (dono e gestor) ou CPF (motorista) > chega um link
   no e-mail > a senha nova é criada no painel web. O link não chega: conferir o spam e o SMTP próprio
-  (`docs/EMAIL.md`). Sem acesso ao e-mail: motorista pede ao gestor (Motoristas > o motorista > Redefinir
+  (`docs/EMAIL.md`). "Este link não vale mais": cada pedido novo cancela o link anterior e o e-mail pode
+  levar 1 ou 2 minutos; usar só o e-mail mais novo (o registro do Supabase Auth mostra "One-time token
+  not found" quando o link usado era de um pedido antigo). Sem acesso ao e-mail: motorista pede ao gestor (Motoristas > o motorista > Redefinir
   o acesso); gestor pede ao dono (Configurações > Donos e gestores); dono pede à plataforma
   (`criar_login_dono`).
 - Código do motorista venceu ou foi perdido: Motoristas > Cadastrar motorista de novo (o anterior para de

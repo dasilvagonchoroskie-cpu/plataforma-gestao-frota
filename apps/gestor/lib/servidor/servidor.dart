@@ -191,7 +191,7 @@ ErroServidor traduzirErro(Object e) {
     }
     if (e.code == 'otp_expired' || m.contains('expired') || (m.contains('invalid') && m.contains('otp'))) {
       return const ErroServidor(
-        'Este link venceu ou já foi usado. Peça outro em "Esqueci a senha".',
+        'Este link foi cancelado por um pedido mais novo, venceu ou já foi usado.',
         codigo: 'link_vencido',
       );
     }

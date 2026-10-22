@@ -314,8 +314,12 @@ class _TelaPedirLinkSenhaState extends State<TelaPedirLinkSenha> {
                 if (enviado) ...[
                   Aviso(icone: Icons.mark_email_read_outlined, titulo: 'Pedido feito', texto: _enviado!),
                   const SizedBox(height: 12),
-                  const Nota('O link vale por 1 hora e só funciona uma vez. Não chegou? Confira a caixa de spam '
-                      'ou peça de novo daqui a um minuto.'),
+                  const Aviso(
+                    icone: Icons.schedule,
+                    titulo: 'Espere o e-mail chegar',
+                    texto: 'Pode levar 1 ou 2 minutos (confira também o spam). Use só o e-mail mais novo: cada '
+                        'pedido novo cancela o link anterior. O link vale por 1 hora e funciona uma vez.',
+                  ),
                 ] else
                   Campo(
                     controle: _ident,

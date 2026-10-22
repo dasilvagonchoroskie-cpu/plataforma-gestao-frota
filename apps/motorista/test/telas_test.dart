@@ -281,6 +281,8 @@ void main() {
     await tester.pumpAndSettle();
     expect(s.linksPedidos, ['52998224725']);
     expect(find.textContaining('mandamos um link para ele'), findsOneWidget);
+    expect(find.textContaining('Use só o e-mail mais novo'), findsOneWidget);
+    await tester.scrollUntilVisible(find.textContaining('Redefinir o acesso'), 200, scrollable: find.byType(Scrollable).first);
     expect(find.textContaining('Redefinir o acesso'), findsOneWidget, reason: 'sem e-mail, o patrão ajuda');
   });
 
