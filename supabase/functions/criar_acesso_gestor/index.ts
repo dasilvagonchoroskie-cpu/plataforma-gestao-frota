@@ -1,21 +1,18 @@
 // O dono cria (ou renova) o acesso de um gestor: libera o e-mail na empresa
 // e gera uma senha provisória, que aparece só para o dono. O gestor entra com
 // e-mail e essa senha e o app pede para trocar. Não depende de envio de e-mail.
-import { clientePublico, clienteServidor, cors, emailValido, resposta, senhaProvisoria } from "../_compartilhado/apoio.ts";
+import { clientePublico, clienteServidor, emailValido, lerCorpo, resposta, senhaProvisoria, servir } from "../_compartilhado/apoio.ts";
 
 const recusa = (status: number, mensagem: string) => resposta({ ok: false, mensagem }, status);
 
-Deno.serve(async (req) => {
-  if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
-  if (req.method !== "POST") return resposta({ ok: false, mensagem: "Use POST." }, 405);
-
+servir(async (req) => {
   const token = req.headers.get("Authorization") ?? "";
   if (!token.startsWith("Bearer ")) return recusa(401, "Entre na sua conta para continuar.");
 
-  try {
-    const corpo = await req.json().catch(() => ({}));
+  {
+    const corpo = await lerCorpo(req);
     const email = String(corpo.email ?? "").trim().toLowerCase();
-    const nome = String(corpo.nome ?? "").trim().replace(/\s+/g, " ");
+    const nome = String(corpo.nome ?? "").trim().replace(/\s+/g, " ").slice(0, 120);
 
     const doDono = clientePublico(token);
     const { data: usuario, error: erroUsuario } = await doDono.auth.getUser(token.slice(7));
@@ -94,7 +91,5 @@ Deno.serve(async (req) => {
     });
 
     return resposta({ ok: true, nome: perfil?.nome ?? nome, email, senha_provisoria: senha });
-  } catch (_e) {
-    return recusa(500, "Não deu para criar o acesso agora. Tente de novo.");
   }
-});
+}, "Não deu para criar o acesso agora. Tente de novo.");

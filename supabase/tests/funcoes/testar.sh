@@ -39,12 +39,12 @@ funcao() { # nome token json -> imprime "status corpo"
 CODIGO=$(psql "$DB" -tA -c "select public.criar_empresa('Transportes Teste', 'dono@teste.com') ->> 'codigo_entrada'")
 [ ${#CODIGO} -eq 6 ] && ok "empresa criada pela função da plataforma" || falha "criar_empresa" "$CODIGO"
 
-criar_usuario dono@teste.com donosenha >/dev/null
-TD=$(token dono@teste.com donosenha)
+criar_usuario dono@teste.com donosenha1 >/dev/null
+TD=$(token dono@teste.com donosenha1)
 igual "$(rpc "$TD" completar_cadastro '{"p_nome":"Dono Teste"}' | jq -r .perfil.papel)" "dono" "dono entra pelo e-mail autorizado"
 
-criar_usuario moto@teste.com senha123 >/dev/null
-TM=$(token moto@teste.com senha123)
+criar_usuario moto@teste.com senha1234 >/dev/null
+TM=$(token moto@teste.com senha1234)
 rpc "$TM" completar_cadastro '{"p_nome":"Motorista Teste","p_cpf":"529.982.247-25"}' >/dev/null
 igual "$(rpc "$TM" pedir_entrada "{\"p_codigo\":\"$CODIGO\"}" | jq -r .status)" "pendente" "motorista pede entrada com o código"
 PEDIDO=$(curl -s "$A/rest/v1/pedidos_entrada?select=id&status=eq.pendente" -H "apikey: $K" -H "Authorization: Bearer $TD" | jq -r '.[0].id')
@@ -52,7 +52,7 @@ MOT=$(rpc "$TD" decidir_entrada "{\"p_pedido_id\":\"$PEDIDO\",\"p_aprovar\":true
 [ -n "$MOT" ] && [ "$MOT" != "null" ] && ok "dono aprova o motorista" || falha "decidir_entrada" "$MOT"
 
 # Login por CPF
-R=$(funcao entrar_com_cpf "" '{"cpf":"529.982.247-25","senha":"senha123","aparelho":"teste-1"}')
+R=$(funcao entrar_com_cpf "" '{"cpf":"529.982.247-25","senha":"senha1234","aparelho":"teste-1"}')
 igual "${R%% *}" "200" "login com CPF e senha certos"
 TOK=$(echo "${R#* }" | jq -r .access_token)
 igual "$(rpc "$TOK" situacao_acesso '{}' | jq -r .empresa.nome)" "Transportes Teste" "a sessão do login por CPF funciona no banco"
@@ -69,10 +69,10 @@ igual "${R%% *}" "401" "sem login não redefine acesso"
 R=$(funcao redefinir_acesso "$TD" "{\"motorista_id\":\"$MOT\"}")
 igual "${R%% *}" "200" "dono redefine o acesso do motorista"
 NOVA=$(echo "${R#* }" | jq -r .senha_provisoria)
-[ ${#NOVA} -eq 8 ] && ok "senha provisória de 8 caracteres" || falha "senha provisória" "$NOVA"
+[[ ${#NOVA} -eq 10 && "$NOVA" =~ [A-Z] && "$NOVA" =~ [0-9] ]] && ok "senha provisória de 10 caracteres, com letras e números" || falha "senha provisória" "$NOVA"
 R=$(funcao entrar_com_cpf "" "{\"cpf\":\"52998224725\",\"senha\":\"$NOVA\",\"aparelho\":\"teste-3\"}")
 igual "${R%% *} $(echo "${R#* }" | jq -r .trocar_senha)" "200 true" "entra com a senha provisória e o app pede para trocar"
-R=$(funcao entrar_com_cpf "" '{"cpf":"52998224725","senha":"senha123","aparelho":"teste-3"}')
+R=$(funcao entrar_com_cpf "" '{"cpf":"52998224725","senha":"senha1234","aparelho":"teste-3"}')
 igual "${R%% *}" "401" "a senha antiga deixou de valer"
 
 # Bloqueio depois de 5 erros seguidos
@@ -81,21 +81,23 @@ R=$(funcao entrar_com_cpf "" "{\"cpf\":\"52998224725\",\"senha\":\"$NOVA\",\"apa
 igual "${R%% *}" "429" "depois de 5 erros seguidos o CPF fica bloqueado, mesmo com a senha certa"
 
 # Cadastro do motorista sem e-mail (nome, CPF e senha)
-R=$(funcao cadastrar_motorista "" '{"nome":"Motorista Sem Email","cpf":"111.444.777-35","senha":"senha456","aparelho":"cad-1"}')
+R=$(funcao cadastrar_motorista "" '{"nome":"Motorista Sem Email","cpf":"111.444.777-35","senha":"senha4567","aparelho":"cad-1"}')
 igual "${R%% *}" "200" "motorista cria a conta só com nome, CPF e senha"
-R=$(funcao entrar_com_cpf "" '{"cpf":"11144477735","senha":"senha456","aparelho":"cad-1"}')
+R=$(funcao entrar_com_cpf "" '{"cpf":"11144477735","senha":"senha4567","aparelho":"cad-1"}')
 igual "${R%% *}" "200" "e já entra com CPF e senha"
 TN=$(echo "${R#* }" | jq -r .access_token)
 igual "$(rpc "$TN" pedir_entrada "{\"p_codigo\":\"$CODIGO\"}" | jq -r .status)" "pendente" "e pede entrada na empresa com o código"
-R=$(funcao cadastrar_motorista "" '{"nome":"Fulano","cpf":"123.456.789-00","senha":"senha789","aparelho":"cad-2"}')
+R=$(funcao cadastrar_motorista "" '{"nome":"Fulano","cpf":"123.456.789-00","senha":"senha7890","aparelho":"cad-2"}')
 igual "${R%% *} $(echo "${R#* }" | jq -r .codigo)" "400 cpf_invalido" "CPF com dígito errado é recusado"
 R=$(funcao cadastrar_motorista "" '{"nome":"Fulano","cpf":"39053344705","senha":"123","aparelho":"cad-2"}')
-igual "${R%% *} $(echo "${R#* }" | jq -r .codigo)" "400 senha_curta" "senha curta é recusada"
+igual "${R%% *} $(echo "${R#* }" | jq -r .codigo)" "400 senha_fraca" "senha curta é recusada"
+R=$(funcao cadastrar_motorista "" '{"nome":"Fulano","cpf":"39053344705","senha":"senhasemnumero","aparelho":"cad-3"}')
+igual "${R%% *} $(echo "${R#* }" | jq -r .codigo)" "400 senha_fraca" "senha sem número é recusada"
 for i in 1 2 3 4 5; do
-  R=$(funcao cadastrar_motorista "" '{"nome":"Outro","cpf":"11144477735","senha":"senha789","aparelho":"cad-4"}')
+  R=$(funcao cadastrar_motorista "" '{"nome":"Outro","cpf":"11144477735","senha":"senha7890","aparelho":"cad-4"}')
 done
 igual "${R%% *} $(echo "${R#* }" | jq -r .codigo)" "409 cpf_em_uso" "CPF que já tem conta não cria outra"
-R=$(funcao cadastrar_motorista "" '{"nome":"Outro","cpf":"39053344705","senha":"senha789","aparelho":"cad-4"}')
+R=$(funcao cadastrar_motorista "" '{"nome":"Outro","cpf":"39053344705","senha":"senha7890","aparelho":"cad-4"}')
 igual "${R%% *}" "429" "mais de 5 cadastros por hora no mesmo aparelho são bloqueados"
 
 # Acesso do gestor criado pelo dono (senha provisória, sem e-mail)
@@ -130,9 +132,9 @@ curl -s -X PUT "$A/auth/v1/user" -H "apikey: $K" -H "Authorization: Bearer $TW" 
 CONV=$(rpc "$TD" gerar_convite_motorista '{"p_nome":"Motorista Convite","p_cpf":"246.813.579-28"}' | jq -r .codigo)
 [ ${#CONV} -eq 6 ] && ok "o painel gera o código individual do motorista" || falha "gerar_convite_motorista" "$CONV"
 VT=$(psql "$DB" -tA -c "select public.versao_termos()")
-R=$(funcao cadastrar_motorista "" "{\"nome\":\"Motorista Convite\",\"cpf\":\"24681357928\",\"senha\":\"senha321\",\"aparelho\":\"conv-1\",\"termos\":\"$VT\"}")
+R=$(funcao cadastrar_motorista "" "{\"nome\":\"Motorista Convite\",\"cpf\":\"24681357928\",\"senha\":\"senha3210\",\"aparelho\":\"conv-1\",\"termos\":\"$VT\"}")
 igual "${R%% *}" "200" "motorista cria a conta aceitando os termos"
-R=$(funcao entrar_com_cpf "" '{"cpf":"24681357928","senha":"senha321","aparelho":"conv-1"}')
+R=$(funcao entrar_com_cpf "" '{"cpf":"24681357928","senha":"senha3210","aparelho":"conv-1"}')
 TC=$(echo "${R#* }" | jq -r .access_token)
 igual "$(rpc "$TC" situacao_acesso '{}' | jq -r .termos.aceito)" "true" "o aceite dos termos do cadastro fica guardado"
 igual "$(rpc "$TC" pedir_entrada "{\"p_codigo\":\"$CONV\"}" | jq -r .status)" "aprovado" "com o código individual entra na empresa na hora"
@@ -140,36 +142,60 @@ igual "$(rpc "$TC" pedir_entrada "{\"p_codigo\":\"$CONV\"}" | jq -r .status)" "a
 # Recuperar o acesso com o código de recuperação
 REC=$(rpc "$TC" gerar_codigo_recuperacao '{}' | jq -r .)
 [ ${#REC} -eq 14 ] && ok "o motorista gera o código de recuperação" || falha "gerar_codigo_recuperacao" "$REC"
-R=$(funcao recuperar_acesso "" "{\"identificador\":\"246.813.579-28\",\"codigo\":\"AAAA-BBBB-CCCC\",\"senha_nova\":\"nova123\",\"aparelho\":\"rec-1\"}")
+R=$(funcao recuperar_acesso "" "{\"identificador\":\"246.813.579-28\",\"codigo\":\"AAAA-BBBB-CCCC\",\"senha_nova\":\"nova12345\",\"aparelho\":\"rec-1\"}")
 igual "${R%% *}" "401" "código de recuperação errado é recusado"
-R=$(funcao recuperar_acesso "" "{\"identificador\":\"246.813.579-28\",\"codigo\":\"$REC\",\"senha_nova\":\"nova123\",\"aparelho\":\"rec-1\"}")
+R=$(funcao recuperar_acesso "" "{\"identificador\":\"246.813.579-28\",\"codigo\":\"$REC\",\"senha_nova\":\"nova12345\",\"aparelho\":\"rec-1\"}")
 igual "${R%% *}" "200" "CPF e código certos: senha nova criada"
 REC2=$(echo "${R#* }" | jq -r .codigo_novo)
 [ ${#REC2} -eq 14 ] && [ "$REC2" != "$REC" ] && ok "recebe um código de recuperação novo" || falha "codigo_novo" "$REC2"
-R=$(funcao entrar_com_cpf "" '{"cpf":"24681357928","senha":"nova123","aparelho":"rec-1"}')
+R=$(funcao entrar_com_cpf "" '{"cpf":"24681357928","senha":"nova12345","aparelho":"rec-1"}')
 igual "${R%% *}" "200" "entra com a senha nova"
-R=$(funcao recuperar_acesso "" "{\"identificador\":\"24681357928\",\"codigo\":\"$REC\",\"senha_nova\":\"outra123\",\"aparelho\":\"rec-2\"}")
+R=$(funcao recuperar_acesso "" "{\"identificador\":\"24681357928\",\"codigo\":\"$REC\",\"senha_nova\":\"outra1234\",\"aparelho\":\"rec-2\"}")
 igual "${R%% *}" "401" "o código antigo deixa de valer"
 TGR=$(token gestor.novo@teste.com "$SG2")
 RECG=$(rpc "$TGR" gerar_codigo_recuperacao '{}' | jq -r .)
-R=$(funcao recuperar_acesso "" "{\"identificador\":\"Gestor.Novo@teste.com\",\"codigo\":\"$RECG\",\"senha_nova\":\"gestor789\",\"aparelho\":\"rec-3\"}")
+R=$(funcao recuperar_acesso "" "{\"identificador\":\"Gestor.Novo@teste.com\",\"codigo\":\"$RECG\",\"senha_nova\":\"gestor7890\",\"aparelho\":\"rec-3\"}")
 igual "${R%% *}" "200" "gestor recupera com o e-mail e o código"
-[ "$(token gestor.novo@teste.com gestor789)" != "null" ] && ok "e entra com a senha nova" || falha "login do gestor depois de recuperar"
+[ "$(token gestor.novo@teste.com gestor7890)" != "null" ] && ok "e entra com a senha nova" || falha "login do gestor depois de recuperar"
 
 # Exclusões com o Supabase Auth de verdade
 MOTC=$(curl -s "$A/rest/v1/motoristas?select=id&cpf=eq.24681357928" -H "apikey: $K" -H "Authorization: Bearer $TD" | jq -r '.[0].id')
 igual "$(rpc "$TD" excluir_motorista "{\"p_motorista_id\":\"$MOTC\"}" | jq -r .ok)" "true" "o dono exclui o motorista e os dados dele"
-TC=$(token "m24681357928@motorista.fortalezadigitalsecurity.com.br" nova123)
+EMC=$(psql "$DB" -tA -c "select email from public.perfis where cpf = '24681357928'")
+TC=$(token "$EMC" nova12345)
 igual "$(rpc "$TC" excluir_minha_conta '{}' | jq -r .apagada)" "true" "o motorista, sem empresa, exclui a própria conta"
-R=$(funcao entrar_com_cpf "" '{"cpf":"24681357928","senha":"nova123","aparelho":"rec-4"}')
+R=$(funcao entrar_com_cpf "" '{"cpf":"24681357928","senha":"nova12345","aparelho":"rec-4"}')
 igual "${R%% *}" "401" "a conta excluída não entra mais"
-R=$(funcao cadastrar_motorista "" '{"nome":"Motorista Volta","cpf":"24681357928","senha":"senha654","aparelho":"conv-2"}')
+R=$(funcao cadastrar_motorista "" '{"nome":"Motorista Volta","cpf":"24681357928","senha":"senha6543","aparelho":"conv-2"}')
 igual "${R%% *}" "200" "o CPF fica livre para um cadastro novo"
 psql "$DB" -tA -c "select public.bloquear_empresa(e.id, 'Teste encerrado.', 30) from public.empresas e where e.nome = 'Transportes W'" >/dev/null
 igual "$(rpc "$TW" situacao_acesso '{}' | jq -r .empresa.bloqueada)" "true" "a plataforma encerra o acesso de uma empresa"
 igual "$(curl -s "$A/rest/v1/caminhoes?select=id" -H "apikey: $K" -H "Authorization: Bearer $TW" | jq -r length)" "0" "e ela não vê mais nada"
 igual "$(rpc "$TW" excluir_minha_empresa '{"p_confirmacao":"Transportes W"}' | jq -r .ok)" "true" "mesmo bloqueado, o dono exclui a empresa e os dados"
 igual "$(token dono.w@teste.com novasenha1)" "null" "o login do dono some junto"
+
+# Login interno sorteado e troca automática das contas antigas
+igual "$(psql "$DB" -tA -c "select email ~ '^m[0-9a-f]{32}@motorista\.' from public.perfis where cpf = '11144477735'")" "t" "o login interno do motorista é sorteado (não sai do CPF)"
+igual "$(token m11144477735@motorista.fortalezadigitalsecurity.com.br senha4567)" "null" "ninguém tenta senha direto no Supabase Auth com o CPF"
+ANT=$(criar_usuario m70482156317@motorista.fortalezadigitalsecurity.com.br senhaantiga1)
+psql "$DB" -tA -c "insert into public.perfis (id, papel, nome, cpf, email) values ('$ANT', 'motorista', 'Conta Antiga', '70482156317', 'm70482156317@motorista.fortalezadigitalsecurity.com.br')" >/dev/null
+R=$(funcao entrar_com_cpf "" '{"cpf":"70482156317","senha":"senhaantiga1","aparelho":"ant-1"}')
+igual "${R%% *}" "200" "conta antiga (login tirado do CPF) entra com CPF e senha"
+igual "$(psql "$DB" -tA -c "select (p.email ~ '^m[0-9a-f]{32}@') and p.email = u.email from public.perfis p join auth.users u on u.id = p.id where p.cpf = '70482156317'")" "t" "e o login interno dela troca para o sorteado"
+igual "$(token m70482156317@motorista.fortalezadigitalsecurity.com.br senhaantiga1)" "null" "o login antigo, tirado do CPF, deixa de funcionar"
+R=$(funcao entrar_com_cpf "" '{"cpf":"70482156317","senha":"senhaantiga1","aparelho":"ant-1"}')
+igual "${R%% *}" "200" "e ela continua entrando com CPF e senha"
+
+# Proteções gerais das funções
+CORS=$(curl -s -o /dev/null -D - -X OPTIONS "$A/functions/v1/entrar_com_cpf" -H "Origin: https://site-estranho.example" | grep -ci "^access-control-allow-origin" || true)
+igual "$CORS" "0" "site estranho não recebe liberação de CORS"
+CORS=$(curl -s -o /dev/null -D - -X OPTIONS "$A/functions/v1/entrar_com_cpf" -H "Origin: https://dasilvagonchoroskie-cpu.github.io" | grep -i "^access-control-allow-origin" | tr -d '\r' | cut -d' ' -f2)
+igual "$CORS" "https://dasilvagonchoroskie-cpu.github.io" "o painel web recebe a liberação de CORS"
+GRANDE=$(python3 -c "print('{\"cpf\":\"' + 'x' * 20000 + '\"}')")
+R=$(funcao entrar_com_cpf "" "$GRANDE")
+igual "${R%% *}" "413" "pedido grande demais é recusado"
+R=$(funcao redefinir_acesso "$TD" '{"motorista_id":"nao-e-uuid"}')
+igual "${R%% *} $(echo "${R#* }" | jq -r .mensagem)" "403 Motorista não encontrado." "erro técnico não aparece para quem chamou"
 
 echo "1..$N"
 echo "verificações: $N, falhas: $FALHAS"

@@ -1,18 +1,88 @@
-// Apoio comum das Edge Functions: respostas, CORS e chaves do servidor.
+// Apoio comum das Edge Functions: entrada e saída, CORS, IP, senhas e chaves.
 // As chaves vêm do ambiente do Supabase; nada de segredo fica no código.
 import { createClient, type SupabaseClient } from "jsr:@supabase/supabase-js@2";
 
-export const cors: Record<string, string> = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-};
+/** Maior pedido aceito (bytes). Os pedidos do app têm poucas centenas. */
+const LIMITE_CORPO = 16 * 1024;
+
+/**
+ * Sites que podem chamar as funções pelo navegador (o painel web). Os apps de
+ * celular não mandam Origin e não dependem disto. Para trocar sem mexer no
+ * código: segredo ORIGENS_PERMITIDAS nas Edge Functions (lista com vírgulas).
+ */
+const ORIGENS = (Deno.env.get("ORIGENS_PERMITIDAS") ?? "https://dasilvagonchoroskie-cpu.github.io")
+  .split(",").map((s) => s.trim()).filter(Boolean);
+
+function cabecalhosCors(req: Request): Record<string, string> {
+  const origem = req.headers.get("Origin") ?? "";
+  const liberada = ORIGENS.includes(origem) || /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origem);
+  return {
+    ...(liberada ? { "Access-Control-Allow-Origin": origem } : {}),
+    "Vary": "Origin",
+    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
+    "Access-Control-Max-Age": "600",
+  };
+}
 
 export function resposta(corpo: unknown, status = 200): Response {
   return new Response(JSON.stringify(corpo), {
     status,
-    headers: { ...cors, "Content-Type": "application/json; charset=utf-8" },
+    headers: { "Content-Type": "application/json; charset=utf-8" },
   });
+}
+
+/**
+ * Atende só POST, recusa pedido grande demais e põe os cabeçalhos de CORS e
+ * de segurança em toda resposta. Erro inesperado vira mensagem genérica (sem
+ * detalhe técnico nem dado de ninguém).
+ */
+export function servir(tratar: (req: Request) => Promise<Response>, falha: string): void {
+  Deno.serve(async (req) => {
+    const cors = cabecalhosCors(req);
+    let r: Response;
+    if (req.method === "OPTIONS") {
+      r = new Response("ok");
+    } else if (req.method !== "POST") {
+      r = resposta({ ok: false, codigo: "metodo", mensagem: "Use POST." }, 405);
+    } else if (Number(req.headers.get("content-length") ?? "0") > LIMITE_CORPO) {
+      r = resposta({ ok: false, codigo: "grande", mensagem: "Pedido grande demais." }, 413);
+    } else {
+      try {
+        r = await tratar(req);
+      } catch (_e) {
+        r = resposta({ ok: false, codigo: "falha", mensagem: falha }, 500);
+      }
+    }
+    for (const [k, v] of Object.entries(cors)) r.headers.set(k, v);
+    r.headers.set("Cache-Control", "no-store");
+    r.headers.set("X-Content-Type-Options", "nosniff");
+    return r;
+  });
+}
+
+/** Lê o JSON do pedido (até LIMITE_CORPO). Pedido inválido vira objeto vazio. */
+export async function lerCorpo(req: Request): Promise<Record<string, unknown>> {
+  const texto = await req.text().catch(() => "");
+  if (texto.length > LIMITE_CORPO) return {};
+  try {
+    const v = JSON.parse(texto);
+    return v && typeof v === "object" && !Array.isArray(v) ? v as Record<string, unknown> : {};
+  } catch {
+    return {};
+  }
+}
+
+/**
+ * IP de quem chamou. O cf-connecting-ip é escrito pela Cloudflare e o aparelho
+ * não consegue mudar; no x-forwarded-for, o começo da lista pode ser inventado
+ * por quem chama, e o último endereço é o que o servidor viu de verdade.
+ */
+export function ipDoCliente(req: Request): string {
+  const cf = req.headers.get("cf-connecting-ip")?.trim();
+  if (cf) return cf.slice(0, 64);
+  const lista = (req.headers.get("x-forwarded-for") ?? "").split(",").map((s) => s.trim()).filter(Boolean);
+  return (lista.at(-1) ?? req.headers.get("x-real-ip") ?? "-").slice(0, 64) || "-";
 }
 
 function primeiraChave(lista: string | undefined): string | undefined {
@@ -48,12 +118,23 @@ export function clientePublico(token?: string): SupabaseClient {
 
 export const espera = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-const ALFABETO_SENHA = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+/** Mensagem da regra de senha (a mesma no app, nas funções e no banco). */
+export const MENSAGEM_SENHA = "A senha precisa ter pelo menos 8 caracteres, com letras e números.";
 
-/** Senha provisória de 8 caracteres sem letras que se confundem (0/O, 1/I). */
+/** Regra de senha: de 8 a 72 caracteres, com pelo menos uma letra e um número. */
+export function senhaAceita(senha: string): boolean {
+  return senha.length >= 8 && senha.length <= 72 && /[A-Za-z]/.test(senha) && /[0-9]/.test(senha);
+}
+
+const ALFABETO_SENHA = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // 32 símbolos: sem viés no sorteio
+
+/** Senha provisória de 10 caracteres, com letras e números, sem 0/O e 1/I. */
 export function senhaProvisoria(): string {
-  const bytes = crypto.getRandomValues(new Uint8Array(8));
-  return Array.from(bytes, (b) => ALFABETO_SENHA[b % ALFABETO_SENHA.length]).join("");
+  for (;;) {
+    const bytes = crypto.getRandomValues(new Uint8Array(10));
+    const s = Array.from(bytes, (b) => ALFABETO_SENHA[b % ALFABETO_SENHA.length]).join("");
+    if (senhaAceita(s)) return s;
+  }
 }
 
 /** Confere os dois dígitos verificadores do CPF (só números). */
@@ -69,7 +150,17 @@ export function cpfValido(cpf: string): boolean {
   return dv(9) === d[9] && dv(10) === d[10];
 }
 
-/** Login interno do motorista (ele entra com CPF; este e-mail nunca recebe nada). */
-export const emailDoMotorista = (cpf: string) => `m${cpf}@motorista.fortalezadigitalsecurity.com.br`;
+const DOMINIO_MOTORISTA = "motorista.fortalezadigitalsecurity.com.br";
 
-export const emailValido = (e: string) => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e);
+/**
+ * Login interno do motorista (ele entra com CPF; este e-mail nunca recebe
+ * nada). É sorteado, e não tirado do CPF: assim ninguém consegue tentar senhas
+ * direto no Supabase Auth sem passar pelo bloqueio de tentativas daqui.
+ */
+export const emailInternoNovo = () => `m${crypto.randomUUID().replaceAll("-", "")}@${DOMINIO_MOTORISTA}`;
+
+/** Contas antigas usavam m<CPF>@...; elas trocam para o sorteado no próximo login. */
+export const emailInternoAntigo = (email: string) =>
+  new RegExp(`^m\\d{11}@${DOMINIO_MOTORISTA.replaceAll(".", "\\.")}$`).test(email);
+
+export const emailValido = (e: string) => e.length <= 254 && /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e);
