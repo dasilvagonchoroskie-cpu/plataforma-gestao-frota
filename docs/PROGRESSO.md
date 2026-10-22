@@ -103,13 +103,13 @@ Relatório completo (achado, gravidade, correção): `docs/SEGURANCA.md`.
 - **feito e testado** — Banco: permissões padrão fechadas para `anon`/PUBLIC, IP verdadeiro, regra de
   senha (8–72, letras e números), registro das ações da plataforma (`auditoria_plataforma`, só inclusão),
   teste 07 de auditoria geral (RLS em tudo, nada para `anon`, nenhuma função para PUBLIC, isolamento entre
-  empresas e motoristas em todas as tabelas, empresa suspensa sem acesso).
-  Local: `PGTAP_SQL=... supabase/tests/local/rodar.sh` → `total de verificações que passaram: 271`.
-  Esteira (Supabase local, Postgres 17): 271 pgTAP e `verificações: 62, falhas: 0` nas Edge Functions.
+  empresas e motoristas em todas as tabelas, empresa bloqueada sem ver nem gravar nada).
+  Local: `PGTAP_SQL=... supabase/tests/local/rodar.sh` → `total de verificações que passaram: 274`.
+  Esteira (Supabase local, Postgres 17): pgTAP e Edge Functions ponta a ponta (inclui o bloqueio por IP).
 - **feito e testado** — Backup criptografado + restauração num Supabase vazio na Esteira:
   `tabelas conferidas: 52, diferenças: 0`. Fluxo diário na nuvem pronto (`banco-nuvem.yml`).
-- **feito e publicado na nuvem** — Edge Functions novas (login interno sorteado, IP verdadeiro, senha
-  forte, CORS só do painel, limite de 16 KB, erro técnico escondido). Códigos de entrada de todas as
+- **feito e publicado na nuvem** — Edge Functions novas (login interno sorteado, IP verdadeiro, bloqueio
+  de 30 erros por IP em 15 minutos, senha forte, CORS só do painel, limite de 16 KB, erro técnico escondido). Códigos de entrada de todas as
   empresas trocados (migration `rotacionar_codigos_empresa`).
 - **feito e testado** — Apps: regra de senha nova, CPF e e-mail fora do celular, sem backup do Android,
   tráfego só HTTPS, R8 ligado e Dart ofuscado, assinatura derivada da `CHAVE_MESTRA`.

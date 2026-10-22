@@ -164,7 +164,8 @@ altera nem apaga esse registro, nem o dono do banco.
 ## Regras de login
 
 Senha de 8 a 72 caracteres, com letras e números (apps, Edge Functions, banco e Supabase Auth). Login do
-motorista bloqueia por 15 minutos depois de 5 erros seguidos (por CPF e por aparelho); recuperação idem.
+motorista bloqueia por 15 minutos depois de 5 erros seguidos (por CPF e por aparelho) e o endereço IP
+fica bloqueado depois de 30 erros em 15 minutos; recuperação: 5 erros em 15 minutos.
 O login interno do motorista é sorteado (não sai do CPF), então ninguém tenta senha direto no Supabase.
 Sessão: token de 1 hora renovado com rotação. A proteção contra senha vazada (HaveIBeenPwned) e o limite
 de tempo de sessão só existem no plano Pro: o fluxo tenta ligar e só avisa se o plano não deixar.
