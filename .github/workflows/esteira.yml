@@ -246,9 +246,11 @@ jobs:
         working-directory: apps/gestor
         env:
           BASE: ${{ steps.painel.outputs.base }}
+          URL_PAINEL: ${{ steps.painel.outputs.url }}
         run: |
           set -o pipefail
-          flutter build web --release --base-href "$BASE" 2>&1 | tail -5 | tee -a ../../registros/gestor.log
+          flutter build web --release --base-href "$BASE" --dart-define=PAINEL_URL="$URL_PAINEL" 2>&1 | tail -5 \
+            | tee -a ../../registros/gestor.log
           # Marca a versão publicada (a esteira confere depois se esta versão está no ar).
           echo "${GITHUB_SHA::7}" > build/web/versao.txt
       - name: Compilar o APK (ofuscado, encolhido e assinado)
@@ -256,11 +258,13 @@ jobs:
         working-directory: apps/gestor
         env:
           CHAVE_MESTRA: ${{ secrets.CHAVE_MESTRA }}
+          URL_PAINEL: ${{ steps.painel.outputs.url }}
         run: |
           set -o pipefail
           NUMERO=$((100 + ${{ github.run_number }}))
           bash ../../ferramentas/chaves/com_assinatura.sh flutter build apk --release --build-number=$NUMERO \
-            --obfuscate --split-debug-info=build/simbolos 2>&1 | tail -8 | tee -a ../../registros/gestor.log
+            --obfuscate --split-debug-info=build/simbolos --dart-define=PAINEL_URL="$URL_PAINEL" 2>&1 | tail -8 \
+            | tee -a ../../registros/gestor.log
           mkdir -p ../../saida
           cp build/app/outputs/flutter-apk/app-release.apk ../../saida/Frota-Gestor.apk
           (cd test && zip -qr ../../../saida/telas-gestor.zip capturas) || true

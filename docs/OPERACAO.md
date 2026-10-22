@@ -16,7 +16,21 @@ repositório. Em caso de incidente de segurança: `docs/INCIDENTES.md`.
 
 ## Criar uma empresa cliente
 
-No Supabase (SQL Editor, como dono da plataforma):
+**Pelo app (recomendado):** entre no Frota Gestor (ou no painel) com a conta da plataforma
+(gestaodefrota2027@gmail.com) > botão **Plataforma** (escudo, no alto) > **Cadastrar empresa**: nome da
+empresa, nome e e-mail do dono, prazo de teste e limite de caminhões. O app mostra a senha provisória uma
+vez e um recado pronto para mandar ao dono pelo WhatsApp. Na mesma área: dar 30 dias de teste, liberar
+sem prazo, bloquear (com motivo) e gerar senha provisória para o dono que perdeu o acesso ao e-mail. O
+banco confere em cada ação se quem chama é o super administrador (tabela `admins_plataforma`) e registra
+tudo na auditoria (origem `plataforma_app`). Enquanto o dono não troca a senha provisória, o banco não
+mostra nada da empresa para ele.
+
+Para incluir outro super administrador (só pelo SQL Editor):
+
+    insert into public.admins_plataforma (usuario_id)
+    select id from auth.users where lower(email) = 'email-da-pessoa@exemplo.com';
+
+**Pelo Supabase (SQL Editor, como dono da plataforma)**, se precisar:
 
     select public.criar_empresa('Nome da Transportadora', 'email-do-dono@exemplo.com', null, 'piloto', 5, 'teste');
 

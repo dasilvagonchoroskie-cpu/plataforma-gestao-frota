@@ -82,6 +82,14 @@ configurar SMTP e modelos no painel do Supabase, então o acesso do piloto passo
   0.2.0 e pode ser retirada depois. Dono e gestor não trocam o próprio e-mail pelo app (o banco recusa).
   Para chegar a qualquer e-mail é preciso o SMTP próprio (Brevo, `docs/EMAIL.md`); sem ele, só a equipe do
   projeto recebe.
+- **Área Plataforma (super administrador), decisão do dono em 22/10/2026:** o dono da plataforma
+  cadastra e cuida das empresas pelo Frota Gestor (botão Plataforma), sem abrir o Supabase. Super
+  administrador = tabela `admins_plataforma` (hoje gestaodefrota2027@gmail.com); cada ação confere no
+  banco; nenhuma apaga dados (exclusão continua só pelo SQL). Senha provisória do dono forçada no banco.
+  **Melhoria futura (pedida pelo dono):** verificação em duas etapas (TOTP do Google Authenticator, grátis
+  no Supabase Auth) para abrir a área Plataforma: exigir `aal2` em `eh_admin_plataforma()` e a tela de
+  cadastrar o código no app. Também futuro: estender a senha provisória forçada no banco aos gestores e
+  motoristas (hoje o app cobra a troca deles).
 - **Código privado, painel público à parte (decisão do dono, 22/10/2026, opção A):** repositório público
   `painel-frota` só com o painel compilado; a Esteira publica lá com o segredo `PAINEL_TOKEN` e o fluxo do
   banco troca o Site URL do Supabase para o painel novo. Passo a passo em `docs/REPOSITORIO-PRIVADO.md`.

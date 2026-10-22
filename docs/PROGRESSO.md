@@ -148,6 +148,20 @@ Pedido do Evandro: recuperar a senha sem código (link no e-mail) e aceitar os t
   em `docs/REPOSITORIO-PRIVADO.md`). Varredura de segredos (histórico atual, commits antigos, registros
   públicos): nenhum segredo válido.
 
+## Área Plataforma (super administrador) — 22/10/2026
+
+Pedido do Evandro: cadastrar e cuidar das empresas pelo app, sem abrir o Supabase.
+
+- **feito e testado** — Banco (migration `area_plataforma`): `admins_plataforma`, ações `plataforma_*`
+  (lista, cadastrar empresa com o dono e senha provisória gerada pelo banco, prazo, liberar, bloquear,
+  senha nova do dono), conferência do super administrador em cada ação, auditoria `plataforma_app`, senha
+  provisória do dono forçada no banco. Local: `supabase/tests/local/rodar.sh` → `total de verificações
+  que passaram: 306` (teste 08: 27).
+- **feito e testado** — Frota Gestor 0.4.0: botão Plataforma (só para o super administrador), lista das
+  empresas, cadastrar empresa, ações por empresa e recado pronto para o dono (WhatsApp). `flutter analyze`
+  sem problemas; `flutter test --exclude-tags capturas` → 40 testes.
+- **anotado** — Verificação em duas etapas para a área Plataforma (melhoria futura, `docs/PASSAGEM.md`).
+
 ## Fase 7 — acabamento e piloto
 
 - **em andamento** — SMTP próprio (Brevo, configuração no painel do Supabase pelo dono).
