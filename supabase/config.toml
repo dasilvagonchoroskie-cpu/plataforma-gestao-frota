@@ -46,12 +46,13 @@ email_sent = 30
 
 [auth.email]
 enable_signup = true
-double_confirm_changes = true
+# A troca de e-mail do motorista confirma só o e-mail novo (o antigo é interno).
+double_confirm_changes = false
 enable_confirmations = true
 secure_password_change = false
 max_frequency = "30s"
 otp_length = 6
-otp_expiry = 600
+otp_expiry = 3600
 
 [auth.email.template.magic_link]
 subject = "Seu código de acesso"
@@ -62,8 +63,12 @@ subject = "Seu código de acesso"
 content_path = "./supabase/templates/codigo.html"
 
 [auth.email.template.recovery]
-subject = "Código para criar uma senha nova"
-content_path = "./supabase/templates/recuperar.html"
+subject = "Criar uma senha nova - Plataforma de Gestão de Frota"
+content_path = "./supabase/templates/link_senha.html"
+
+[auth.email.template.email_change]
+subject = "Confirme o seu e-mail - Plataforma de Gestão de Frota"
+content_path = "./supabase/templates/confirmar_email.html"
 
 [auth.sms]
 enable_signup = false
@@ -81,4 +86,7 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.recuperar_acesso]
+verify_jwt = false
+
+[functions.pedir_link_senha]
 verify_jwt = false

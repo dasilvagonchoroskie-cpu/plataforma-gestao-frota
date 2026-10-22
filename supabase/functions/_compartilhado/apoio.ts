@@ -159,6 +159,9 @@ const DOMINIO_MOTORISTA = "motorista.fortalezadigitalsecurity.com.br";
  */
 export const emailInternoNovo = () => `m${crypto.randomUUID().replaceAll("-", "")}@${DOMINIO_MOTORISTA}`;
 
+/** Login interno (não recebe e-mail): o motorista ainda não cadastrou um e-mail dele. */
+export const emailInterno = (email: string) => email.toLowerCase().endsWith(`@${DOMINIO_MOTORISTA}`);
+
 /** Contas antigas usavam m<CPF>@...; elas trocam para o sorteado no próximo login. */
 export const emailInternoAntigo = (email: string) =>
   new RegExp(`^m\\d{11}@${DOMINIO_MOTORISTA.replaceAll(".", "\\.")}$`).test(email);

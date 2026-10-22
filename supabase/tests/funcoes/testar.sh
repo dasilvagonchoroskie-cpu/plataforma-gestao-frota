@@ -36,6 +36,32 @@ funcao() { # nome token json -> imprime "status corpo"
   echo -n " "; cat /tmp/resp.json
 }
 
+# E-mails do Supabase local (Mailpit ou Inbucket, conforme a versão).
+CAIXA="${MAILPIT_URL:-${INBUCKET_URL:-http://127.0.0.1:54324}}"
+limpar_emails() {
+  curl -s -X DELETE "$CAIXA/api/v1/messages" >/dev/null 2>&1 || true
+  for c in "$@"; do curl -s -X DELETE "$CAIXA/api/v1/mailbox/${c%@*}" >/dev/null 2>&1 || true; done
+}
+token_do_email() { # destinatário -> token_hash do link do e-mail mais novo (espera até 20 s)
+  local para=$1 corpo id th i
+  for i in $(seq 1 20); do
+    corpo=""
+    id=$(curl -s "$CAIXA/api/v1/search?query=to:$para" | jq -r '.messages[0].ID // empty' 2>/dev/null)
+    [ -n "$id" ] && corpo=$(curl -s "$CAIXA/api/v1/message/$id" | jq -r '(.HTML // "") + (.Text // "")' 2>/dev/null)
+    if [ -z "$corpo" ]; then
+      id=$(curl -s "$CAIXA/api/v1/mailbox/${para%@*}" | jq -r 'last.id // empty' 2>/dev/null)
+      [ -n "$id" ] && corpo=$(curl -s "$CAIXA/api/v1/mailbox/${para%@*}/$id" | jq -r '(.body.html // "") + (.body.text // "")' 2>/dev/null)
+    fi
+    th=$(echo "$corpo" | grep -o 'token_hash=[A-Za-z0-9_-]*' | head -1 | cut -d= -f2)
+    [ -n "$th" ] && { echo "$th"; return; }
+    sleep 1
+  done
+}
+verificar_link() { # tipo token_hash -> access_token (como a página do painel faz)
+  curl -s -X POST "$A/auth/v1/verify" -H "apikey: $K" -H "Content-Type: application/json" \
+    -d "{\"type\":\"$1\",\"token_hash\":\"$2\"}" | jq -r '.access_token // empty'
+}
+
 CODIGO=$(psql "$DB" -tA -c "select public.criar_empresa('Transportes Teste', 'dono@teste.com') ->> 'codigo_entrada'")
 [ ${#CODIGO} -eq 6 ] && ok "empresa criada pela função da plataforma" || falha "criar_empresa" "$CODIGO"
 
@@ -193,6 +219,48 @@ R=$(funcao entrar_com_cpf "" "$GRANDE")
 igual "${R%% *}" "413" "pedido grande demais é recusado"
 R=$(funcao redefinir_acesso "$TD" '{"motorista_id":"nao-e-uuid"}')
 igual "${R%% *} $(echo "${R#* }" | jq -r .mensagem)" "403 Motorista não encontrado." "erro técnico não aparece para quem chamou"
+
+# Recuperar a senha por link no e-mail (dono e gestor: pelo e-mail)
+limpar_emails dono@teste.com
+R=$(funcao pedir_link_senha "" '{"identificador":"Dono@teste.com"}')
+igual "${R%% *}" "200" "o dono pede o link para criar uma senha nova"
+R2=$(funcao pedir_link_senha "" '{"identificador":"ninguem@teste.com"}')
+igual "$(echo "${R2#* }" | jq -r .mensagem | cut -c1-20)" "$(echo "${R#* }" | jq -r .mensagem | cut -c1-20)" "e-mail sem conta: a mesma resposta"
+TH=$(token_do_email dono@teste.com)
+[ -n "$TH" ] && ok "o e-mail chega com o link (token_hash)" || falha "e-mail de recuperação do dono"
+TR=$(verificar_link recovery "$TH")
+[ -n "$TR" ] && ok "o link do e-mail abre a sessão para criar a senha" || falha "verificar o link de recuperação"
+curl -s -X PUT "$A/auth/v1/user" -H "apikey: $K" -H "Authorization: Bearer $TR" -H "Content-Type: application/json" \
+  -d '{"password":"donoNova2026"}' >/dev/null
+[ "$(token dono@teste.com donoNova2026)" != "null" ] && ok "o dono entra com a senha nova criada pelo link" || falha "senha nova do dono"
+igual "$(token dono@teste.com donosenha1)" "null" "a senha antiga do dono deixa de valer"
+igual "$(verificar_link recovery "$TH")" "" "o link só funciona uma vez"
+
+# Motorista: cadastra um e-mail dele, confirma pelo link e recupera a senha pelo CPF
+R=$(funcao entrar_com_cpf "" '{"cpf":"11144477735","senha":"senha4567","aparelho":"email-1"}')
+TME=$(echo "${R#* }" | jq -r .access_token)
+limpar_emails moto.real@teste.com
+curl -s -X PUT "$A/auth/v1/user" -H "apikey: $K" -H "Authorization: Bearer $TME" -H "Content-Type: application/json" \
+  -d '{"email":"moto.real@teste.com"}' >/dev/null
+THE=$(token_do_email moto.real@teste.com)
+[ -n "$THE" ] && ok "o motorista recebe o link para confirmar o e-mail" || falha "e-mail de confirmação do motorista"
+[ -n "$(verificar_link email_change "$THE")" ] && ok "o link confirma o e-mail" || falha "confirmar o e-mail do motorista"
+igual "$(psql "$DB" -tA -c "select email from public.perfis where cpf = '11144477735'")" "moto.real@teste.com" "o e-mail confirmado vai para o perfil"
+R=$(funcao entrar_com_cpf "" '{"cpf":"11144477735","senha":"senha4567","aparelho":"email-1"}')
+igual "${R%% *}" "200" "o motorista continua entrando com CPF e senha"
+limpar_emails moto.real@teste.com
+R=$(funcao pedir_link_senha "" '{"identificador":"111.444.777-35"}')
+igual "${R%% *}" "200" "o motorista pede o link pelo CPF"
+THR=$(token_do_email moto.real@teste.com)
+TMR=$(verificar_link recovery "$THR")
+[ -n "$TMR" ] && ok "o link chega no e-mail confirmado do motorista" || falha "recuperação do motorista pelo CPF"
+curl -s -X PUT "$A/auth/v1/user" -H "apikey: $K" -H "Authorization: Bearer $TMR" -H "Content-Type: application/json" \
+  -d '{"password":"motoNova2026"}' >/dev/null
+R=$(funcao entrar_com_cpf "" '{"cpf":"11144477735","senha":"motoNova2026","aparelho":"email-2"}')
+igual "${R%% *}" "200" "e ele entra com CPF e a senha nova"
+for i in 1 2 3; do funcao pedir_link_senha "" '{"identificador":"11144477735"}' >/dev/null; done
+R=$(funcao pedir_link_senha "" '{"identificador":"11144477735"}')
+igual "${R%% *}" "429" "mais de 3 pedidos de link por hora para o mesmo CPF são bloqueados"
 
 # Bloqueio por endereço IP (por último: o IP da esteira fica bloqueado 15 minutos)
 for i in $(seq 1 30); do

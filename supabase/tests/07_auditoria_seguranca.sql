@@ -15,7 +15,7 @@
 begin;
 \ir apoio/fixtures.psql
 
-select plan(34);
+select plan(36);
 
 -- --------------------------------------------------- estrutura e permissões
 
@@ -240,6 +240,14 @@ select set_config('request.headers', '', true);
 select is(array[public.senha_aceita('abc12345'), public.senha_aceita('abcdefgh'), public.senha_aceita('12345678'),
   public.senha_aceita('ab1'), public.senha_aceita(null)], array[true, false, false, false, false],
   'regra de senha: 8 ou mais, com letras e números');
+
+-- --------------------------------------------- e-mail confirmado vai para o perfil
+
+update auth.users set email = 'motorista.a.real@exemplo.com' where id = pg_temp.fx('u_a');
+select is((select email from public.perfis where id = pg_temp.fx('u_a')), 'motorista.a.real@exemplo.com',
+  'e-mail trocado no login (confirmado) vai para o perfil');
+select is((select email from public.motoristas where perfil_id = pg_temp.fx('u_a')), 'motorista.a.real@exemplo.com',
+  'e para o cadastro de motorista');
 
 select * from finish();
 rollback;
