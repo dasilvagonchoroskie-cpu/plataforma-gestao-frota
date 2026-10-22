@@ -36,7 +36,9 @@ jobs:
             "https://github.com/gitleaks/gitleaks/releases/download/v${VERSAO}/gitleaks_${VERSAO}_linux_x64.tar.gz"
           echo "$RESUMO  $RUNNER_TEMP/gitleaks.tgz" | sha256sum -c -
           tar -xzf "$RUNNER_TEMP/gitleaks.tgz" -C "$RUNNER_TEMP" gitleaks
-          "$RUNNER_TEMP/gitleaks" git . --config .gitleaks.toml --redact --no-banner -v
+          # Todo o histórico do ramo main (as etiquetas antigas dos Releases ainda
+          # apontam para o histórico de antes da limpeza; ver docs/SEGURANCA.md).
+          "$RUNNER_TEMP/gitleaks" git . --config .gitleaks.toml --redact --no-banner -v --log-opts="--full-history HEAD"
 
   aprovacoes:
     name: Migrations que apagam dados têm aprovação

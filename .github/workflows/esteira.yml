@@ -356,3 +356,14 @@ jobs:
           [ -f saida/telas-motorista.zip ] && gh release upload motorista-teste $R saida/telas-motorista.zip --clobber || true
           [ -f saida/telas-gestor.zip ] && gh release upload gestor-teste $R saida/telas-gestor.zip --clobber || true
           echo "APKs publicados (commit ${GITHUB_SHA::7})"
+      - name: Etiquetas dos Releases apontam para esta versão
+        if: needs.motorista.outputs.assinatura == 'oficial' && needs.gestor.outputs.assinatura == 'oficial'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Cada Release fica preso ao commit dos APKs que ele tem (e o histórico de
+          # antes da limpeza de 22/10/2026 deixa de ser referenciado).
+          for t in motorista-teste gestor-teste registros ferramentas; do
+            gh api -X PATCH "repos/$GITHUB_REPOSITORY/git/refs/tags/$t" -f sha="$GITHUB_SHA" -F force=true \
+              --jq '"etiqueta " + .ref + " -> " + .object.sha[0:7]' || echo "::notice::etiqueta $t não encontrada"
+          done
