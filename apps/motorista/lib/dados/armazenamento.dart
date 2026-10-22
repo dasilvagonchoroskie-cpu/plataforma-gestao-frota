@@ -56,6 +56,17 @@ abstract class Armazenamento {
   Future<void> limparTudo();
 }
 
+/// O que fica guardado no celular da situação da conta: sem CPF e sem e-mail
+/// (o app não usa esses dados offline, então eles não ficam no aparelho).
+String situacaoParaGuardar(Map<String, Object?> s) {
+  final perfil = s['perfil'];
+  if (perfil is! Map) return jsonEncode(s);
+  final limpo = Map<String, Object?>.from(perfil.cast<String, Object?>())
+    ..remove('cpf')
+    ..remove('email');
+  return jsonEncode({...s, 'perfil': limpo});
+}
+
 String _json(Map<String, Object?> m) => jsonEncode(m);
 Map<String, Object?> _mapa(String t) => (jsonDecode(t) as Map).cast<String, Object?>();
 

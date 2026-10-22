@@ -92,8 +92,9 @@ void main() {
 
     final aB = ArmazenamentoMemoria();
     final cb = await celular(ServidorFalsoDe(sb, motoristaB), armazenamento: aB);
-    await cb.read(dadosProvider.notifier).salvarVale(
-        Vale(id: 'vb', motoristaId: motoristaB, data: DateTime.utc(2026, 10, 10), valorCentavos: 2000));
+    await cb
+        .read(dadosProvider.notifier)
+        .salvarVale(Vale(id: 'vb', motoristaId: motoristaB, data: DateTime.utc(2026, 10, 10), valorCentavos: 2000));
 
     s.online = true;
     await ca.read(sincronizadorProvider.notifier).sincronizar();
@@ -115,8 +116,15 @@ void main() {
   test('celular novo: entra e recupera todo o histórico da nuvem', () async {
     final s = servidorComCadastros();
     s.colocar('vales', vale('antigo', 9900).paraMapa());
-    s.colocar('uso_caminhao', UsoCaminhao(id: 'u1', motoristaId: motoristaA, caminhaoId: caminhao2,
-        inicioEm: DateTime.utc(2026, 9, 1)).paraMapa());
+    s.colocar(
+      'uso_caminhao',
+      UsoCaminhao(
+        id: 'u1',
+        motoristaId: motoristaA,
+        caminhaoId: caminhao2,
+        inicioEm: DateTime.utc(2026, 9, 1),
+      ).paraMapa(),
+    );
     final c = await celular(s);
     await c.read(sincronizadorProvider.notifier).baixar(tudo: true);
     await c.read(dadosProvider.notifier).recarregar();
@@ -147,9 +155,15 @@ void main() {
     await c.read(dadosProvider.notifier).salvarVale(vale('v1', 1000));
     await c.read(sincronizadorProvider.notifier).sincronizar();
     s.ajustes.add({
-      'id': 'aj1', 'tabela_alvo': 'vales', 'registro_id': 'v1', 'campo': 'valor_centavos',
-      'valor_antigo': 1000, 'valor_novo': 800, 'motivo': 'Conferido no recibo',
-      'criado_em': '2026-10-16T10:00:00Z', 'apagado': false,
+      'id': 'aj1',
+      'tabela_alvo': 'vales',
+      'registro_id': 'v1',
+      'campo': 'valor_centavos',
+      'valor_antigo': 1000,
+      'valor_novo': 800,
+      'motivo': 'Conferido no recibo',
+      'criado_em': '2026-10-16T10:00:00Z',
+      'apagado': false,
     });
     await c.read(sincronizadorProvider.notifier).sincronizar();
     final d = c.read(dadosProvider).requireValue;
@@ -164,8 +178,13 @@ void main() {
     await c.read(dadosProvider.notifier).salvarVale(vale('v1', 1000));
     await c.read(sincronizadorProvider.notifier).sincronizar();
     s.ajustes.add({
-      'id': 'aj1', 'tabela_alvo': 'vales', 'registro_id': 'v1', 'campo': 'valor_centavos',
-      'valor_novo': 800, 'motivo': 'Recibo', 'criado_em': '2026-10-16T10:00:00Z',
+      'id': 'aj1',
+      'tabela_alvo': 'vales',
+      'registro_id': 'v1',
+      'campo': 'valor_centavos',
+      'valor_novo': 800,
+      'motivo': 'Recibo',
+      'criado_em': '2026-10-16T10:00:00Z',
     });
     await c.read(dadosProvider.notifier).salvarVale(vale('v1', 5000)); // ainda não sabia do ajuste
     await c.read(sincronizadorProvider.notifier).sincronizar();
@@ -223,7 +242,13 @@ void main() {
     await dados.salvarPontoDePartida(caminhaoId: caminhao1, km: 100000);
     await dados.salvarPontoDePartida(caminhaoId: caminhao2, km: 500000);
     Abastecimento ab(String id, String cam, double km, double litros) => Abastecimento(
-        id: id, motoristaId: motoristaA, caminhaoId: cam, data: DateTime.utc(2026, 10, 5), kmOdometro: km, litros: litros);
+      id: id,
+      motoristaId: motoristaA,
+      caminhaoId: cam,
+      data: DateTime.utc(2026, 10, 5),
+      kmOdometro: km,
+      litros: litros,
+    );
     await dados.salvarAbastecimento(ab('a1', caminhao1, 100800, 320));
     await dados.salvarAbastecimento(ab('b1', caminhao2, 500600, 300));
     final d = c.read(dadosProvider).requireValue;
@@ -254,6 +279,32 @@ void main() {
     await c2.read(sincronizadorProvider.notifier).sincronizar();
     expect(c2.read(sincronizadorProvider).desligado, isTrue);
     expect(c2.read(dadosProvider).requireValue.vales, isNotEmpty);
+  });
+
+  test('o CPF e o e-mail não ficam guardados no celular', () async {
+    final s = servidorComCadastros();
+    final completo = {
+      ...s.situacaoAtual(),
+      'perfil': {
+        'id': 'p1',
+        'nome': 'Carlos',
+        'papel': 'motorista',
+        'cpf': '52998224725',
+        'email': 'm@x.com',
+        'ativo': true,
+      },
+    };
+    final guardado = situacaoParaGuardar(completo);
+    expect(guardado, isNot(contains('52998224725')));
+    expect(guardado, isNot(contains('m@x.com')));
+    expect(guardado, contains('Carlos'));
+
+    s.situacaoFixa = completo;
+    final c = await celular(s);
+    await c.read(sincronizadorProvider.notifier).baixar(tudo: true);
+    final t = await c.read(armazenamentoProvider).lerEstado('situacao');
+    expect(t, isNot(contains('52998224725')));
+    expect(c.read(dadosProvider).requireValue.info.nome, isNotEmpty);
   });
 }
 

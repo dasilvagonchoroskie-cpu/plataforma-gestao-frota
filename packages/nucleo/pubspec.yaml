@@ -7,8 +7,8 @@ environment:
   sdk: ^3.8.0
 
 dependencies:
-  pdf: any
+  pdf: ^3.13.1
 
 dev_dependencies:
-  test: any
-  lints: any
+  test: ^1.33.0
+  lints: ^6.1.0

@@ -290,7 +290,7 @@ class _TelaCompletarCadastroState extends ConsumerState<TelaCompletarCadastro> w
 
   Future<void> _salvar() async {
     if (_nome.text.trim().length < 2) return setState(() => erro = 'Escreva o seu nome.');
-    if (_senha.text.length < 6) return setState(() => erro = 'A senha precisa ter pelo menos 6 letras ou números.');
+    if (!senhaAceita(_senha.text)) return setState(() => erro = mensagemSenha);
     final s = ref.read(servidorProvider);
     final ok = await tentar(() async {
       try {
@@ -321,7 +321,7 @@ class _TelaCompletarCadastroState extends ConsumerState<TelaCompletarCadastro> w
         controle: _senha,
         rotulo: 'Crie uma senha',
         tipo: TipoCampo.senha,
-        ajuda: 'Pelo menos 6 letras ou números.',
+        ajuda: ajudaSenha,
       ),
       MensagemErro(erro),
     ],
@@ -390,7 +390,7 @@ class _TelaNovaSenhaState extends ConsumerState<TelaNovaSenha> with _Ocupado {
   final _senha = TextEditingController();
 
   Future<void> _salvar() async {
-    if (_senha.text.length < 6) return setState(() => erro = 'A senha precisa ter pelo menos 6 letras ou números.');
+    if (!senhaAceita(_senha.text)) return setState(() => erro = mensagemSenha);
     final ok = await tentar(() => ref.read(servidorProvider).definirSenha(_senha.text));
     if (!ok || !mounted) return;
     if (widget.primeiroAcesso) {
@@ -417,7 +417,7 @@ class _TelaNovaSenhaState extends ConsumerState<TelaNovaSenha> with _Ocupado {
         rotulo: 'Senha nova',
         tipo: TipoCampo.senha,
         autofoco: true,
-        ajuda: 'Pelo menos 6 letras ou números.',
+        ajuda: ajudaSenha,
       ),
       MensagemErro(erro),
     ],

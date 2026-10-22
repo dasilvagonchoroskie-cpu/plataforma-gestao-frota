@@ -28,29 +28,32 @@ android {
         versionName = flutter.versionName
     }
 
-    // Chave de TESTE (piloto): fica no repositório para todo APK da esteira
-    // sair com a mesma assinatura e o motorista conseguir atualizar sem
-    // desinstalar. Antes da Play Store troca pela chave de envio de verdade.
+    // Assinatura: a esteira deriva a chave da CHAVE_MESTRA (segredo do GitHub,
+    // ferramentas/chaves/derivar.py) e passa o arquivo e a senha por variáveis
+    // de ambiente; nada de chave ou senha fica no repositório. Sem elas (no
+    // computador de quem desenvolve), a versão sai com a chave de depuração.
+    val arquivoChave = System.getenv("FROTA_CHAVE_ARQUIVO")
     signingConfigs {
-        create("teste") {
-            storeFile = file("chave-teste.jks")
-            storePassword = "REMOVIDO"
-            keyAlias = "teste"
-            keyPassword = "REMOVIDO"
+        if (arquivoChave != null) {
+            create("frota") {
+                storeFile = file(arquivoChave)
+                storeType = "pkcs12"
+                storePassword = System.getenv("FROTA_CHAVE_SENHA")
+                keyAlias = "frota"
+                keyPassword = System.getenv("FROTA_CHAVE_SENHA")
+            }
         }
     }
 
     buildTypes {
         release {
-            signingConfig = signingConfigs.getByName("teste")
-            // Sem o "encolhedor" R8: ele renomeia métodos que os plugins
-            // (shared_preferences, path_provider) chamam por JNI, e o app
-            // travava na abertura (NoSuchMethodError) só na versão de entrega.
-            isMinifyEnabled = false
-            isShrinkResources = false
-        }
-        debug {
-            signingConfig = signingConfigs.getByName("teste")
+            signingConfig = signingConfigs.findByName("frota") ?: signingConfigs.getByName("debug")
+            // Encolhedor R8 ligado, com as regras de proguard-rules.pro para as
+            // classes que o código nativo chama pelo nome. A esteira abre o APK
+            // num emulador a cada versão para garantir que nada quebrou.
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
     }
 }

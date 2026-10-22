@@ -174,8 +174,8 @@ ErroServidor traduzirErro(Object e) {
     if (m.contains('for security purposes') || m.contains('rate limit') || e.statusCode == '429') {
       return const ErroServidor('Espere um minuto antes de tentar de novo.', codigo: 'espera');
     }
-    if (m.contains('password') && m.contains('least')) {
-      return const ErroServidor('A senha precisa ter pelo menos 6 letras ou números.', codigo: 'senha_curta');
+    if (m.contains('password') && (m.contains('least') || m.contains('weak') || m.contains('should contain'))) {
+      return const ErroServidor('A senha precisa ter pelo menos 8 caracteres, com letras e números.', codigo: 'senha_fraca');
     }
     if (m.contains('same') && m.contains('password')) {
       return const ErroServidor('Escolha uma senha diferente da anterior.', codigo: 'senha_igual');

@@ -148,7 +148,7 @@ void main() {
     final campos = find.byType(TextField);
     await tester.enterText(campos.at(0), 'Novo Motorista');
     await tester.enterText(campos.at(1), '12345678900');
-    await tester.enterText(campos.at(2), 'senha1');
+    await tester.enterText(campos.at(2), 'senha123');
     await tester.tap(find.text('Criar minha conta'));
     await tester.pumpAndSettle();
     expect(find.textContaining('Confira o CPF'), findsOneWidget);
@@ -237,12 +237,12 @@ void main() {
     final campos = find.byType(TextField);
     await tester.enterText(campos.at(0), '52998224725');
     await tester.enterText(campos.at(1), 'abcd efgh jk22');
-    await tester.enterText(campos.at(2), 'nova123');
+    await tester.enterText(campos.at(2), 'nova1234');
     await tester.pumpAndSettle();
     expect(find.text('ABCD-EFGH-JK22'), findsOneWidget, reason: 'o código entra formatado');
     await tester.tap(find.text('Criar a senha nova'));
     await tester.pumpAndSettle();
-    expect(s.recuperacoes, ['52998224725:nova123']);
+    expect(s.recuperacoes, ['52998224725:nova1234']);
     expect(find.text('NOVO-CODI-GO23'), findsOneWidget, reason: 'mostra o código novo');
     await tester.tap(find.text('Já anotei o código em lugar seguro.'));
     await tester.tap(find.text('Continuar'));

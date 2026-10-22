@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:convert';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -173,7 +172,7 @@ class Sincronizador extends Notifier<EstadoEnvio> {
     final r = await _s.baixarAlteracoes(desde);
 
     final situacao = (r['situacao'] as Map?)?.cast<String, Object?>();
-    if (situacao != null) await _a.gravarEstado('situacao', jsonEncode(situacao));
+    if (situacao != null) await _a.gravarEstado('situacao', situacaoParaGuardar(situacao));
     if ((situacao?['empresa'] as Map?)?['bloqueada'] == true) {
       throw const ErroServidor('O acesso da empresa à plataforma foi encerrado.', codigo: 'empresa_bloqueada');
     }

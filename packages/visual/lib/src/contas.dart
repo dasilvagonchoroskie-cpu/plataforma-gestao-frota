@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:nucleo/nucleo.dart' show ajudaSenha, mensagemSenha, senhaAceita;
 
 import 'basicos.dart';
 import 'campos.dart';
@@ -393,8 +394,8 @@ class _TelaRecuperarComCodigoState extends State<TelaRecuperarComCodigo> {
       erro = widget.porCpf ? 'Confira o CPF: tem 11 números.' : 'Confira o e-mail.';
     } else if (_codigo.text.replaceAll('-', '').length != 12) {
       erro = 'O código de recuperação tem 12 letras e números.';
-    } else if (_senha.text.length < 6) {
-      erro = 'A senha nova precisa ter pelo menos 6 letras ou números.';
+    } else if (!senhaAceita(_senha.text)) {
+      erro = mensagemSenha;
     }
     setState(() => _erro = erro);
     if (erro != null) return;
@@ -450,7 +451,7 @@ class _TelaRecuperarComCodigoState extends State<TelaRecuperarComCodigo> {
               controle: _senha,
               rotulo: 'Senha nova',
               tipo: TipoCampo.senha,
-              ajuda: 'Pelo menos 6 letras ou números.',
+              ajuda: ajudaSenha,
               acaoTeclado: TextInputAction.done,
             ),
             if (_erro != null) ...[const SizedBox(height: 16), Aviso(texto: _erro!, icone: Icons.error_outline)],

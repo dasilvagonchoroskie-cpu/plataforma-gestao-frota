@@ -12,5 +12,6 @@ export 'src/regras/dados_relatorio.dart';
 export 'src/regras/media_diesel.dart';
 export 'src/regras/periodo.dart';
 export 'src/regras/resumo.dart';
+export 'src/senha.dart';
 export 'src/relatorio/csv.dart';
 export 'src/relatorio/gerador_pdf.dart';

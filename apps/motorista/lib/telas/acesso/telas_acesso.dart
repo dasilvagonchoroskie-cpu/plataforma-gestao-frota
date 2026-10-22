@@ -239,7 +239,7 @@ class _TelaCriarContaState extends ConsumerState<TelaCriarConta> {
       _erro = null;
       _erroNome = _nome.text.trim().length < 2 ? 'Escreva o seu nome.' : null;
       _erroCpf = cpfValido(_cpf.text) ? null : 'Confira o CPF: tem 11 números.';
-      _erroSenha = _senha.text.length < 6 ? 'Pelo menos 6 letras ou números.' : null;
+      _erroSenha = senhaAceita(_senha.text) ? null : ajudaSenha;
       _faltaAceite = !_aceito;
     });
     if (_erroNome != null || _erroCpf != null || _erroSenha != null) return;
@@ -281,7 +281,7 @@ class _TelaCriarContaState extends ConsumerState<TelaCriarConta> {
           rotulo: 'Crie uma senha',
           tipo: TipoCampo.senha,
           erro: _erroSenha,
-          ajuda: 'Pelo menos 6 letras ou números. Você vai entrar com o CPF e esta senha.',
+          ajuda: '$ajudaSenha Você vai entrar com o CPF e esta senha.',
           acaoTeclado: TextInputAction.done,
         ),
         const SizedBox(height: 8),
@@ -332,7 +332,7 @@ class _TelaCompletarCadastroState extends ConsumerState<TelaCompletarCadastro> {
       _erro = null;
       _erroNome = _nome.text.trim().length < 2 ? 'Escreva o seu nome.' : null;
       _erroCpf = cpfValido(_cpf.text) ? null : 'O CPF não está certo. Confira os números.';
-      _erroSenha = _senha.text.length < 6 ? 'A senha precisa ter pelo menos 6 letras ou números.' : null;
+      _erroSenha = senhaAceita(_senha.text) ? null : mensagemSenha;
     });
     if (_erroNome != null || _erroCpf != null || _erroSenha != null) return;
     setState(() => _ocupado = true);
@@ -367,7 +367,7 @@ class _TelaCompletarCadastroState extends ConsumerState<TelaCompletarCadastro> {
           controle: _senha,
           rotulo: 'Crie uma senha',
           tipo: TipoCampo.senha,
-          ajuda: 'Pelo menos 6 letras ou números. Você vai usar com o CPF para entrar.',
+          ajuda: '$ajudaSenha Você vai usar com o CPF para entrar.',
           erro: _erroSenha,
           acaoTeclado: TextInputAction.done,
         ),
@@ -448,8 +448,8 @@ class _TelaTrocarSenhaState extends ConsumerState<TelaTrocarSenha> {
   }
 
   Future<void> _salvar() async {
-    if (_senha.text.length < 6) {
-      setState(() => _erro = 'A senha precisa ter pelo menos 6 letras ou números.');
+    if (!senhaAceita(_senha.text)) {
+      setState(() => _erro = mensagemSenha);
       return;
     }
     setState(() {
@@ -473,7 +473,7 @@ class _TelaTrocarSenhaState extends ConsumerState<TelaTrocarSenha> {
   Widget build(BuildContext context) {
     return PaginaAcesso(
       titulo: 'Senha nova',
-      texto: 'Crie uma senha que só você saiba. Pelo menos 6 letras ou números.',
+      texto: 'Crie uma senha que só você saiba. $ajudaSenha',
       botao: 'Salvar a senha',
       aoTocar: _salvar,
       ocupado: _ocupado,

@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../dados/armazenamento.dart';
 import '../dados/dados.dart';
 import '../dados/sincronizador.dart';
 import '../servidor/servidor.dart';
@@ -46,10 +47,17 @@ class Acesso extends AsyncNotifier<EstadoAcesso> {
   Future<EstadoAcesso> build() => _decidir();
 
   Future<Map<String, Object?>?> _situacaoGuardada() async {
-    final t = await ref.read(armazenamentoProvider).lerEstado('situacao');
+    final a = ref.read(armazenamentoProvider);
+    final t = await a.lerEstado('situacao');
     if (t == null) return null;
     try {
-      return _mapa(jsonDecode(t));
+      final s = _mapa(jsonDecode(t));
+      // Versões antigas guardavam o CPF e o e-mail: limpa na primeira leitura.
+      final perfil = _mapa(s?['perfil']);
+      if (s != null && perfil != null && (perfil.containsKey('cpf') || perfil.containsKey('email'))) {
+        await a.gravarEstado('situacao', situacaoParaGuardar(s));
+      }
+      return s;
     } catch (_) {
       return null;
     }
@@ -97,7 +105,7 @@ class Acesso extends AsyncNotifier<EstadoAcesso> {
       return EstadoAcesso(Etapa.completarCadastro, email: _s.emailDaSessao ?? '');
     }
     if (perfil['papel'] != 'motorista') return const EstadoAcesso(Etapa.contaDeGestor);
-    if (pronto) await a.gravarEstado('situacao', jsonEncode(s));
+    if (pronto) await a.gravarEstado('situacao', situacaoParaGuardar(s));
     if (_termosPendentes(s)) return const EstadoAcesso(Etapa.termos);
     if (_empresaBloqueada(s)) return _bloqueada(s);
     if (_semCodigoRecuperacao(s)) return const EstadoAcesso(Etapa.codigoRecuperacao);
@@ -111,7 +119,7 @@ class Acesso extends AsyncNotifier<EstadoAcesso> {
       }
       if (pronto) return const EstadoAcesso(Etapa.pronto);
       // Aprovado: baixa o histórico (celular novo recupera tudo) e abre.
-      await a.gravarEstado('situacao', jsonEncode(s));
+      await a.gravarEstado('situacao', situacaoParaGuardar(s));
       try {
         await ref.read(sincronizadorProvider.notifier).baixar(tudo: true);
       } on ErroServidor catch (e) {
@@ -162,7 +170,7 @@ class Acesso extends AsyncNotifier<EstadoAcesso> {
     try {
       final s = await _s.aceitarTermos(versao);
       if (await ref.read(armazenamentoProvider).lerEstado('pronto') == '1') {
-        await ref.read(armazenamentoProvider).gravarEstado('situacao', jsonEncode(s));
+        await ref.read(armazenamentoProvider).gravarEstado('situacao', situacaoParaGuardar(s));
       }
     } on ErroServidor catch (e) {
       return e.mensagem;
