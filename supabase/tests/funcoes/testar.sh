@@ -266,6 +266,28 @@ for i in 1 2 3; do funcao pedir_link_senha "" '{"identificador":"11144477735"}' 
 R=$(funcao pedir_link_senha "" '{"identificador":"11144477735"}')
 igual "${R%% *}" "429" "mais de 3 pedidos de link por hora para o mesmo CPF são bloqueados"
 
+# Área da Plataforma (super administrador) e senha provisória forçada no banco
+ADM=$(criar_usuario admin@plataforma.teste admin12345)
+psql "$DB" -tA -c "insert into public.admins_plataforma (usuario_id) values ('$ADM')" >/dev/null
+TA=$(token admin@plataforma.teste admin12345)
+igual "$(rpc "$TD" plataforma_empresas '{}' | jq -r .code)" "42501" "dono de empresa não usa a área da Plataforma"
+R=$(rpc "$TA" plataforma_criar_empresa '{"p_nome":"Transportes Plataforma","p_dono_nome":"Dona Nova","p_dono_email":"dona.nova@teste.com","p_dias_teste":30,"p_limite_caminhoes":5}')
+SP=$(echo "$R" | jq -r .senha_provisoria)
+[[ "$SP" =~ ^[A-HJ-NP-Z2-9]{10}$ ]] && ok "o super administrador cadastra a empresa e recebe a senha provisória" || falha "plataforma_criar_empresa" "$R"
+TN2=$(token dona.nova@teste.com "$SP")
+[ "$TN2" != "null" ] && ok "a dona entra com a senha provisória" || falha "login com a senha provisória"
+igual "$(rpc "$TN2" situacao_acesso '{}' | jq -r '.senha_provisoria')" "true" "o app pede a senha nova"
+igual "$(curl -s "$A/rest/v1/categorias_gasto?select=id" -H "apikey: $K" -H "Authorization: Bearer $TN2" | jq -r length)" "0" \
+  "com a senha provisória o banco não mostra nada da empresa"
+curl -s -X PUT "$A/auth/v1/user" -H "apikey: $K" -H "Authorization: Bearer $TN2" -H "Content-Type: application/json" \
+  -d '{"password":"donaNova2026","data":{"trocar_senha":false}}' >/dev/null
+TN3=$(token dona.nova@teste.com donaNova2026)
+igual "$(rpc "$TN3" situacao_acesso '{}' | jq -r '.senha_provisoria')" "false" "trocou a senha: o app libera"
+igual "$(curl -s "$A/rest/v1/categorias_gasto?select=id" -H "apikey: $K" -H "Authorization: Bearer $TN3" | jq -r length)" "11" \
+  "e o banco mostra os dados da empresa"
+igual "$(rpc "$TA" plataforma_empresas '{}' | jq -r '[.[] | select(.nome == "Transportes Plataforma")][0].situacao')" "teste" \
+  "a empresa nova aparece na lista da Plataforma, em teste"
+
 # Bloqueio por endereço IP (por último: o IP da esteira fica bloqueado 15 minutos)
 for i in $(seq 1 30); do
   R=$(funcao entrar_com_cpf "" "{\"cpf\":\"$(printf '9%010d' "$i")\",\"senha\":\"errada1\",\"aparelho\":\"ip-$i\"}")

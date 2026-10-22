@@ -67,7 +67,8 @@ select is(array(
 select is(array(
   select c.relname::text from pg_class c join pg_namespace n on n.oid = c.relnamespace
   where n.nspname = 'public' and c.relname in ('tentativas_acesso', 'codigos_recuperacao', 'registros_acesso',
-    'registro_exclusoes', 'configuracao_plataforma', 'limpeza_execucoes', 'auditoria_plataforma')
+    'registro_exclusoes', 'configuracao_plataforma', 'limpeza_execucoes', 'auditoria_plataforma',
+    'admins_plataforma', 'senhas_provisorias')
     and (has_table_privilege('authenticated', c.oid, 'select') or has_table_privilege('authenticated', c.oid, 'insert'))
   order by 1),
   '{}'::text[], 'o app não lê nem grava as tabelas internas (tentativas, códigos, registros, auditoria)');
