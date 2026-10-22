@@ -118,23 +118,6 @@ class TelaConfiguracoes extends ConsumerWidget {
             onTap: () => abrir(const TelaNovaSenha()),
           ),
           ListTile(
-            leading: const Icon(Icons.key_outlined),
-            title: const Text('Código de recuperação'),
-            subtitle: const Text('Gerar um código novo (o anterior para de valer)'),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (ctx) => TelaCodigoRecuperacao(
-                  voltar: true,
-                  comoEntrar: 'o seu e-mail',
-                  gerar: () => ref.read(servidorProvider).gerarCodigoRecuperacao(),
-                  concluir: () => Navigator.pop(ctx),
-                ),
-              ),
-            ),
-          ),
-          ListTile(
             leading: const Icon(Icons.description_outlined),
             title: const Text('Termos de Uso'),
             trailing: const Icon(Icons.chevron_right),

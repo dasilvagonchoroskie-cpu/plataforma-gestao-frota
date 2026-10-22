@@ -198,7 +198,8 @@ class _TelaEntrarState extends ConsumerState<TelaEntrar> {
             child: const Text('Esqueci a senha'),
           ),
         ),
-        const Nota('Esqueceu a senha? Peça para o seu patrão criar uma senha provisória pelo painel.'),
+        const Nota('Esqueceu a senha? Toque em "Esqueci a senha" para receber o link no seu e-mail, ou peça ao '
+            'seu patrão uma senha provisória pelo painel.'),
       ],
     );
   }
@@ -206,7 +207,8 @@ class _TelaEntrarState extends ConsumerState<TelaEntrar> {
 
 // ----------------------------------------------------------- criar conta
 
-/// Cadastro numa tela só: nome, CPF e senha. Não precisa de e-mail.
+/// Cadastro numa tela só: nome, CPF, senha e, se quiser, o e-mail para
+/// recuperar a senha. Os termos já foram aceitos na abertura do app.
 class TelaCriarConta extends ConsumerStatefulWidget {
   const TelaCriarConta({super.key});
 
@@ -218,12 +220,12 @@ class _TelaCriarContaState extends ConsumerState<TelaCriarConta> {
   final _nome = TextEditingController();
   final _cpf = TextEditingController();
   final _senha = TextEditingController();
+  final _email = TextEditingController();
   String? _erro;
   String? _erroNome;
   String? _erroCpf;
   String? _erroSenha;
-  bool _aceito = false;
-  bool _faltaAceite = false;
+  String? _erroEmail;
   bool _ocupado = false;
 
   @override
@@ -231,22 +233,20 @@ class _TelaCriarContaState extends ConsumerState<TelaCriarConta> {
     _nome.dispose();
     _cpf.dispose();
     _senha.dispose();
+    _email.dispose();
     super.dispose();
   }
 
   Future<void> _criar() async {
+    final email = _email.text.trim().toLowerCase();
     setState(() {
       _erro = null;
       _erroNome = _nome.text.trim().length < 2 ? 'Escreva o seu nome.' : null;
       _erroCpf = cpfValido(_cpf.text) ? null : 'Confira o CPF: tem 11 números.';
       _erroSenha = senhaAceita(_senha.text) ? null : ajudaSenha;
-      _faltaAceite = !_aceito;
+      _erroEmail = email.isEmpty || emailValido(email) ? null : 'Confira o e-mail (ou deixe em branco).';
     });
-    if (_erroNome != null || _erroCpf != null || _erroSenha != null) return;
-    if (!_aceito) {
-      setState(() => _erro = 'Para criar a conta, marque que leu e aceita os Termos de Uso e a Política de Privacidade.');
-      return;
-    }
+    if (_erroNome != null || _erroCpf != null || _erroSenha != null || _erroEmail != null) return;
     setState(() => _ocupado = true);
     try {
       final s = ref.read(servidorProvider);
@@ -254,8 +254,20 @@ class _TelaCriarContaState extends ConsumerState<TelaCriarConta> {
       final cpf = soDigitos(_cpf.text);
       await s.cadastrarMotorista(_nome.text, cpf, _senha.text, aparelho, termos: versaoTermos);
       await s.entrarComCpf(cpf, _senha.text, aparelho);
+      String? recado;
+      if (email.isNotEmpty) {
+        try {
+          await s.cadastrarEmail(email);
+          recado = 'Conta criada. Mandamos um link para $email: abra o e-mail e toque em "Confirmar e-mail".';
+        } on ErroServidor catch (e) {
+          recado = 'Conta criada, mas o e-mail não foi cadastrado: ${e.mensagem} '
+              'Dá para cadastrar depois em Configurações.';
+        }
+      }
       await ref.read(acessoProvider.notifier).recarregar();
-      if (mounted) Navigator.of(context).popUntil((r) => r.isFirst);
+      if (!mounted) return;
+      Navigator.of(context).popUntil((r) => r.isFirst);
+      if (recado != null) mostrarMensagem(context, recado);
     } on ErroServidor catch (e) {
       setState(() => _erro = e.mensagem);
     } finally {
@@ -267,7 +279,7 @@ class _TelaCriarContaState extends ConsumerState<TelaCriarConta> {
   Widget build(BuildContext context) {
     return PaginaAcesso(
       titulo: 'Criar conta',
-      texto: 'Só o seu nome, o CPF e uma senha. Depois você digita o código da empresa que o seu patrão mandar.',
+      texto: 'O seu nome, o CPF e uma senha. Depois você digita o código da empresa que o seu patrão mandar.',
       botao: 'Criar minha conta',
       aoTocar: _criar,
       ocupado: _ocupado,
@@ -282,18 +294,20 @@ class _TelaCriarContaState extends ConsumerState<TelaCriarConta> {
           tipo: TipoCampo.senha,
           erro: _erroSenha,
           ajuda: '$ajudaSenha Você vai entrar com o CPF e esta senha.',
+        ),
+        const SizedBox(height: 16),
+        Campo(
+          controle: _email,
+          rotulo: 'E-mail (para recuperar a senha)',
+          tipo: TipoCampo.email,
+          erro: _erroEmail,
+          ajuda: 'Se esquecer a senha, o link para criar outra chega neste e-mail. Pode deixar em branco.',
           acaoTeclado: TextInputAction.done,
         ),
-        const SizedBox(height: 8),
-        CaixaAceite(
-          marcado: _aceito,
-          erro: _faltaAceite,
-          aoMudar: (v) => setState(() {
-            _aceito = v;
-            _faltaAceite = false;
-          }),
-        ),
         MensagemErro(_erro),
+        const SizedBox(height: 12),
+        const Nota('Criando a conta, você segue os Termos de Uso e a Política de Privacidade que aceitou.'),
+        const LinksLegais(),
       ],
     );
   }
@@ -379,44 +393,19 @@ class _TelaCompletarCadastroState extends ConsumerState<TelaCompletarCadastro> {
 
 // ------------------------------------------------------------ esqueci a senha
 
-/// Esqueci a senha: com o código de recuperação, a própria pessoa cria a
-/// senha nova. Sem o código, o patrão cria uma senha provisória no painel.
+/// Esqueci a senha: o link para criar a senha nova vai para o e-mail que o
+/// motorista confirmou no app. Sem e-mail, o patrão cria uma senha provisória.
 class TelaEsqueciSenha extends ConsumerWidget {
   const TelaEsqueciSenha({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    return PaginaAcesso(
-      titulo: 'Esqueci a senha',
-      texto: 'Com o código de recuperação que você anotou ao criar a conta, você mesmo cria uma senha nova.',
-      botao: 'Tenho o código de recuperação',
-      aoTocar: () => Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (_) => TelaRecuperarComCodigo(
-            porCpf: true,
-            recuperar: (cpf, codigo, senha) async {
-              final s = ref.read(servidorProvider);
-              return s.recuperarAcesso(cpf, codigo, senha, await idDoAparelho(ref.read(armazenamentoProvider)));
-            },
-            entrar: (cpf, senha) async {
-              final s = ref.read(servidorProvider);
-              await s.entrarComCpf(cpf, senha, await idDoAparelho(ref.read(armazenamentoProvider)));
-              await ref.read(acessoProvider.notifier).recarregar(conferir: true);
-              if (context.mounted) Navigator.of(context).popUntil((r) => r.isFirst);
-            },
-            semCodigo: 'Não tem o código? Peça ao seu patrão uma senha provisória (no painel: Motoristas, o seu nome, '
-                'Redefinir o acesso).',
-          ),
-        ),
-      ),
-      filhos: [
-        const Aviso(
-          icone: Icons.help_outline,
-          titulo: 'Não tem o código?',
-          texto: 'Fale com o seu patrão ou com o gestor. Ele cria uma senha provisória para você no painel '
-              '(Motoristas, o seu nome, Redefinir o acesso).',
-        ),
+    return TelaPedirLinkSenha(
+      porCpf: true,
+      pedir: (cpf) => ref.read(servidorProvider).pedirLinkSenha(cpf),
+      semEmail: 'Não cadastrou e-mail no app? Peça ao seu patrão ou ao gestor uma senha provisória '
+          '(no painel: Motoristas, o seu nome, Redefinir o acesso).',
+      extras: [
         const SizedBox(height: 12),
         OutlinedButton(
           onPressed: () => Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const TelaEntrar())),
@@ -427,7 +416,97 @@ class TelaEsqueciSenha extends ConsumerWidget {
   }
 }
 
-/// Senha nova (depois do código ou da senha provisória do gestor).
+/// E-mail para recuperar a senha: cadastrar ou trocar (vale depois de
+/// confirmado pelo link que chega no e-mail).
+class TelaEmailRecuperacao extends ConsumerStatefulWidget {
+  const TelaEmailRecuperacao({super.key});
+
+  @override
+  ConsumerState<TelaEmailRecuperacao> createState() => _TelaEmailRecuperacaoState();
+}
+
+class _TelaEmailRecuperacaoState extends ConsumerState<TelaEmailRecuperacao> {
+  final _email = TextEditingController();
+  String? _erro;
+  String? _enviado;
+  bool _ocupado = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // Confere na nuvem se o e-mail já foi confirmado pelo link.
+    ref.read(servidorProvider).atualizarConta().then((_) {
+      if (mounted) setState(() {});
+    });
+  }
+
+  @override
+  void dispose() {
+    _email.dispose();
+    super.dispose();
+  }
+
+  Future<void> _enviar() async {
+    final email = _email.text.trim().toLowerCase();
+    if (!emailValido(email)) {
+      setState(() => _erro = 'Confira o e-mail.');
+      return;
+    }
+    setState(() {
+      _erro = null;
+      _ocupado = true;
+    });
+    try {
+      await ref.read(servidorProvider).cadastrarEmail(email);
+      if (mounted) setState(() => _enviado = email);
+    } on ErroServidor catch (e) {
+      if (mounted) setState(() => _erro = e.mensagem);
+    } finally {
+      if (mounted) setState(() => _ocupado = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final s = ref.read(servidorProvider);
+    final confirmado = s.emailConfirmado;
+    final esperando = _enviado ?? s.emailEsperando;
+    return PaginaAcesso(
+      titulo: 'E-mail para recuperar a senha',
+      texto: 'Se esquecer a senha, o link para criar outra chega neste e-mail. Só você e a sua empresa veem.',
+      botao: _enviado == null ? 'Mandar o link de confirmação' : null,
+      aoTocar: _enviar,
+      ocupado: _ocupado,
+      filhos: [
+        Aviso(
+          icone: confirmado == null ? Icons.mail_outline : Icons.mark_email_read_outlined,
+          texto: confirmado == null ? 'Nenhum e-mail confirmado ainda.' : 'E-mail confirmado: $confirmado',
+        ),
+        if (esperando != null) ...[
+          const SizedBox(height: 12),
+          Aviso(
+            icone: Icons.hourglass_top,
+            titulo: 'Falta confirmar',
+            texto: 'Mandamos um link para $esperando. Abra o e-mail e toque em "Confirmar e-mail". '
+                'Confira também a caixa de spam.',
+          ),
+        ],
+        if (_enviado == null) ...[
+          const SizedBox(height: 20),
+          Campo(
+            controle: _email,
+            rotulo: confirmado == null ? 'Seu e-mail' : 'E-mail novo',
+            tipo: TipoCampo.email,
+            acaoTeclado: TextInputAction.done,
+          ),
+        ],
+        MensagemErro(_erro),
+      ],
+    );
+  }
+}
+
+/// Senha nova (depois da senha provisória do patrão ou nas configurações).
 class TelaTrocarSenha extends ConsumerStatefulWidget {
   const TelaTrocarSenha({super.key, this.voltar = true});
   final bool voltar;

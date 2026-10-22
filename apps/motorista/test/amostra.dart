@@ -2,8 +2,10 @@ import 'dart:convert';
 
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:motorista/acesso/acesso.dart' show chaveTermosAparelho;
 import 'package:motorista/dados/armazenamento.dart';
 import 'package:nucleo/nucleo.dart';
+import 'package:visual/visual.dart' show versaoTermos;
 
 import 'apoio.dart';
 
@@ -29,6 +31,7 @@ DateTime dia(int d, {int mesesAtras = 0}) {
 /// Celular de um motorista com um mês de lançamentos, parecido com o real.
 Future<ArmazenamentoMemoria> celularComAmostra() async {
   final a = ArmazenamentoMemoria();
+  await a.gravarEstado(chaveTermosAparelho, versaoTermos);
   await a.gravarEstado('situacao', jsonEncode(situacaoDe(motoristaA, nome: 'João Batista')));
   await a.gravarEstado('pronto', '1');
   await a.gravarRegistros('caminhoes', [

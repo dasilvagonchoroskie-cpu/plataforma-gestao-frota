@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:nucleo/nucleo.dart';
 import 'package:visual/visual.dart';
 
+import '../../dados/link_email.dart';
 import '../../dados/provedores.dart';
 import '../../servidor/servidor.dart';
 
@@ -172,108 +173,6 @@ class _TelaEntrarState extends ConsumerState<TelaEntrar> with _Ocupado {
   }
 }
 
-// ------------------------------------------------------------- criar conta
-
-class TelaCriarConta extends ConsumerStatefulWidget {
-  const TelaCriarConta({super.key});
-
-  @override
-  ConsumerState<TelaCriarConta> createState() => _TelaCriarContaState();
-}
-
-class _TelaCriarContaState extends ConsumerState<TelaCriarConta> with _Ocupado {
-  final _email = TextEditingController();
-
-  Future<void> _enviar() async {
-    if (!_emailValido(_email.text)) return setState(() => erro = 'Digite um e-mail válido.');
-    final ok = await tentar(() => ref.read(servidorProvider).pedirCodigoCadastro(_email.text));
-    if (ok && mounted) {
-      Navigator.push(
-        context,
-        MaterialPageRoute(builder: (_) => TelaCodigo(email: _email.text.trim().toLowerCase(), recuperar: false)),
-      );
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) => PaginaAcesso(
-    titulo: 'Criar conta',
-    texto: 'Digite o e-mail que o dono da empresa liberou. Vamos mandar um código de 6 números para ele.',
-    filhos: [
-      Campo(controle: _email, rotulo: 'E-mail', tipo: TipoCampo.email, autofoco: true),
-      MensagemErro(erro),
-    ],
-    botao: 'Mandar o código',
-    aoTocar: _enviar,
-    ocupado: ocupado,
-  );
-}
-
-/// Digita o código que chegou no e-mail (cadastro ou senha esquecida).
-class TelaCodigo extends ConsumerStatefulWidget {
-  const TelaCodigo({super.key, required this.email, required this.recuperar});
-  final String email;
-  final bool recuperar;
-
-  @override
-  ConsumerState<TelaCodigo> createState() => _TelaCodigoState();
-}
-
-class _TelaCodigoState extends ConsumerState<TelaCodigo> with _Ocupado {
-  final _codigo = TextEditingController();
-
-  Future<void> _confirmar() async {
-    if (_codigo.text.trim().length < 6) return setState(() => erro = 'Digite os 6 números do código.');
-    final s = ref.read(servidorProvider);
-    final ok = await tentar(
-      () => widget.recuperar
-          ? s.confirmarCodigoSenha(widget.email, _codigo.text)
-          : s.confirmarCodigoCadastro(widget.email, _codigo.text),
-    );
-    if (!ok || !mounted) return;
-    if (widget.recuperar) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (_) => const TelaNovaSenha(depoisDeRecuperar: true)),
-      );
-    } else {
-      Navigator.popUntil(context, (r) => r.isFirst);
-      await ref.read(acessoProvider.notifier).recarregar();
-    }
-  }
-
-  Future<void> _reenviar() async {
-    final s = ref.read(servidorProvider);
-    final ok = await tentar(
-      () => widget.recuperar ? s.pedirCodigoSenha(widget.email) : s.pedirCodigoCadastro(widget.email),
-    );
-    if (ok && mounted) mostrarMensagem(context, 'Mandamos outro código.');
-  }
-
-  @override
-  Widget build(BuildContext context) => PaginaAcesso(
-    titulo: 'Digite o código',
-    texto: 'Mandamos um código de 6 números para ${widget.email}. Confira também a caixa de spam.',
-    filhos: [
-      Campo(
-        controle: _codigo,
-        rotulo: 'Código',
-        tipo: TipoCampo.numeros,
-        autofoco: true,
-        acaoTeclado: TextInputAction.done,
-      ),
-      MensagemErro(erro),
-    ],
-    botao: 'Confirmar',
-    aoTocar: _confirmar,
-    ocupado: ocupado,
-    rodape: [
-      const SizedBox(height: 8),
-      TextButton(onPressed: ocupado ? null : _reenviar, child: const Text('Mandar outro código')),
-    ],
-  );
-}
-
 /// Depois de confirmar o e-mail: nome e senha. Se o e-mail estiver liberado
 /// pelo dono, a pessoa já entra na empresa.
 class TelaCompletarCadastro extends ConsumerStatefulWidget {
@@ -337,47 +236,134 @@ class _TelaCompletarCadastroState extends ConsumerState<TelaCompletarCadastro> w
 
 // ----------------------------------------------------------- esqueci a senha
 
-/// Esqueci a senha: com o código de recuperação, a própria pessoa cria a
-/// senha nova. Sem o código: o dono gera uma senha provisória para o gestor;
-/// o dono fala com o suporte da plataforma.
+/// Esqueci a senha: o link para criar a senha nova vai para o e-mail.
 class TelaEsqueciSenha extends ConsumerWidget {
   const TelaEsqueciSenha({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) => PaginaAcesso(
-    titulo: 'Esqueci a senha',
-    texto: 'Com o código de recuperação que você anotou no primeiro acesso, você mesmo cria uma senha nova.',
-    filhos: const [
-      Aviso(
-        icone: Icons.help_outline,
-        titulo: 'Não tem o código?',
-        texto:
-            'Gestor: peça ao dono da empresa uma senha provisória (Configurações, Donos e gestores). '
-            'Dono: fale com o suporte da plataforma (gestaodefrota2027@gmail.com).',
-      ),
-    ],
-    botao: 'Tenho o código de recuperação',
-    aoTocar: () => Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => TelaRecuperarComCodigo(
-          porCpf: false,
-          recuperar: (email, codigo, senha) => ref.read(servidorProvider).recuperarAcesso(email, codigo, senha),
-          entrar: (email, senha) async {
-            await ref.read(servidorProvider).entrar(email, senha);
-            if (context.mounted) Navigator.of(context).popUntil((r) => r.isFirst);
-            await ref.read(acessoProvider.notifier).recarregar();
-          },
-        ),
-      ),
-    ),
+  Widget build(BuildContext context, WidgetRef ref) => TelaPedirLinkSenha(
+    porCpf: false,
+    pedir: (email) => ref.read(servidorProvider).pedirLinkSenha(email),
+    semEmail:
+        'Gestor: peça ao dono da empresa uma senha provisória (Configurações, Donos e gestores). '
+        'Dono: fale com o suporte da plataforma (gestaodefrota2027@gmail.com).',
   );
 }
 
-/// Senha nova (depois do código de recuperação ou nas configurações).
+/// Abre o link que chegou por e-mail: criar a senha nova (dono, gestor ou
+/// motorista) ou confirmar o e-mail do motorista. Depois sai da conta: a
+/// pessoa entra de novo, com a senha nova, no app dela.
+class TelaLinkDoEmail extends ConsumerStatefulWidget {
+  const TelaLinkDoEmail({super.key, required this.link});
+  final LinkDoEmail link;
+
+  @override
+  ConsumerState<TelaLinkDoEmail> createState() => _TelaLinkDoEmailState();
+}
+
+enum _FaseLink { abrindo, senha, pronto, erro }
+
+class _TelaLinkDoEmailState extends ConsumerState<TelaLinkDoEmail> with _Ocupado {
+  final _senha = TextEditingController();
+  var _fase = _FaseLink.abrindo;
+  bool get _criarSenha => widget.link.tipo == TipoLink.senha;
+
+  @override
+  void initState() {
+    super.initState();
+    _abrir();
+  }
+
+  @override
+  void dispose() {
+    _senha.dispose();
+    super.dispose();
+  }
+
+  Future<void> _abrir() async {
+    final s = ref.read(servidorProvider);
+    try {
+      await s.abrirLinkDoEmail(widget.link.tokenHash, senha: _criarSenha);
+      if (!_criarSenha) await s.sair();
+      if (mounted) setState(() => _fase = _criarSenha ? _FaseLink.senha : _FaseLink.pronto);
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _fase = _FaseLink.erro;
+          erro = traduzirErro(e).mensagem;
+        });
+      }
+    }
+  }
+
+  Future<void> _salvar() async {
+    if (!senhaAceita(_senha.text)) return setState(() => erro = mensagemSenha);
+    final s = ref.read(servidorProvider);
+    final ok = await tentar(() => s.definirSenha(_senha.text));
+    if (!ok || !mounted) return;
+    // Senha nova: encerra as sessões abertas em outros aparelhos.
+    await s.sair(todosOsAparelhos: true);
+    if (mounted) setState(() => _fase = _FaseLink.pronto);
+  }
+
+  Future<void> _irParaEntrar() async {
+    ref.read(linkDoEmailProvider.notifier).concluir();
+    await ref.read(acessoProvider.notifier).recarregar();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    switch (_fase) {
+      case _FaseLink.abrindo:
+        return const Scaffold(body: Center(child: CircularProgressIndicator()));
+      case _FaseLink.erro:
+        return PaginaAcesso(
+          titulo: 'Este link não vale mais',
+          texto: erro,
+          voltar: false,
+          filhos: const [Nota('O link vale por 1 hora e só funciona uma vez.')],
+          botao: 'Ir para a tela de entrar',
+          aoTocar: _irParaEntrar,
+        );
+      case _FaseLink.senha:
+        return PaginaAcesso(
+          titulo: 'Crie a senha nova',
+          texto: 'Escolha a senha que você vai usar para entrar daqui para frente.',
+          voltar: false,
+          filhos: [
+            Campo(controle: _senha, rotulo: 'Senha nova', tipo: TipoCampo.senha, autofoco: true, ajuda: ajudaSenha),
+            MensagemErro(erro),
+          ],
+          botao: 'Salvar a senha nova',
+          aoTocar: _salvar,
+          ocupado: ocupado,
+        );
+      case _FaseLink.pronto:
+        return PaginaAcesso(
+          titulo: _criarSenha ? 'Senha nova criada' : 'E-mail confirmado',
+          texto: _criarSenha
+              ? 'Pronto! Agora entre com a senha nova. Por segurança, quem estava logado em outro aparelho '
+                    'precisa entrar de novo.'
+              : 'Pronto! Se um dia esquecer a senha, o link para criar outra chega neste e-mail.',
+          voltar: false,
+          filhos: const [
+            Aviso(
+              icone: Icons.info_outline,
+              texto:
+                  'Motorista: abra o app Frota Motorista e entre com o CPF e a senha. '
+                  'Dono e gestor: entrem com o e-mail e a senha, aqui no painel ou no app Frota Gestor.',
+            ),
+          ],
+          botao: 'Ir para a tela de entrar',
+          aoTocar: _irParaEntrar,
+        );
+    }
+  }
+}
+
+/// Senha nova (primeiro acesso com senha provisória ou nas configurações).
 class TelaNovaSenha extends ConsumerStatefulWidget {
-  const TelaNovaSenha({super.key, this.depoisDeRecuperar = false, this.primeiroAcesso = false});
-  final bool depoisDeRecuperar;
+  const TelaNovaSenha({super.key, this.primeiroAcesso = false});
 
   /// Entrou com senha provisória: tela inicial obrigatória, sem voltar.
   final bool primeiroAcesso;
@@ -394,9 +380,6 @@ class _TelaNovaSenhaState extends ConsumerState<TelaNovaSenha> with _Ocupado {
     final ok = await tentar(() => ref.read(servidorProvider).definirSenha(_senha.text));
     if (!ok || !mounted) return;
     if (widget.primeiroAcesso) {
-      await ref.read(acessoProvider.notifier).recarregar();
-    } else if (widget.depoisDeRecuperar) {
-      Navigator.popUntil(context, (r) => r.isFirst);
       await ref.read(acessoProvider.notifier).recarregar();
     } else {
       Navigator.pop(context);

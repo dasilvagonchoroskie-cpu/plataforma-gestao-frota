@@ -53,8 +53,14 @@ abstract class Armazenamento {
 
   Future<String?> lerEstado(String chave);
   Future<void> gravarEstado(String chave, String? valor);
+
+  /// Apaga os dados da conta do celular. Fica só o aceite dos termos feito
+  /// na abertura do app (não é dado da conta).
   Future<void> limparTudo();
 }
+
+/// Estados que ficam no celular mesmo depois de sair da conta.
+const estadosDoAparelho = {'termos_local'};
 
 /// O que fica guardado no celular da situação da conta: sem CPF e sem e-mail
 /// (o app não usa esses dados offline, então eles não ficam no aparelho).
@@ -200,7 +206,7 @@ class ArmazenamentoDrift implements Armazenamento {
     await banco.transaction(() async {
       await banco.delete(banco.registros).go();
       await banco.delete(banco.filaEnvio).go();
-      await banco.delete(banco.estado).go();
+      await (banco.delete(banco.estado)..where((e) => e.chave.isNotIn(estadosDoAparelho))).go();
     });
   }
 }
@@ -297,6 +303,6 @@ class ArmazenamentoMemoria implements Armazenamento {
   Future<void> limparTudo() async {
     _registros.clear();
     _fila.clear();
-    _estado.clear();
+    _estado.removeWhere((chave, _) => !estadosDoAparelho.contains(chave));
   }
 }

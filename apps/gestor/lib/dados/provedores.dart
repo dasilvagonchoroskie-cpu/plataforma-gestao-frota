@@ -7,6 +7,7 @@ import 'package:uuid/uuid.dart';
 import 'package:visual/visual.dart';
 
 import '../servidor/servidor.dart';
+import 'aparelho.dart';
 import 'equipe.dart';
 import 'modelos.dart';
 
@@ -18,17 +19,17 @@ String novoId() => _uuid.v4();
 
 // ------------------------------------------------------------------- acesso
 
-/// Em que ponto a pessoa está: sem entrar, terminando o cadastro, sem
-/// liberação do dono, com conta de motorista, com algo a fazer (senha,
-/// termos, código de recuperação), com a empresa bloqueada ou pronta.
+/// Em que ponto a pessoa está: termos na primeira abertura, sem entrar,
+/// terminando o cadastro, sem liberação do dono, com conta de motorista, com
+/// algo a fazer (senha, termos), com a empresa bloqueada ou pronta.
 enum Etapa {
+  termosAbertura,
   entrar,
   completarCadastro,
   naoAutorizado,
   contaMotorista,
   trocarSenha,
   termos,
-  codigoRecuperacao,
   bloqueada,
   pronto,
 }
@@ -64,6 +65,9 @@ class Acesso extends AsyncNotifier<EstadoAcesso> {
   Future<EstadoAcesso> build() => _decidir();
 
   Future<EstadoAcesso> _decidir() async {
+    // Primeira abertura (ou versão nova dos termos): aceitar antes de tudo.
+    final aceitaNoAparelho = await ref.read(aparelhoProvider).ler(chaveTermosAparelho);
+    if (aceitaNoAparelho != versaoTermos) return const EstadoAcesso(Etapa.termosAbertura);
     if (!_s.temSessao) return const EstadoAcesso(Etapa.entrar);
     final Map<String, Object?> s;
     try {
@@ -85,7 +89,15 @@ class Acesso extends AsyncNotifier<EstadoAcesso> {
       return EstadoAcesso(Etapa.naoAutorizado, email: email, nome: nome);
     }
     if (_s.precisaTrocarSenha) return EstadoAcesso(Etapa.trocarSenha, email: email, nome: nome);
-    if ((s['termos'] as Map?)?['aceito'] == false) return EstadoAcesso(Etapa.termos, email: email, nome: nome);
+    if ((s['termos'] as Map?)?['aceito'] == false) {
+      // Já aceitou neste aparelho ao abrir: o aceite vai para a conta. Se não
+      // der agora (sem internet), pede de novo na tela de termos.
+      try {
+        await _s.aceitarTermos(versaoTermos);
+      } on ErroServidor {
+        return EstadoAcesso(Etapa.termos, email: email, nome: nome);
+      }
+    }
     if (empresa['bloqueada'] == true) {
       return EstadoAcesso(
         Etapa.bloqueada,
@@ -97,7 +109,6 @@ class Acesso extends AsyncNotifier<EstadoAcesso> {
         excluirEm: DateTime.tryParse('${empresa['excluir_em'] ?? ''}'),
       );
     }
-    if (s['recuperacao'] == false) return EstadoAcesso(Etapa.codigoRecuperacao, email: email, nome: nome);
     if (!_acessoRegistrado) {
       _acessoRegistrado = true;
       unawaited(_s.registrarAcesso(kIsWeb ? 'web' : 'gestor'));
@@ -108,6 +119,14 @@ class Acesso extends AsyncNotifier<EstadoAcesso> {
   Future<void> recarregar() async {
     state = const AsyncLoading();
     state = await AsyncValue.guard(_decidir);
+  }
+
+  /// Aceite dos termos na primeira abertura: fica guardado neste aparelho e,
+  /// com alguém logado, também na conta.
+  Future<String?> aceitarTermosNoAparelho() async {
+    await ref.read(aparelhoProvider).gravar(chaveTermosAparelho, versaoTermos);
+    await recarregar();
+    return null;
   }
 
   /// Aceite dos termos. Devolve a mensagem de erro ou nulo.

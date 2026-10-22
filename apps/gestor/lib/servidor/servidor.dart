@@ -63,12 +63,15 @@ abstract class Servidor {
   bool get precisaTrocarSenha;
 
   Future<void> entrar(String email, String senha);
-  Future<void> pedirCodigoCadastro(String email);
-  Future<void> confirmarCodigoCadastro(String email, String codigo);
   Future<void> definirSenha(String senha);
   Future<Map<String, Object?>> completarCadastro(String nome);
-  Future<void> pedirCodigoSenha(String email);
-  Future<void> confirmarCodigoSenha(String email, String codigo);
+
+  /// Pede o link para criar a senha nova (vai por e-mail). Devolve o recado.
+  Future<String> pedirLinkSenha(String email);
+
+  /// Abre o link que chegou por e-mail ([senha]: criar senha nova; senão,
+  /// confirmar o e-mail). Deixa a pessoa logada para o próximo passo.
+  Future<void> abrirLinkDoEmail(String tokenHash, {required bool senha});
   Future<Map<String, Object?>> situacao();
 
   /// Todas as linhas de cada fonte (Fontes.todas) que o RLS deixa ver.
@@ -95,12 +98,6 @@ abstract class Servidor {
   /// Aceite dos Termos de Uso e da Política de Privacidade.
   Future<Map<String, Object?>> aceitarTermos(String versao);
 
-  /// Gera um código de recuperação novo (o anterior para de valer).
-  Future<String> gerarCodigoRecuperacao();
-
-  /// Senha nova com e-mail e código de recuperação. Devolve o código novo.
-  Future<String> recuperarAcesso(String email, String codigo, String senhaNova);
-
   /// Registro de acesso (data, hora e IP) exigido pelo Marco Civil.
   Future<void> registrarAcesso(String app);
 
@@ -109,7 +106,10 @@ abstract class Servidor {
 
   /// Muda colunas de uma linha (só as que o banco libera para cada perfil).
   Future<void> alterar(String tabela, String id, Map<String, Object?> campos);
-  Future<void> sair();
+
+  /// Sai da conta. Com [todosOsAparelhos], encerra também as outras sessões
+  /// (depois de criar a senha nova pelo link).
+  Future<void> sair({bool todosOsAparelhos = false});
 }
 
 bool _pareceSemInternet(String texto) {
@@ -168,8 +168,11 @@ ErroServidor traduzirErro(Object e) {
     if (e.code == 'invalid_credentials' || m.contains('invalid login')) {
       return const ErroServidor('E-mail ou senha incorretos.', codigo: 'login');
     }
-    if (m.contains('expired') || (m.contains('invalid') && m.contains('otp')) || m.contains('token has expired')) {
-      return const ErroServidor('Código errado ou vencido. Confira ou peça outro.', codigo: 'codigo');
+    if (e.code == 'otp_expired' || m.contains('expired') || (m.contains('invalid') && m.contains('otp'))) {
+      return const ErroServidor(
+        'Este link venceu ou já foi usado. Peça outro em "Esqueci a senha".',
+        codigo: 'link_vencido',
+      );
     }
     if (m.contains('for security purposes') || m.contains('rate limit') || e.statusCode == '429') {
       return const ErroServidor('Espere um minuto antes de tentar de novo.', codigo: 'espera');
@@ -181,7 +184,7 @@ ErroServidor traduzirErro(Object e) {
       return const ErroServidor('Escolha uma senha diferente da anterior.', codigo: 'senha_igual');
     }
     if (m.contains('email not confirmed')) {
-      return const ErroServidor('Confirme o seu e-mail com o código antes de entrar.', codigo: 'email');
+      return const ErroServidor('Confirme o seu e-mail pelo link antes de entrar.', codigo: 'email');
     }
     if (m.contains('signups not allowed') || m.contains('not allowed')) {
       return const ErroServidor('Não foi possível criar a conta com este e-mail.', codigo: 'cadastro');
@@ -237,14 +240,6 @@ class ServidorSupabase implements Servidor {
       _tentar(() => _auth.signInWithPassword(email: _email(email), password: senha));
 
   @override
-  Future<void> pedirCodigoCadastro(String email) =>
-      _tentar(() => _auth.signInWithOtp(email: _email(email), shouldCreateUser: true));
-
-  @override
-  Future<void> confirmarCodigoCadastro(String email, String codigo) =>
-      _tentar(() => _auth.verifyOTP(email: _email(email), token: codigo.trim(), type: OtpType.email));
-
-  @override
   Future<void> definirSenha(String senha) =>
       _tentar(() => _auth.updateUser(UserAttributes(password: senha, data: {'trocar_senha': false})));
 
@@ -253,11 +248,17 @@ class ServidorSupabase implements Servidor {
       _tentar(() async => _mapa(await cliente.rpc('completar_cadastro', params: {'p_nome': nome.trim()})));
 
   @override
-  Future<void> pedirCodigoSenha(String email) => _tentar(() => _auth.resetPasswordForEmail(_email(email)));
+  Future<String> pedirLinkSenha(String email) => _tentar(() async {
+    final r = await cliente.functions.invoke('pedir_link_senha', body: {'identificador': _email(email)});
+    final d = _mapa(r.data);
+    if (d['ok'] != true) throw ErroServidor('${d['mensagem'] ?? 'Não deu para pedir o link agora.'}');
+    return '${d['mensagem']}';
+  });
 
   @override
-  Future<void> confirmarCodigoSenha(String email, String codigo) =>
-      _tentar(() => _auth.verifyOTP(email: _email(email), token: codigo.trim(), type: OtpType.recovery));
+  Future<void> abrirLinkDoEmail(String tokenHash, {required bool senha}) => _tentar(
+    () => _auth.verifyOTP(tokenHash: tokenHash, type: senha ? OtpType.recovery : OtpType.emailChange),
+  );
 
   @override
   Future<Map<String, Object?>> situacao() => _tentar(() async => _mapa(await cliente.rpc('situacao_acesso')));
@@ -336,22 +337,6 @@ class ServidorSupabase implements Servidor {
       _tentar(() async => _mapa(await cliente.rpc('aceitar_termos', params: {'p_versao': versao})));
 
   @override
-  Future<String> gerarCodigoRecuperacao() => _tentar(() async => '${await cliente.rpc('gerar_codigo_recuperacao')}');
-
-  @override
-  Future<String> recuperarAcesso(String email, String codigo, String senhaNova) => _tentar(() async {
-    final r = await cliente.functions.invoke(
-      'recuperar_acesso',
-      body: {'identificador': _email(email), 'codigo': codigo, 'senha_nova': senhaNova, 'aparelho': 'gestor'},
-    );
-    final d = _mapa(r.data);
-    if (d['ok'] != true || d['codigo_novo'] == null) {
-      throw ErroServidor('${d['mensagem'] ?? 'E-mail e código de recuperação não conferem.'}');
-    }
-    return d['codigo_novo'] as String;
-  });
-
-  @override
   Future<void> registrarAcesso(String app) async {
     try {
       await cliente.rpc('registrar_acesso', params: {'p_app': app}).timeout(const Duration(seconds: 20));
@@ -376,9 +361,9 @@ class ServidorSupabase implements Servidor {
   });
 
   @override
-  Future<void> sair() async {
+  Future<void> sair({bool todosOsAparelhos = false}) async {
     try {
-      await _auth.signOut();
+      await _auth.signOut(scope: todosOsAparelhos ? SignOutScope.global : SignOutScope.local);
     } catch (_) {
       // Sem internet: a sessão local some do mesmo jeito.
     }

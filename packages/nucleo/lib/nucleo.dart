@@ -4,6 +4,7 @@
 library;
 
 export 'src/cpf.dart';
+export 'src/email.dart';
 export 'src/formato.dart';
 export 'src/modelos.dart';
 export 'src/placa.dart';

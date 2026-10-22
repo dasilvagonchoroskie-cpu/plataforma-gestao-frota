@@ -1,14 +1,12 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-import 'package:nucleo/nucleo.dart' show ajudaSenha, mensagemSenha, senhaAceita;
 
 import 'basicos.dart';
 import 'campos.dart';
 import 'tema.dart';
 import 'textos_legais.dart';
 
-// Telas de conta usadas pelos dois apps: termos de uso, código de
-// recuperação, recuperar o acesso com o código e confirmação digitada.
+// Telas de conta usadas pelos dois apps: termos de uso, pedir o link para
+// criar a senha nova e confirmação digitada.
 
 /// Mostra um texto legal (títulos com "# " e "## ", itens com "- ").
 class TextoLegal extends StatelessWidget {
@@ -117,12 +115,16 @@ class CaixaAceite extends StatelessWidget {
       );
 }
 
-/// Pede o aceite dos Termos de Uso e da Política de Privacidade (primeiro
-/// acesso ou versão nova). [aceitar] devolve a mensagem de erro ou nulo.
+/// Pede o aceite dos Termos de Uso e da Política de Privacidade. Com
+/// [naAbertura], é a primeira tela do app (antes de entrar): sem aceitar não
+/// dá para usar, e "Não aceito" fecha o app. Sem ela, é o aceite de uma conta
+/// já logada (versão nova) e "Não aceito" sai da conta.
+/// [aceitar] devolve a mensagem de erro ou nulo.
 class TelaAceiteTermos extends StatefulWidget {
-  const TelaAceiteTermos({super.key, required this.aceitar, required this.sair});
+  const TelaAceiteTermos({super.key, required this.aceitar, required this.sair, this.naAbertura = false});
   final Future<String?> Function() aceitar;
   final VoidCallback sair;
+  final bool naAbertura;
 
   @override
   State<TelaAceiteTermos> createState() => _TelaAceiteTermosState();
@@ -132,7 +134,13 @@ class _TelaAceiteTermosState extends State<TelaAceiteTermos> {
   bool _marcado = false;
   bool _ocupado = false;
   bool _faltaMarcar = false;
+  bool _recusou = false;
   String? _erro;
+
+  void _naoAceito() {
+    if (widget.naAbertura) setState(() => _recusou = true);
+    widget.sair();
+  }
 
   Future<void> _aceitar() async {
     if (!_marcado) {
@@ -163,8 +171,9 @@ class _TelaAceiteTermosState extends State<TelaAceiteTermos> {
             Text('Termos de Uso e Privacidade', style: context.textos.headlineSmall?.copyWith(fontSize: 28)),
             const SizedBox(height: 10),
             Text(
-              'Para continuar, leia e aceite os Termos de Uso e a Política de Privacidade. Eles explicam o que a '
-              'plataforma faz, quem vê os seus dados, por quanto tempo ficam guardados e como excluir a conta.',
+              '${widget.naAbertura ? 'Antes de começar' : 'Para continuar'}, leia e aceite os Termos de Uso e a '
+              'Política de Privacidade. Eles explicam o que a plataforma faz, quem vê os seus dados, por quanto '
+              'tempo ficam guardados e como excluir a conta.',
               style: TextStyle(fontSize: 17, height: 1.4, color: context.cores.textoFraco),
             ),
             const SizedBox(height: 16),
@@ -203,10 +212,16 @@ class _TelaAceiteTermosState extends State<TelaAceiteTermos> {
             if (_erro != null) ...[const SizedBox(height: 12), Aviso(texto: _erro!, icone: Icons.error_outline)],
             const SizedBox(height: 16),
             TextButton.icon(
-              onPressed: _ocupado ? null : widget.sair,
-              icon: const Icon(Icons.logout),
-              label: const Text('Não aceito, sair da conta'),
+              onPressed: _ocupado ? null : _naoAceito,
+              icon: Icon(widget.naAbertura ? Icons.close : Icons.logout),
+              label: Text(widget.naAbertura ? 'Não aceito' : 'Não aceito, sair da conta'),
             ),
+            if (_recusou)
+              const Aviso(
+                icone: Icons.block,
+                texto: 'Sem aceitar, não dá para usar. Se mudar de ideia, marque a caixa e toque em '
+                    '"Aceitar e continuar".',
+              ),
           ],
         ),
       ),
@@ -215,206 +230,57 @@ class _TelaAceiteTermosState extends State<TelaAceiteTermos> {
   }
 }
 
-/// O código de recuperação em letras grandes, com botão para copiar.
-class CartaoCodigoRecuperacao extends StatelessWidget {
-  const CartaoCodigoRecuperacao(this.codigo, {super.key});
-  final String codigo;
-
-  @override
-  Widget build(BuildContext context) => Container(
-        padding: const EdgeInsets.fromLTRB(16, 18, 16, 10),
-        decoration: BoxDecoration(
-          color: Paleta.verdePlaca,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: Colors.white, width: 2),
-        ),
-        child: Column(
-          children: [
-            SelectableText(
-              codigo,
-              textAlign: TextAlign.center,
-              style: estiloNumero(32, peso: FontWeight.w700, cor: Colors.white).copyWith(letterSpacing: 2),
-            ),
-            TextButton.icon(
-              onPressed: () async {
-                await Clipboard.setData(ClipboardData(text: codigo));
-                if (context.mounted) mostrarMensagem(context, 'Código copiado.');
-              },
-              style: TextButton.styleFrom(foregroundColor: Colors.white),
-              icon: const Icon(Icons.copy),
-              label: const Text('Copiar'),
-            ),
-          ],
-        ),
-      );
-}
-
-/// Gera e mostra o código de recuperação. Com [codigoPronto], só mostra.
-class TelaCodigoRecuperacao extends StatefulWidget {
-  const TelaCodigoRecuperacao({
-    super.key,
-    required this.gerar,
-    required this.concluir,
-    this.codigoPronto,
-    this.voltar = false,
-    this.comoEntrar = 'o seu CPF',
-  });
-
-  /// Gera o código no servidor (lança exceção com a mensagem se falhar).
-  final Future<String> Function() gerar;
-  final VoidCallback concluir;
-  final String? codigoPronto;
-  final bool voltar;
-
-  /// Como a pessoa se identifica ao recuperar ("o seu CPF" ou "o seu e-mail").
-  final String comoEntrar;
-
-  @override
-  State<TelaCodigoRecuperacao> createState() => _TelaCodigoRecuperacaoState();
-}
-
-class _TelaCodigoRecuperacaoState extends State<TelaCodigoRecuperacao> {
-  late String? _codigo = widget.codigoPronto;
-  bool _anotado = false;
-  bool _faltaMarcar = false;
-  bool _ocupado = false;
-  String? _erro;
-
-  Future<void> _gerar() async {
-    setState(() {
-      _ocupado = true;
-      _erro = null;
-    });
-    try {
-      final c = await widget.gerar();
-      if (mounted) setState(() => _codigo = c);
-    } catch (e) {
-      if (mounted) setState(() => _erro = '$e');
-    } finally {
-      if (mounted) setState(() => _ocupado = false);
-    }
-  }
-
-  void _continuar() {
-    if (!_anotado) {
-      setState(() => _faltaMarcar = true);
-      return;
-    }
-    widget.concluir();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final cores = context.cores;
-    final temCodigo = _codigo != null;
-    return Scaffold(
-      appBar: AppBar(automaticallyImplyLeading: widget.voltar),
-      body: SafeArea(
-        child: ListView(
-          padding: const EdgeInsets.fromLTRB(24, 4, 24, 24),
-          children: [
-            Text('Código de recuperação', style: context.textos.headlineSmall?.copyWith(fontSize: 28)),
-            const SizedBox(height: 10),
-            Text(
-              'Se um dia esquecer a senha, você cria outra com ${widget.comoEntrar} e este código, sem depender de '
-              'ninguém. Anote num papel ou tire um print e guarde em lugar seguro. Não mande para ninguém.',
-              style: TextStyle(fontSize: 17, height: 1.4, color: cores.textoFraco),
-            ),
-            const SizedBox(height: 20),
-            if (temCodigo) ...[
-              CartaoCodigoRecuperacao(_codigo!),
-              const SizedBox(height: 12),
-              CheckboxListTile(
-                value: _anotado,
-                onChanged: (v) => setState(() {
-                  _anotado = v ?? false;
-                  _faltaMarcar = false;
-                }),
-                contentPadding: EdgeInsets.zero,
-                controlAffinity: ListTileControlAffinity.leading,
-                title: Text('Já anotei o código em lugar seguro.',
-                    style: TextStyle(fontSize: 16, color: _faltaMarcar ? cores.negativo : null)),
-              ),
-              const Nota('Gerar um código novo depois (em Configurações) faz este parar de valer.'),
-            ] else
-              const Nota('O código aparece uma vez só. Depois dá para gerar outro em Configurações.'),
-            if (_erro != null) ...[const SizedBox(height: 12), Aviso(texto: _erro!, icone: Icons.error_outline)],
-          ],
-        ),
-      ),
-      bottomNavigationBar: RodapeBotao(
-        texto: _ocupado ? 'Aguarde...' : (temCodigo ? 'Continuar' : 'Gerar o meu código'),
-        aoTocar: _ocupado ? null : (temCodigo ? _continuar : _gerar),
-      ),
-    );
-  }
-}
-
-/// Esqueci a senha: identificação (CPF ou e-mail), código de recuperação e
-/// senha nova. [recuperar] devolve o código novo; [entrar] faz o login.
-class TelaRecuperarComCodigo extends StatefulWidget {
-  const TelaRecuperarComCodigo({
+/// Esqueci a senha: a pessoa informa o CPF (motorista) ou o e-mail (dono e
+/// gestor) e recebe no e-mail um link para criar a senha nova.
+/// [pedir] devolve a mensagem do servidor (ou lança a exceção com o erro).
+class TelaPedirLinkSenha extends StatefulWidget {
+  const TelaPedirLinkSenha({
     super.key,
     required this.porCpf,
-    required this.recuperar,
-    required this.entrar,
-    this.semCodigo,
+    required this.pedir,
+    required this.semEmail,
+    this.extras = const [],
   });
 
   final bool porCpf;
-  final Future<String> Function(String identificador, String codigo, String senha) recuperar;
-  final Future<void> Function(String identificador, String senha) entrar;
+  final Future<String> Function(String identificador) pedir;
 
-  /// O que fazer quando a pessoa não tem o código (texto curto).
-  final String? semCodigo;
+  /// O que fazer quando não tem acesso ao e-mail (texto curto).
+  final String semEmail;
+
+  /// Botões a mais embaixo (ex.: "Já tenho a senha provisória").
+  final List<Widget> extras;
 
   @override
-  State<TelaRecuperarComCodigo> createState() => _TelaRecuperarComCodigoState();
+  State<TelaPedirLinkSenha> createState() => _TelaPedirLinkSenhaState();
 }
 
-class _TelaRecuperarComCodigoState extends State<TelaRecuperarComCodigo> {
+class _TelaPedirLinkSenhaState extends State<TelaPedirLinkSenha> {
   final _ident = TextEditingController();
-  final _codigo = TextEditingController();
-  final _senha = TextEditingController();
   String? _erro;
+  String? _enviado;
   bool _ocupado = false;
 
   @override
   void dispose() {
     _ident.dispose();
-    _codigo.dispose();
-    _senha.dispose();
     super.dispose();
   }
 
   Future<void> _enviar() async {
     final ident = widget.porCpf ? _ident.text.replaceAll(RegExp(r'[^0-9]'), '') : _ident.text.trim().toLowerCase();
-    String? erro;
-    if (widget.porCpf ? ident.length != 11 : !ident.contains('@')) {
-      erro = widget.porCpf ? 'Confira o CPF: tem 11 números.' : 'Confira o e-mail.';
-    } else if (_codigo.text.replaceAll('-', '').length != 12) {
-      erro = 'O código de recuperação tem 12 letras e números.';
-    } else if (!senhaAceita(_senha.text)) {
-      erro = mensagemSenha;
+    final certo = widget.porCpf ? ident.length == 11 : RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(ident);
+    if (!certo) {
+      setState(() => _erro = widget.porCpf ? 'Confira o CPF: tem 11 números.' : 'Confira o e-mail.');
+      return;
     }
-    setState(() => _erro = erro);
-    if (erro != null) return;
-    setState(() => _ocupado = true);
+    setState(() {
+      _erro = null;
+      _ocupado = true;
+    });
     try {
-      final novo = await widget.recuperar(ident, _codigo.text, _senha.text);
-      if (!mounted) return;
-      await Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (ctx) => TelaCodigoRecuperacao(
-            codigoPronto: novo,
-            gerar: () async => novo,
-            concluir: () => Navigator.pop(ctx),
-            comoEntrar: widget.porCpf ? 'o seu CPF' : 'o seu e-mail',
-          ),
-        ),
-      );
-      await widget.entrar(ident, _senha.text);
+      final mensagem = await widget.pedir(ident);
+      if (mounted) setState(() => _enviado = mensagem);
     } catch (e) {
       if (mounted) setState(() => _erro = '$e');
     } finally {
@@ -424,42 +290,54 @@ class _TelaRecuperarComCodigoState extends State<TelaRecuperarComCodigo> {
 
   @override
   Widget build(BuildContext context) {
+    final enviado = _enviado != null;
     return Scaffold(
       appBar: AppBar(),
       body: SafeArea(
-        child: ListView(
-          padding: const EdgeInsets.fromLTRB(24, 4, 24, 24),
-          children: [
-            Text('Criar senha nova', style: context.textos.headlineSmall?.copyWith(fontSize: 28)),
-            const SizedBox(height: 10),
-            Text(
-              'Use o código de recuperação que você anotou quando criou a conta.',
-              style: TextStyle(fontSize: 17, height: 1.4, color: context.cores.textoFraco),
+        child: Align(
+          alignment: Alignment.topCenter,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 460),
+            child: ListView(
+              padding: const EdgeInsets.fromLTRB(24, 4, 24, 24),
+              children: [
+                Text('Esqueci a senha', style: context.textos.headlineSmall?.copyWith(fontSize: 28)),
+                const SizedBox(height: 10),
+                Text(
+                  widget.porCpf
+                      ? 'Digite o seu CPF. Mandamos um link para o e-mail que você cadastrou no app. '
+                          'Abrindo o link, você cria a senha nova.'
+                      : 'Digite o seu e-mail. Mandamos um link para ele. Abrindo o link, você cria a senha nova.',
+                  style: TextStyle(fontSize: 17, height: 1.4, color: context.cores.textoFraco),
+                ),
+                const SizedBox(height: 24),
+                if (enviado) ...[
+                  Aviso(icone: Icons.mark_email_read_outlined, titulo: 'Pedido feito', texto: _enviado!),
+                  const SizedBox(height: 12),
+                  const Nota('O link vale por 1 hora e só funciona uma vez. Não chegou? Confira a caixa de spam '
+                      'ou peça de novo daqui a um minuto.'),
+                ] else
+                  Campo(
+                    controle: _ident,
+                    rotulo: widget.porCpf ? 'CPF' : 'E-mail',
+                    tipo: widget.porCpf ? TipoCampo.cpf : TipoCampo.email,
+                    dica: widget.porCpf ? '000.000.000-00' : null,
+                    autofoco: true,
+                    acaoTeclado: TextInputAction.done,
+                  ),
+                if (_erro != null) ...[const SizedBox(height: 16), Aviso(texto: _erro!, icone: Icons.error_outline)],
+                const SizedBox(height: 20),
+                Aviso(icone: Icons.help_outline, titulo: 'Não tem acesso ao e-mail?', texto: widget.semEmail),
+                ...widget.extras,
+              ],
             ),
-            const SizedBox(height: 24),
-            Campo(
-              controle: _ident,
-              rotulo: widget.porCpf ? 'CPF' : 'E-mail',
-              tipo: widget.porCpf ? TipoCampo.cpf : TipoCampo.email,
-              dica: widget.porCpf ? '000.000.000-00' : null,
-              autofoco: true,
-            ),
-            const SizedBox(height: 16),
-            Campo(controle: _codigo, rotulo: 'Código de recuperação', tipo: TipoCampo.recuperacao, dica: 'ABCD-EFGH-JKLM'),
-            const SizedBox(height: 16),
-            Campo(
-              controle: _senha,
-              rotulo: 'Senha nova',
-              tipo: TipoCampo.senha,
-              ajuda: ajudaSenha,
-              acaoTeclado: TextInputAction.done,
-            ),
-            if (_erro != null) ...[const SizedBox(height: 16), Aviso(texto: _erro!, icone: Icons.error_outline)],
-            if (widget.semCodigo != null) ...[const SizedBox(height: 20), Nota(widget.semCodigo!)],
-          ],
+          ),
         ),
       ),
-      bottomNavigationBar: RodapeBotao(texto: _ocupado ? 'Aguarde...' : 'Criar a senha nova', aoTocar: _ocupado ? null : _enviar),
+      bottomNavigationBar: RodapeBotao(
+        texto: enviado ? 'Voltar' : (_ocupado ? 'Aguarde...' : 'Mandar o link'),
+        aoTocar: enviado ? () => Navigator.pop(context) : (_ocupado ? null : _enviar),
+      ),
     );
   }
 }

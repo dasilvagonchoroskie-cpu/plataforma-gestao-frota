@@ -84,19 +84,11 @@ class TelaConfiguracoes extends ConsumerWidget {
             onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const TelaTrocarSenha())),
           ),
           ListTile(
-            leading: const Icon(Icons.key_outlined),
-            title: const Text('Código de recuperação', style: TextStyle(fontSize: 17)),
-            subtitle: const Text('Gerar um código novo (o anterior para de valer)'),
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (ctx) => TelaCodigoRecuperacao(
-                  voltar: true,
-                  gerar: () => ref.read(servidorProvider).gerarCodigoRecuperacao(),
-                  concluir: () => Navigator.pop(ctx),
-                ),
-              ),
-            ),
+            leading: const Icon(Icons.alternate_email),
+            title: const Text('E-mail para recuperar a senha', style: TextStyle(fontSize: 17)),
+            subtitle: Text(ref.read(servidorProvider).emailConfirmado ?? 'Não cadastrado'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const TelaEmailRecuperacao())),
           ),
           ListTile(
             leading: const Icon(Icons.description_outlined),

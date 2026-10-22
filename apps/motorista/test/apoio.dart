@@ -69,6 +69,35 @@ class ServidorFalso implements Servidor {
   @override
   bool get precisaTrocarSenha => trocarSenha;
 
+  /// E-mail do motorista: confirmado e esperando confirmação.
+  String? emailConfirmadoNaNuvem;
+  String? emailEsperandoNaNuvem;
+  final emailsCadastrados = <String>[];
+  final linksPedidos = <String>[];
+
+  @override
+  String? get emailConfirmado => emailConfirmadoNaNuvem;
+
+  @override
+  String? get emailEsperando => emailEsperandoNaNuvem;
+
+  @override
+  Future<String> pedirLinkSenha(String cpf) async {
+    _rede();
+    linksPedidos.add(cpf);
+    return 'Se este CPF tiver um e-mail confirmado, mandamos um link para ele.';
+  }
+
+  @override
+  Future<void> cadastrarEmail(String email) async {
+    _rede();
+    emailsCadastrados.add(email);
+    emailEsperandoNaNuvem = email;
+  }
+
+  @override
+  Future<void> atualizarConta() async {}
+
   @override
   Future<Map<String, Object?>> sincronizarLote(Map<String, Object?> lote) async {
     _rede();
@@ -177,10 +206,8 @@ class ServidorFalso implements Servidor {
   }
 
   String? termosAceitos;
-  int codigosGerados = 0;
   int acessosRegistrados = 0;
   bool contaExcluida = false;
-  final recuperacoes = <String>[];
 
   @override
   Future<Map<String, Object?>> aceitarTermos(String versao) async {
@@ -189,25 +216,6 @@ class ServidorFalso implements Servidor {
     final s = situacaoFixa;
     if (s != null) situacaoFixa = {...s, 'termos': {'versao': versao, 'aceito': true}};
     return situacaoAtual();
-  }
-
-  @override
-  Future<String> gerarCodigoRecuperacao() async {
-    _rede();
-    codigosGerados++;
-    final s = situacaoFixa;
-    if (s != null) situacaoFixa = {...s, 'recuperacao': true};
-    return 'ABCD-EFGH-JK$codigosGerados$codigosGerados';
-  }
-
-  @override
-  Future<String> recuperarAcesso(String cpf, String codigo, String senhaNova, String aparelho) async {
-    _rede();
-    if (codigo.replaceAll('-', '') != 'ABCDEFGHJK22') {
-      throw const ErroServidor('CPF (ou e-mail) e código de recuperação não conferem.', codigo: 'incorreto');
-    }
-    recuperacoes.add('$cpf:$senhaNova');
-    return 'NOVO-CODI-GO23';
   }
 
   @override
@@ -220,10 +228,6 @@ class ServidorFalso implements Servidor {
   @override
   Future<void> registrarAcesso() async => acessosRegistrados++;
 
-  @override
-  Future<void> pedirCodigoSenha(String email) async => _rede();
-  @override
-  Future<void> confirmarCodigoSenha(String email, String codigo) async => _rede();
   @override
   Future<Map<String, Object?>> pedirEntrada(String codigo) async => {'ok': true, 'status': 'pendente'};
   @override

@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:visual/visual.dart';
 
+import 'dados/link_email.dart';
 import 'dados/provedores.dart';
 import 'servidor/servidor.dart';
 import 'telas/acesso/telas_acesso.dart';
@@ -46,6 +48,9 @@ class Raiz extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // Link do e-mail (senha nova ou confirmar e-mail): resolve antes de tudo.
+    final link = ref.watch(linkDoEmailProvider);
+    if (link != null) return TelaLinkDoEmail(link: link);
     final acesso = ref.watch(acessoProvider);
     return acesso.when(
       loading: () => const Carregando(),
@@ -55,6 +60,12 @@ class Raiz extends ConsumerWidget {
       ),
       data: (a) {
         switch (a.etapa) {
+          case Etapa.termosAbertura:
+            return TelaAceiteTermos(
+              naAbertura: true,
+              aceitar: () => ref.read(acessoProvider.notifier).aceitarTermosNoAparelho(),
+              sair: () => SystemNavigator.pop(),
+            );
           case Etapa.entrar:
             return const TelaEntrar();
           case Etapa.completarCadastro:
@@ -69,12 +80,6 @@ class Raiz extends ConsumerWidget {
             return TelaAceiteTermos(
               aceitar: () => ref.read(acessoProvider.notifier).aceitarTermos(versaoTermos),
               sair: () => ref.read(acessoProvider.notifier).sair(),
-            );
-          case Etapa.codigoRecuperacao:
-            return TelaCodigoRecuperacao(
-              comoEntrar: 'o seu e-mail',
-              gerar: () => ref.read(servidorProvider).gerarCodigoRecuperacao(),
-              concluir: () => ref.read(acessoProvider.notifier).recarregar(),
             );
           case Etapa.bloqueada:
             return TelaAcessoEncerrado(estado: a);

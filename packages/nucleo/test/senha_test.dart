@@ -10,4 +10,13 @@ void main() {
     expect(senhaAceita('ab1'), isFalse, reason: 'curta');
     expect(senhaAceita('a1' * 37), isFalse, reason: 'mais de 72');
   });
+
+  test('formato do e-mail: algo@algo.algo, sem espaços', () {
+    expect(emailValido('motorista@gmail.com'), isTrue);
+    expect(emailValido('  Dono@Empresa.com.br '), isTrue);
+    expect(emailValido('sem-arroba.com'), isFalse);
+    expect(emailValido('a@b'), isFalse, reason: 'sem ponto no domínio');
+    expect(emailValido('a b@c.com'), isFalse, reason: 'com espaço');
+    expect(emailValido('${'a' * 250}@b.com'), isFalse, reason: 'mais de 254');
+  });
 }

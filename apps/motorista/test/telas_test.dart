@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:motorista/acesso/acesso.dart' show chaveTermosAparelho;
 import 'package:motorista/app.dart';
 import 'package:motorista/dados/armazenamento.dart';
 import 'package:motorista/dados/dados.dart';
@@ -11,6 +12,13 @@ import 'package:visual/visual.dart';
 
 import 'amostra.dart';
 import 'apoio.dart';
+
+/// Celular sem dados. [termos]: os termos já foram aceitos ao abrir o app.
+Future<ArmazenamentoMemoria> celularNovo({bool termos = true}) async {
+  final a = ArmazenamentoMemoria();
+  if (termos) await a.gravarEstado(chaveTermosAparelho, versaoTermos);
+  return a;
+}
 
 Future<ArmazenamentoMemoria> abrir(WidgetTester tester, {ArmazenamentoMemoria? a, ServidorFalso? s}) async {
   tester.view.physicalSize = const Size(1080, 2340);
@@ -85,7 +93,7 @@ void main() {
 
   testWidgets('sem conta: tela de boas-vindas e login por CPF confere o número', (tester) async {
     final s = servidorComCadastros()..sessao = false;
-    await abrir(tester, a: ArmazenamentoMemoria(), s: s);
+    await abrir(tester, a: await celularNovo(), s: s);
     expect(find.text('Entrar com CPF e senha'), findsOneWidget);
     await tester.tap(find.text('Entrar com CPF e senha'));
     await tester.pumpAndSettle();
@@ -118,7 +126,7 @@ void main() {
     expect(find.text('R\$ 877,50'), findsOneWidget);
   });
 
-  testWidgets('criar conta sem e-mail: nome, CPF e senha, e já pede o código da empresa', (tester) async {
+  testWidgets('criar conta: nome, CPF, senha e o e-mail para recuperar a senha', (tester) async {
     tester.view.physicalSize = const Size(1080, 2340);
     tester.view.devicePixelRatio = 2.75;
     addTearDown(tester.view.reset);
@@ -131,9 +139,10 @@ void main() {
         'motorista': null,
         'pedido': null,
       };
+    final a = await celularNovo();
     await tester.pumpWidget(ProviderScope(
       overrides: [
-        armazenamentoProvider.overrideWithValue(ArmazenamentoMemoria()),
+        armazenamentoProvider.overrideWithValue(a),
         servidorProvider.overrideWithValue(s),
         sincronizarSozinhoProvider.overrideWithValue(false),
       ],
@@ -143,38 +152,65 @@ void main() {
     await tester.tap(find.text('Criar minha conta'));
     await tester.pumpAndSettle();
     expect(find.text('Criar conta'), findsOneWidget);
-    expect(find.textContaining('E-mail'), findsNothing, reason: 'o cadastro não pede e-mail');
+    expect(find.text('Li e aceito os Termos de Uso e a Política de Privacidade.'), findsNothing,
+        reason: 'os termos já foram aceitos na abertura do app');
 
     final campos = find.byType(TextField);
     await tester.enterText(campos.at(0), 'Novo Motorista');
     await tester.enterText(campos.at(1), '12345678900');
     await tester.enterText(campos.at(2), 'senha123');
+    await tester.enterText(campos.at(3), 'novo@');
     await tester.tap(find.text('Criar minha conta'));
     await tester.pumpAndSettle();
     expect(find.textContaining('Confira o CPF'), findsOneWidget);
+    expect(find.text('Confira o e-mail (ou deixe em branco).'), findsOneWidget);
+    expect(s.cadastros, isEmpty);
 
     await tester.enterText(campos.at(1), '52998224725');
-    await tester.tap(find.text('Criar minha conta'));
-    await tester.pumpAndSettle();
-    expect(s.cadastros, isEmpty, reason: 'sem marcar o aceite dos termos não cria a conta');
-    expect(find.textContaining('marque que leu e aceita'), findsOneWidget);
-
-    await tester.tap(find.text('Li e aceito os Termos de Uso e a Política de Privacidade.'));
+    await tester.enterText(campos.at(3), 'Novo.Motorista@Gmail.com');
     await tester.tap(find.text('Criar minha conta'));
     await tester.pumpAndSettle();
     expect(s.cadastros, ['52998224725']);
-    expect(s.termosAceitos, versaoTermos);
+    expect(s.termosAceitos, versaoTermos, reason: 'o aceite da abertura vai junto com o cadastro');
+    expect(s.emailsCadastrados, ['novo.motorista@gmail.com']);
+    expect(find.textContaining('Mandamos um link para novo.motorista@gmail.com'), findsOneWidget);
     expect(find.text('Código de entrada'), findsOneWidget);
   });
 
-  Future<ServidorFalso> abrirSemDados(WidgetTester tester, Map<String, Object?> situacao) async {
+  testWidgets('criar conta sem e-mail também funciona', (tester) async {
+    final s = ServidorFalso()
+      ..sessao = false
+      ..situacaoFixa = {
+        'logado': true,
+        'perfil': {'id': 'u-novo', 'nome': 'Sem Email', 'papel': 'motorista', 'ativo': true},
+        'empresa': null,
+        'motorista': null,
+        'pedido': null,
+      };
+    await abrir(tester, a: await celularNovo(), s: s);
+    s.online = true;
+    await tester.tap(find.text('Criar minha conta'));
+    await tester.pumpAndSettle();
+    final campos = find.byType(TextField);
+    await tester.enterText(campos.at(0), 'Sem Email');
+    await tester.enterText(campos.at(1), '52998224725');
+    await tester.enterText(campos.at(2), 'senha123');
+    await tester.tap(find.text('Criar minha conta'));
+    await tester.pumpAndSettle();
+    expect(s.cadastros, ['52998224725']);
+    expect(s.emailsCadastrados, isEmpty);
+    expect(find.text('Código de entrada'), findsOneWidget);
+  });
+
+  Future<ServidorFalso> abrirSemDados(WidgetTester tester, Map<String, Object?> situacao, {bool termos = true}) async {
     tester.view.physicalSize = const Size(1080, 2340);
     tester.view.devicePixelRatio = 2.75;
     addTearDown(tester.view.reset);
     final s = ServidorFalso()..situacaoFixa = situacao;
+    final a = await celularNovo(termos: termos);
     await tester.pumpWidget(ProviderScope(
       overrides: [
-        armazenamentoProvider.overrideWithValue(ArmazenamentoMemoria()),
+        armazenamentoProvider.overrideWithValue(a),
         servidorProvider.overrideWithValue(s),
         sincronizarSozinhoProvider.overrideWithValue(false),
       ],
@@ -184,71 +220,89 @@ void main() {
     return s;
   }
 
-  Map<String, Object?> semEmpresa({bool termos = true, bool recuperacao = true}) => {
+  Map<String, Object?> semEmpresa({bool termos = true}) => {
         'logado': true,
         'perfil': {'id': 'u-novo', 'nome': 'Novo Motorista', 'papel': 'motorista', 'ativo': true},
         'empresa': null,
         'motorista': null,
         'pedido': null,
         'termos': {'versao': versaoTermos, 'aceito': termos},
-        'recuperacao': recuperacao,
       };
 
-  testWidgets('primeiro acesso: aceitar os termos e guardar o código de recuperação', (tester) async {
-    final s = await abrirSemDados(tester, semEmpresa(termos: false, recuperacao: false));
+  testWidgets('primeira abertura: termos antes de tudo; o aceite vai para a conta', (tester) async {
+    final s = await abrirSemDados(tester, semEmpresa(termos: false), termos: false);
     expect(find.text('Termos de Uso e Privacidade'), findsOneWidget);
+    expect(find.text('Código de entrada'), findsNothing, reason: 'nada abre antes do aceite');
+    await tester.ensureVisible(find.text('Não aceito'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Não aceito'));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.textContaining('Sem aceitar'));
+    expect(find.textContaining('Sem aceitar, não dá para usar.'), findsOneWidget);
     await tester.tap(find.text('Aceitar e continuar'));
     await tester.pumpAndSettle();
     expect(s.termosAceitos, isNull, reason: 'precisa marcar que leu');
     await tester.tap(find.text('Li e aceito os Termos de Uso e a Política de Privacidade.'));
     await tester.tap(find.text('Aceitar e continuar'));
     await tester.pumpAndSettle();
-    expect(s.termosAceitos, versaoTermos);
-
-    expect(find.text('Código de recuperação'), findsOneWidget);
-    await tester.tap(find.text('Gerar o meu código'));
-    await tester.pumpAndSettle();
-    expect(find.text('ABCD-EFGH-JK11'), findsOneWidget);
-    await tester.tap(find.text('Continuar'));
-    await tester.pumpAndSettle();
-    expect(find.text('Código de recuperação'), findsOneWidget, reason: 'precisa marcar que anotou');
-    await tester.tap(find.text('Já anotei o código em lugar seguro.'));
-    await tester.tap(find.text('Continuar'));
-    await tester.pumpAndSettle();
+    expect(s.termosAceitos, versaoTermos, reason: 'com a conta aberta, o aceite também vai para a nuvem');
     expect(find.text('Código de entrada'), findsOneWidget);
   });
 
+  testWidgets('sair da conta não pede os termos de novo neste celular', (tester) async {
+    final s = await abrirSemDados(tester, semEmpresa());
+    s.sessao = false;
+    await tester.tap(find.text('Sair desta conta'));
+    await tester.pumpAndSettle();
+    expect(find.text('Entrar com CPF e senha'), findsOneWidget);
+    expect(find.text('Termos de Uso e Privacidade'), findsNothing);
+  });
+
   testWidgets('os termos abrem para ler', (tester) async {
-    await abrirSemDados(tester, semEmpresa(termos: false));
+    await abrirSemDados(tester, semEmpresa(termos: false), termos: false);
     await tester.tap(find.text('Política de Privacidade'));
     await tester.pumpAndSettle();
     expect(find.textContaining('Lei Geral de Proteção de Dados Pessoais'), findsWidgets);
   });
 
-  testWidgets('esqueci a senha: CPF, código de recuperação e senha nova', (tester) async {
+  testWidgets('esqueci a senha: o link vai para o e-mail confirmado do motorista', (tester) async {
     final s = await abrirSemDados(tester, semEmpresa());
     s.sessao = false;
     await tester.tap(find.text('Sair desta conta'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Esqueci a senha'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Tenho o código de recuperação'));
+    await tester.enterText(find.byType(TextField), '123');
+    await tester.tap(find.text('Mandar o link'));
     await tester.pumpAndSettle();
-    final campos = find.byType(TextField);
-    await tester.enterText(campos.at(0), '52998224725');
-    await tester.enterText(campos.at(1), 'abcd efgh jk22');
-    await tester.enterText(campos.at(2), 'nova1234');
+    expect(find.text('Confira o CPF: tem 11 números.'), findsOneWidget);
+    await tester.enterText(find.byType(TextField), '52998224725');
+    await tester.tap(find.text('Mandar o link'));
     await tester.pumpAndSettle();
-    expect(find.text('ABCD-EFGH-JK22'), findsOneWidget, reason: 'o código entra formatado');
-    await tester.tap(find.text('Criar a senha nova'));
+    expect(s.linksPedidos, ['52998224725']);
+    expect(find.textContaining('mandamos um link para ele'), findsOneWidget);
+    expect(find.textContaining('Redefinir o acesso'), findsOneWidget, reason: 'sem e-mail, o patrão ajuda');
+  });
+
+  testWidgets('configurações: cadastrar o e-mail para recuperar a senha', (tester) async {
+    final s = servidorComCadastros();
+    await abrir(tester, s: s);
+    s.online = true;
+    await tester.tap(find.byTooltip('Configurações'));
     await tester.pumpAndSettle();
-    expect(s.recuperacoes, ['52998224725:nova1234']);
-    expect(find.text('NOVO-CODI-GO23'), findsOneWidget, reason: 'mostra o código novo');
-    await tester.tap(find.text('Já anotei o código em lugar seguro.'));
-    await tester.tap(find.text('Continuar'));
+    expect(find.text('Não cadastrado'), findsOneWidget);
+    await tester.tap(find.text('E-mail para recuperar a senha'));
     await tester.pumpAndSettle();
-    expect(s.sessao, isTrue);
-    expect(find.text('Código de entrada'), findsOneWidget);
+    expect(find.text('Nenhum e-mail confirmado ainda.'), findsOneWidget);
+    await tester.enterText(find.byType(TextField), 'joao@');
+    await tester.tap(find.text('Mandar o link de confirmação'));
+    await tester.pumpAndSettle();
+    expect(find.text('Confira o e-mail.'), findsOneWidget);
+    await tester.enterText(find.byType(TextField), 'Joao@Gmail.com');
+    await tester.tap(find.text('Mandar o link de confirmação'));
+    await tester.pumpAndSettle();
+    expect(s.emailsCadastrados, ['joao@gmail.com']);
+    expect(find.textContaining('Mandamos um link para joao@gmail.com'), findsOneWidget);
   });
 
   testWidgets('empresa com o acesso encerrado: o app fecha e mostra o motivo', (tester) async {

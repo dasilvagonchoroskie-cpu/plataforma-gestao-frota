@@ -22,6 +22,12 @@ abstract class Servidor {
   String? get emailDaSessao;
   bool get precisaTrocarSenha;
 
+  /// E-mail do motorista já confirmado (nulo enquanto o login é o interno).
+  String? get emailConfirmado;
+
+  /// E-mail novo esperando a confirmação pelo link.
+  String? get emailEsperando;
+
   Future<void> pedirCodigoCadastro(String email);
   Future<void> confirmarCodigoCadastro(String email, String codigo);
   Future<void> definirSenha(String senha);
@@ -35,19 +41,22 @@ abstract class Servidor {
   /// Aceite dos Termos de Uso e da Política de Privacidade. Devolve a situação.
   Future<Map<String, Object?>> aceitarTermos(String versao);
 
-  /// Gera um código de recuperação novo (o anterior para de valer).
-  Future<String> gerarCodigoRecuperacao();
+  /// Pede o link para criar a senha nova (vai para o e-mail confirmado do
+  /// motorista). Devolve o recado para mostrar.
+  Future<String> pedirLinkSenha(String cpf);
 
-  /// Senha nova com CPF e código de recuperação. Devolve o código novo.
-  Future<String> recuperarAcesso(String cpf, String codigo, String senhaNova, String aparelho);
+  /// Cadastra (ou troca) o e-mail para recuperar a senha. O Supabase manda um
+  /// link para o e-mail novo; ele só passa a valer depois de confirmado.
+  Future<void> cadastrarEmail(String email);
+
+  /// Busca na nuvem os dados da conta (para saber se o e-mail foi confirmado).
+  Future<void> atualizarConta();
 
   /// Exclui a conta (sem empresa: na hora; com empresa: em até 15 dias).
   Future<Map<String, Object?>> excluirMinhaConta();
 
   /// Registro de acesso (data, hora e IP) exigido pelo Marco Civil.
   Future<void> registrarAcesso();
-  Future<void> pedirCodigoSenha(String email);
-  Future<void> confirmarCodigoSenha(String email, String codigo);
   Future<Map<String, Object?>> situacao();
   Future<Map<String, Object?>> pedirEntrada(String codigo);
   Future<Map<String, Object?>> sincronizarLote(Map<String, Object?> lote);
@@ -80,7 +89,10 @@ ErroServidor traduzirErro(Object e) {
       return const ErroServidor('Código errado ou vencido. Confira ou peça outro.', codigo: 'codigo');
     }
     if (m.contains('for security purposes') || m.contains('rate limit') || e.statusCode == '429') {
-      return const ErroServidor('Espere um minuto antes de pedir outro código.', codigo: 'espera');
+      return const ErroServidor('Espere um minuto antes de pedir de novo.', codigo: 'espera');
+    }
+    if (e.code == 'email_exists' || m.contains('already been registered')) {
+      return const ErroServidor('Este e-mail já está em outra conta. Use outro e-mail.', codigo: 'email_em_uso');
     }
     if (m.contains('password') && (m.contains('least') || m.contains('weak') || m.contains('should contain'))) {
       return const ErroServidor('A senha precisa ter pelo menos 8 caracteres, com letras e números.', codigo: 'senha_fraca');
@@ -129,6 +141,21 @@ class ServidorSupabase implements Servidor {
 
   @override
   bool get precisaTrocarSenha => _auth.currentUser?.userMetadata?['trocar_senha'] == true;
+
+  /// Login interno do motorista (não recebe e-mail).
+  static bool _interno(String? e) => e == null || e.isEmpty || e.endsWith('@motorista.fortalezadigitalsecurity.com.br');
+
+  @override
+  String? get emailConfirmado {
+    final e = _auth.currentUser?.email;
+    return _interno(e) ? null : e;
+  }
+
+  @override
+  String? get emailEsperando {
+    final e = _auth.currentUser?.newEmail;
+    return (e == null || e.isEmpty) ? null : e;
+  }
 
   @override
   Future<void> pedirCodigoCadastro(String email) =>
@@ -179,23 +206,25 @@ class ServidorSupabase implements Servidor {
       _tentar(() async => _mapa(await cliente.rpc('aceitar_termos', params: {'p_versao': versao})));
 
   @override
-  Future<String> gerarCodigoRecuperacao() =>
-      _tentar(() async => '${await cliente.rpc('gerar_codigo_recuperacao')}');
+  Future<String> pedirLinkSenha(String cpf) => _tentar(() async {
+        final r = await cliente.functions.invoke('pedir_link_senha', body: {'identificador': cpf});
+        final d = _mapa(r.data);
+        if (d['ok'] != true) throw ErroServidor('${d['mensagem'] ?? 'Não deu para pedir o link agora.'}');
+        return '${d['mensagem']}';
+      });
 
   @override
-  Future<String> recuperarAcesso(String cpf, String codigo, String senhaNova, String aparelho) => _tentar(() async {
-        final r = await cliente.functions.invoke('recuperar_acesso', body: {
-          'identificador': cpf,
-          'codigo': codigo,
-          'senha_nova': senhaNova,
-          'aparelho': aparelho,
-        });
-        final d = _mapa(r.data);
-        if (d['ok'] != true || d['codigo_novo'] == null) {
-          throw ErroServidor('${d['mensagem'] ?? 'CPF e código de recuperação não conferem.'}', codigo: '${d['codigo'] ?? ''}');
-        }
-        return d['codigo_novo'] as String;
-      });
+  Future<void> cadastrarEmail(String email) =>
+      _tentar(() => _auth.updateUser(UserAttributes(email: email.trim().toLowerCase())));
+
+  @override
+  Future<void> atualizarConta() async {
+    try {
+      await _auth.refreshSession().timeout(const Duration(seconds: 20));
+    } catch (_) {
+      // Sem internet: mostra o que já sabe.
+    }
+  }
 
   @override
   Future<Map<String, Object?>> excluirMinhaConta() =>
@@ -209,14 +238,6 @@ class ServidorSupabase implements Servidor {
       // Sem internet: registra na próxima vez.
     }
   }
-
-  @override
-  Future<void> pedirCodigoSenha(String email) => _tentar(() => _auth.resetPasswordForEmail(email.trim().toLowerCase()));
-
-  @override
-  Future<void> confirmarCodigoSenha(String email, String codigo) => _tentar(() async {
-        await _auth.verifyOTP(email: email.trim().toLowerCase(), token: codigo.trim(), type: OtpType.recovery);
-      });
 
   @override
   Future<Map<String, Object?>> situacao() => _tentar(() async => _mapa(await cliente.rpc('situacao_acesso')));

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:visual/visual.dart';
@@ -55,6 +56,12 @@ class Raiz extends ConsumerWidget {
       error: (e, _) => TelaSemInternet(mensagem: '$e'),
       data: (a) {
         switch (a.etapa) {
+          case Etapa.termosAbertura:
+            return TelaAceiteTermos(
+              naAbertura: true,
+              aceitar: () => ref.read(acessoProvider.notifier).aceitarTermosNoAparelho(),
+              sair: () => SystemNavigator.pop(),
+            );
           case Etapa.boasVindas:
             return const TelaBoasVindas();
           case Etapa.completarCadastro:
@@ -71,11 +78,6 @@ class Raiz extends ConsumerWidget {
             return TelaAceiteTermos(
               aceitar: () => ref.read(acessoProvider.notifier).aceitarTermos(versaoTermos),
               sair: () => ref.read(acessoProvider.notifier).sair(),
-            );
-          case Etapa.codigoRecuperacao:
-            return TelaCodigoRecuperacao(
-              gerar: () => ref.read(servidorProvider).gerarCodigoRecuperacao(),
-              concluir: () => ref.read(acessoProvider.notifier).recarregar(conferir: true),
             );
           case Etapa.bloqueada:
             return TelaAcessoEncerrado(empresaNome: a.empresaNome, motivo: a.mensagem);

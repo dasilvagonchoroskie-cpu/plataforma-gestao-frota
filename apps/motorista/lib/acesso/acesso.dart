@@ -1,16 +1,18 @@
 import 'dart:convert';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:visual/visual.dart' show versaoTermos;
 
 import '../dados/armazenamento.dart';
 import '../dados/dados.dart';
 import '../dados/sincronizador.dart';
 import '../servidor/servidor.dart';
 
-/// Em que ponto do caminho o motorista está: sem conta, cadastrando,
-/// esperando aprovação, com algo a fazer (termos, código de recuperação),
-/// com a empresa bloqueada ou pronto para usar.
+/// Em que ponto do caminho o motorista está: termos na primeira abertura,
+/// sem conta, cadastrando, esperando aprovação, com algo a fazer (senha,
+/// termos), com a empresa bloqueada ou pronto para usar.
 enum Etapa {
+  termosAbertura,
   boasVindas,
   completarCadastro,
   codigoEmpresa,
@@ -18,7 +20,6 @@ enum Etapa {
   contaDeGestor,
   trocarSenha,
   termos,
-  codigoRecuperacao,
   bloqueada,
   semInternet,
   pronto,
@@ -38,7 +39,10 @@ Map<String, Object?>? _mapa(Object? v) => v is Map ? v.cast<String, Object?>() :
 
 bool _termosPendentes(Map<String, Object?> s) => _mapa(s['termos'])?['aceito'] == false;
 bool _empresaBloqueada(Map<String, Object?> s) => _mapa(s['empresa'])?['bloqueada'] == true;
-bool _semCodigoRecuperacao(Map<String, Object?> s) => s['recuperacao'] == false;
+
+/// Chave (no celular) da versão dos termos aceita na primeira abertura. Fica
+/// guardada mesmo quando o motorista sai da conta (estadosDoAparelho).
+const chaveTermosAparelho = 'termos_local';
 
 class Acesso extends AsyncNotifier<EstadoAcesso> {
   Servidor get _s => ref.read(servidorProvider);
@@ -72,19 +76,21 @@ class Acesso extends AsyncNotifier<EstadoAcesso> {
   /// (depois de um envio recusado, de aceitar os termos etc.).
   Future<EstadoAcesso> _decidir({bool conferir = false}) async {
     final a = ref.read(armazenamentoProvider);
+    // Primeira abertura (ou versão nova dos termos): aceitar antes de tudo.
+    if (await a.lerEstado(chaveTermosAparelho) != versaoTermos) return const EstadoAcesso(Etapa.termosAbertura);
     final pronto = await a.lerEstado('pronto') == '1';
     final guardada = await _situacaoGuardada();
     // Já tem os dados no celular: abre direto, mesmo sem internet.
     if (pronto && !conferir) {
       final g = guardada ?? const <String, Object?>{};
-      if (!_termosPendentes(g) && !_empresaBloqueada(g) && !_semCodigoRecuperacao(g)) {
+      if (!_termosPendentes(g) && !_empresaBloqueada(g)) {
         return const EstadoAcesso(Etapa.pronto);
       }
     }
     if (!_s.temSessao) return EstadoAcesso(pronto ? Etapa.pronto : Etapa.boasVindas);
     if (_s.precisaTrocarSenha) return const EstadoAcesso(Etapa.trocarSenha);
 
-    final Map<String, Object?> s;
+    Map<String, Object?> s;
     try {
       s = await _s.situacao();
     } on ErroServidor catch (e) {
@@ -105,10 +111,18 @@ class Acesso extends AsyncNotifier<EstadoAcesso> {
       return EstadoAcesso(Etapa.completarCadastro, email: _s.emailDaSessao ?? '');
     }
     if (perfil['papel'] != 'motorista') return const EstadoAcesso(Etapa.contaDeGestor);
+    if (_termosPendentes(s)) {
+      // Já aceitou neste celular ao abrir o app: o aceite vai para a conta.
+      // Se não der agora (sem internet), pede de novo na tela de termos.
+      try {
+        s = await _s.aceitarTermos(versaoTermos);
+      } on ErroServidor {
+        return const EstadoAcesso(Etapa.termos);
+      }
+    }
     if (pronto) await a.gravarEstado('situacao', situacaoParaGuardar(s));
     if (_termosPendentes(s)) return const EstadoAcesso(Etapa.termos);
     if (_empresaBloqueada(s)) return _bloqueada(s);
-    if (_semCodigoRecuperacao(s)) return const EstadoAcesso(Etapa.codigoRecuperacao);
 
     final motorista = _mapa(s['motorista']);
     if (motorista != null) {
@@ -163,6 +177,14 @@ class Acesso extends AsyncNotifier<EstadoAcesso> {
   Future<void> conferirEmSilencio() async {
     final novo = await AsyncValue.guard(() => _decidir(conferir: true));
     if (novo.hasValue && novo.value!.etapa != state.value?.etapa) state = novo;
+  }
+
+  /// Aceite dos termos na primeira abertura: fica guardado no celular e, com
+  /// a conta aberta, também na nuvem (no próximo passo do acesso).
+  Future<String?> aceitarTermosNoAparelho() async {
+    await ref.read(armazenamentoProvider).gravarEstado(chaveTermosAparelho, versaoTermos);
+    await recarregar(conferir: _s.temSessao);
+    return null;
   }
 
   /// Aceite dos termos. Devolve a mensagem de erro ou nulo.

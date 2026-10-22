@@ -5,10 +5,13 @@ import 'dart:convert';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:gestor/app.dart';
+import 'package:gestor/dados/aparelho.dart';
+import 'package:gestor/dados/link_email.dart';
 import 'package:gestor/dados/provedores.dart';
 import 'package:gestor/servidor/servidor.dart';
 import 'package:gestor/telas/casca.dart';
 import 'package:nucleo/nucleo.dart';
+import 'package:visual/visual.dart' show versaoTermos;
 
 const empresaId = 'emp-x';
 const euDono = 'u-dono';
@@ -67,10 +70,6 @@ class ServidorFalso implements Servidor {
   }
 
   @override
-  Future<void> pedirCodigoCadastro(String email) async => chamadas.add('codigo $email');
-  @override
-  Future<void> confirmarCodigoCadastro(String email, String codigo) async => sessao = true;
-  @override
   Future<void> definirSenha(String senha) async {
     chamadas.add('senha');
     trocarSenha = false;
@@ -97,12 +96,16 @@ class ServidorFalso implements Servidor {
     return {'ok': true, 'nome': nome, 'email': e, 'senha_provisoria': 'H4QZ8WMP'};
   }
 
-  /// Campos a mais na situação (termos, recuperação, empresa bloqueada...).
+  /// Campos a mais na situação (termos, empresa bloqueada...).
   Map<String, Object?> situacaoExtra = {};
   Map<String, Object?> empresaExtra = {};
   String? termosAceitos;
   String? empresaExcluida;
-  final recuperacoes = <String>[];
+
+  /// Links pedidos por e-mail e links abertos (token_hash válidos).
+  final linksPedidos = <String>[];
+  final linksValidos = <String>{};
+  bool saiuDeTodos = false;
 
   @override
   Future<Map<String, Object?>> gerarConvite(String nome, String cpf) async {
@@ -155,19 +158,20 @@ class ServidorFalso implements Servidor {
   }
 
   @override
-  Future<String> gerarCodigoRecuperacao() async {
+  Future<String> pedirLinkSenha(String email) async {
     _rede();
-    chamadas.add('codigo recuperacao');
-    situacaoExtra = {...situacaoExtra, 'recuperacao': true};
-    return 'QWER-TYUP-ASDF';
+    linksPedidos.add(email);
+    return 'Se este e-mail tiver conta, mandamos um link para ele.';
   }
 
   @override
-  Future<String> recuperarAcesso(String email, String codigo, String senhaNova) async {
+  Future<void> abrirLinkDoEmail(String tokenHash, {required bool senha}) async {
     _rede();
-    recuperacoes.add('$email:$codigo:$senhaNova');
-    senhaCerta = senhaNova;
-    return 'NOVO-CODI-GO23';
+    if (!linksValidos.remove(tokenHash)) {
+      throw const ErroServidor('Este link venceu ou já foi usado. Peça outro em "Esqueci a senha".');
+    }
+    chamadas.add(senha ? 'link senha' : 'link email');
+    sessao = true;
   }
 
   @override
@@ -179,10 +183,6 @@ class ServidorFalso implements Servidor {
     return situacao();
   }
 
-  @override
-  Future<void> pedirCodigoSenha(String email) async {}
-  @override
-  Future<void> confirmarCodigoSenha(String email, String codigo) async {}
 
   @override
   Future<Map<String, Object?>> situacao() async {
@@ -297,8 +297,9 @@ class ServidorFalso implements Servidor {
   }
 
   @override
-  Future<void> sair() async {
+  Future<void> sair({bool todosOsAparelhos = false}) async {
     chamadas.add('sair');
+    saiuDeTodos = saiuDeTodos || todosOsAparelhos;
     sessao = false;
   }
 }
@@ -575,13 +576,22 @@ Future<void> abrirApp(
   Size tela = const Size(1280, 860),
   double densidade = 1,
   Widget? inicio,
+  bool termosAceitosNoAparelho = true,
+  LinkDoEmail? link,
 }) async {
   tester.view.physicalSize = tela * densidade;
   tester.view.devicePixelRatio = densidade;
   addTearDown(tester.view.reset);
   await tester.pumpWidget(
     ProviderScope(
-      overrides: [servidorProvider.overrideWithValue(s), atualizarSozinhoProvider.overrideWithValue(false)],
+      overrides: [
+        servidorProvider.overrideWithValue(s),
+        atualizarSozinhoProvider.overrideWithValue(false),
+        aparelhoProvider.overrideWithValue(
+          AparelhoMemoria({if (termosAceitosNoAparelho) chaveTermosAparelho: versaoTermos}),
+        ),
+        linkDoEmailProvider.overrideWith(() => LinkAberto(link)),
+      ],
       child: AplicativoGestor(inicio: inicio),
     ),
   );

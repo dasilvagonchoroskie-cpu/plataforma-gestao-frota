@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:gestor/dados/link_email.dart';
 import 'package:gestor/servidor/servidor.dart';
 import 'package:gestor/telas/lancamentos/detalhe_lancamento.dart';
+
+import 'package:nucleo/nucleo.dart' show mensagemSenha;
+import 'package:visual/visual.dart' show versaoTermos;
 
 import 'apoio.dart';
 
@@ -249,24 +253,36 @@ void main() {
     expect(find.text('Motorista e dados excluídos.'), findsOneWidget);
   });
 
-  testWidgets('primeiro acesso: termos e código de recuperação antes do painel', (tester) async {
-    final s = servidorComAmostra()
-      ..situacaoExtra = {
-        'termos': {'versao': '2026-10-22', 'aceito': false},
-        'recuperacao': false,
-      };
-    await abrirApp(tester, s);
+  testWidgets('primeira abertura: aceitar os termos antes de qualquer tela', (tester) async {
+    final s = servidorComAmostra()..sessao = false;
+    await abrirApp(tester, s, termosAceitosNoAparelho: false);
     expect(find.text('Termos de Uso e Privacidade'), findsOneWidget);
+    expect(find.text('Esqueci a senha'), findsNothing, reason: 'nada abre antes do aceite');
+    await tester.ensureVisible(find.text('Não aceito'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Não aceito'));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.textContaining('Sem aceitar'));
+    expect(find.textContaining('Sem aceitar, não dá para usar.'), findsOneWidget);
+    await tester.tap(find.text('Aceitar e continuar'));
+    await tester.pumpAndSettle();
+    expect(find.text('Esqueci a senha'), findsNothing, reason: 'sem marcar a caixa não passa');
     await tester.tap(find.text('Li e aceito os Termos de Uso e a Política de Privacidade.'));
     await tester.tap(find.text('Aceitar e continuar'));
     await tester.pumpAndSettle();
-    expect(s.termosAceitos, '2026-10-22');
-    await tester.tap(find.text('Gerar o meu código'));
+    expect(find.text('Esqueci a senha'), findsOneWidget);
+  });
+
+  testWidgets('versão nova dos termos: o aceite da abertura vai para a conta sem pedir de novo', (tester) async {
+    final s = servidorComAmostra()
+      ..situacaoExtra = {
+        'termos': {'versao': '2026-10-17', 'aceito': false},
+      };
+    await abrirApp(tester, s, termosAceitosNoAparelho: false);
+    await tester.tap(find.text('Li e aceito os Termos de Uso e a Política de Privacidade.'));
+    await tester.tap(find.text('Aceitar e continuar'));
     await tester.pumpAndSettle();
-    expect(find.text('QWER-TYUP-ASDF'), findsOneWidget);
-    await tester.tap(find.text('Já anotei o código em lugar seguro.'));
-    await tester.tap(find.text('Continuar'));
-    await tester.pumpAndSettle();
+    expect(s.termosAceitos, versaoTermos);
     expect(find.text('Faturamento'), findsWidgets);
     expect(s.chamadas, contains('acesso gestor'), reason: 'o acesso fica registrado (Marco Civil)');
   });
@@ -291,24 +307,72 @@ void main() {
     expect(find.text('Esqueci a senha'), findsOneWidget, reason: 'volta para a tela de entrar');
   });
 
-  testWidgets('esqueci a senha: e-mail, código de recuperação e senha nova', (tester) async {
+  testWidgets('esqueci a senha: o link para criar a senha nova vai para o e-mail', (tester) async {
     final s = servidorComAmostra()..sessao = false;
     await abrirApp(tester, s);
     await tester.tap(find.text('Esqueci a senha'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Tenho o código de recuperação'));
+    await tester.enterText(find.byType(TextField), 'dono@');
+    await tester.tap(find.text('Mandar o link'));
     await tester.pumpAndSettle();
-    final campos = find.byType(TextField);
-    await tester.enterText(campos.at(0), 'Dono@Teste.com');
-    await tester.enterText(campos.at(1), 'qwertyupasdf');
-    await tester.enterText(campos.at(2), 'novasenha1');
-    await tester.tap(find.text('Criar a senha nova'));
+    expect(find.text('Confira o e-mail.'), findsOneWidget);
+    await tester.enterText(find.byType(TextField), 'Dono@Teste.com');
+    await tester.tap(find.text('Mandar o link'));
     await tester.pumpAndSettle();
-    expect(s.recuperacoes, ['dono@teste.com:QWER-TYUP-ASDF:novasenha1']);
-    expect(find.text('NOVO-CODI-GO23'), findsOneWidget);
-    await tester.tap(find.text('Já anotei o código em lugar seguro.'));
-    await tester.tap(find.text('Continuar'));
+    expect(s.linksPedidos, ['dono@teste.com']);
+    expect(find.text('Se este e-mail tiver conta, mandamos um link para ele.'), findsOneWidget);
+    await tester.tap(find.text('Voltar'));
     await tester.pumpAndSettle();
-    expect(find.text('Faturamento'), findsWidgets);
+    expect(find.text('Esqueci a senha'), findsOneWidget);
+  });
+
+  testWidgets('link do e-mail: cria a senha nova e encerra as outras sessões', (tester) async {
+    final s = servidorComAmostra()
+      ..sessao = false
+      ..linksValidos.add('abc123def456');
+    await abrirApp(tester, s, link: const LinkDoEmail('abc123def456', TipoLink.senha));
+    expect(find.text('Crie a senha nova'), findsOneWidget);
+    await tester.enterText(find.byType(TextField), 'semnumero');
+    await tester.tap(find.text('Salvar a senha nova'));
+    await tester.pumpAndSettle();
+    expect(find.text(mensagemSenha), findsOneWidget);
+    await tester.enterText(find.byType(TextField), 'novasenha9');
+    await tester.tap(find.text('Salvar a senha nova'));
+    await tester.pumpAndSettle();
+    expect(find.text('Senha nova criada'), findsOneWidget);
+    expect(s.chamadas, containsAllInOrder(['link senha', 'senha', 'sair']));
+    expect(s.saiuDeTodos, isTrue);
+    await tester.tap(find.text('Ir para a tela de entrar'));
+    await tester.pumpAndSettle();
+    expect(find.text('Esqueci a senha'), findsOneWidget);
+  });
+
+  testWidgets('link do e-mail vencido ou já usado: avisa e leva para entrar', (tester) async {
+    final s = servidorComAmostra()..sessao = false;
+    await abrirApp(tester, s, link: const LinkDoEmail('vencido12345', TipoLink.senha));
+    expect(find.text('Este link não vale mais'), findsOneWidget);
+    await tester.tap(find.text('Ir para a tela de entrar'));
+    await tester.pumpAndSettle();
+    expect(find.text('Esqueci a senha'), findsOneWidget);
+  });
+
+  testWidgets('link do e-mail do motorista: confirma o e-mail e sai', (tester) async {
+    final s = servidorComAmostra()
+      ..sessao = false
+      ..linksValidos.add('confirma12345');
+    await abrirApp(tester, s, link: const LinkDoEmail('confirma12345', TipoLink.email));
+    expect(find.text('E-mail confirmado'), findsOneWidget);
+    expect(s.chamadas, containsAllInOrder(['link email', 'sair']));
+    expect(s.sessao, isFalse);
+  });
+
+  test('o painel só reconhece links de e-mail bem formados', () {
+    final senha = LinkDoEmail.doEndereco(Uri.parse('https://x.io/p/?token_hash=abc123def456&type=recovery'));
+    expect(senha?.tipo, TipoLink.senha);
+    final email = LinkDoEmail.doEndereco(Uri.parse('https://x.io/p/?token_hash=abc123def456&type=email_change'));
+    expect(email?.tipo, TipoLink.email);
+    expect(LinkDoEmail.doEndereco(Uri.parse('https://x.io/p/?token_hash=abc123def456&type=signup')), isNull);
+    expect(LinkDoEmail.doEndereco(Uri.parse('https://x.io/p/?token_hash=<script>&type=recovery')), isNull);
+    expect(LinkDoEmail.doEndereco(Uri.parse('https://x.io/p/')), isNull);
   });
 }
