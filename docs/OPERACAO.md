@@ -16,14 +16,48 @@ No Supabase (SQL Editor, como dono da plataforma):
 
     select public.criar_empresa('Nome da Transportadora', 'email-do-dono@exemplo.com', null, 'piloto', 5, 'teste');
 
-A resposta traz o código da empresa. Depois crie o login do dono com uma senha provisória (passe para ele;
-no primeiro login ele cria a senha dele):
+A resposta traz o id da empresa (`empresa_id`). Depois crie o login do dono com uma senha provisória (passe
+para ele; no primeiro login ele aceita os termos, cria a senha dele e anota o código de recuperação):
 
     select public.criar_login_dono('email-do-dono@exemplo.com', 'Nome do Dono', 'SENHA123');
 
-O mesmo comando, rodado de novo, gera outra senha para um dono que esqueceu. O dono cria os gestores em
-Configurações > Donos e gestores (senha provisória) e passa o código da empresa para os motoristas, que
-criam a conta no app só com nome, CPF e senha.
+O mesmo comando, rodado de novo, gera outra senha para um dono que esqueceu a senha e o código de
+recuperação. O dono cria os gestores em Configurações > Donos e gestores (senha provisória). Para cada
+motorista, o gestor toca em Motoristas > Cadastrar motorista (nome e CPF) e manda o código gerado (só
+daquele motorista, vale 7 dias, uma vez só). O motorista cria a conta no app (nome, CPF e senha) e digita
+o código: entra na empresa na hora.
+
+Para dar um prazo de teste (por exemplo 30 dias), logo depois de criar:
+
+    select public.liberar_empresa('ID-DA-EMPRESA', now() + interval '30 days');
+
+## Controle das empresas (só a plataforma)
+
+Só pelo SQL Editor do Supabase (conta gestaodefrota2027). Nenhum dono ou gestor consegue mudar isto pelo
+app, e nenhum deles tira o seu acesso (você entra pelo Supabase, não pelo app).
+
+    -- Visão geral: situação, prazo, quando os dados serão apagados, motoristas, caminhões, último envio.
+    select * from public.empresas_da_plataforma();
+
+    -- Encerrar o acesso agora (os apps fecham; os dados são apagados sozinhos 30 dias depois).
+    select public.bloquear_empresa('ID-DA-EMPRESA', 'O período de teste terminou.', 30);
+
+    -- Encerrar sem apagar sozinho (por exemplo, pagamento atrasado).
+    select public.bloquear_empresa('ID-DA-EMPRESA', 'Pagamento em atraso.', null);
+
+    -- Liberar de novo (sem prazo) ou com novo prazo.
+    select public.liberar_empresa('ID-DA-EMPRESA');
+    select public.liberar_empresa('ID-DA-EMPRESA', now() + interval '30 days');
+
+    -- Apagar agora tudo de uma empresa (não tem volta).
+    select public.excluir_empresa_plataforma('ID-DA-EMPRESA');
+
+Quando o prazo de teste (`acesso_ate`) passa, o acesso fecha sozinho e os dados são apagados 30 dias
+depois, se ninguém liberar. A limpeza roda todo dia às 03:20 (horário de Brasília) pelo pg_cron
+(`frota-limpeza-diaria`); para rodar na hora: `select public.limpeza_diaria();`.
+
+O dono também pode excluir a conta da empresa e todos os dados pelo app (Configurações > Excluir a conta
+da empresa), mesmo com o acesso encerrado. O motorista exclui a própria conta em Configurações.
 
 ## Mudar plano, limite ou suspender
 
@@ -43,6 +77,12 @@ e combinar uma exportação semanal (`supabase db dump`) guardada fora do Supaba
 
 ## Problemas comuns
 
-- Motorista perdeu a senha e o e-mail: painel > Motoristas > o motorista > Redefinir o acesso.
+- Esqueceu a senha: no app, "Esqueci a senha" > código de recuperação (CPF ou e-mail + código + senha
+  nova). Sem o código: motorista pede ao gestor (Motoristas > o motorista > Redefinir o acesso); gestor
+  pede ao dono (Configurações > Donos e gestores); dono pede à plataforma (`criar_login_dono`).
+- Código do motorista venceu ou foi perdido: Motoristas > Cadastrar motorista de novo (o anterior para de
+  valer).
+- Pedido de titular de dados (LGPD) pelo e-mail gestaodefrota2027@gmail.com: responder em até 15 dias. Se
+  for sobre dados que a empresa controla, encaminhar ao dono da empresa.
 - Motorista diz que lançou mas não aparece: o celular dele precisa de internet; o painel mostra o
   último envio de cada um. O que ele lançou fica guardado no celular até enviar.

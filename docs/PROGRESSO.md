@@ -79,6 +79,24 @@ abaixo rodou e passou; o resto está marcado como não testado.
   `cadastrar_motorista` e `criar_acesso_gestor`. Login do dono da empresa piloto criado.
 - **feito** — Ícones próprios (fontes em `ferramentas/icones/`, gerados por `gerar.py`).
 
+## Contas, termos e controle da plataforma (17/10/2026)
+
+- **feito e testado** — Código individual por motorista (gerado no painel, único, 7 dias, uso único, preso
+  ao CPF); código de recuperação (Edge Function `recuperar_acesso`); Termos de Uso e Política de
+  Privacidade com aceite registrado; exclusão de dados (empresa, motorista, própria conta); bloqueio,
+  prazo de teste e exclusão automática pela plataforma; registros de acesso (6 meses).
+  Local: `PGTAP_SQL=... supabase/tests/local/rodar.sh` → `total de verificações que passaram: 222`.
+  Esteira (Supabase local, Postgres 17): 222 pgTAP e `verificações: 53, falhas: 0` nas Edge Functions.
+  Motorista: `flutter analyze` sem problemas, `flutter test --exclude-tags capturas` → 27 testes passaram.
+  Gestor: `flutter analyze` sem problemas, `flutter test --exclude-tags capturas` → 27 testes passaram;
+  `flutter build web` compilou (com termos.html e privacidade.html).
+- **feito** — Na nuvem: partes 1 a 3 da atualização (estrutura, funções, controle da plataforma), hash
+  conferido com os arquivos; Edge Functions `recuperar_acesso` (nova) e `cadastrar_motorista` (grava o aceite).
+- **não feito** — Parte 4 na nuvem (`20261017213600_contas_termos_exclusao.sql`: funções de exclusão e
+  limpeza diária). A ferramenta do Supabase exige a confirmação do dono da conta para funções que apagam
+  dados, e o pedido de confirmação não aparece no app do usuário. Até aplicar, "Excluir" nos apps
+  responde com erro. Ver PASSAGEM.
+
 ## Fase 7 — acabamento e piloto
 
 - **não feito** — SMTP próprio, Sentry, chave de assinatura definitiva, teste fechado no Google Play,

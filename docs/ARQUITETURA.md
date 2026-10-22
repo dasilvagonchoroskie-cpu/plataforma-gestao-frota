@@ -288,7 +288,7 @@ A pessoa digita o e-mail, recebe um código de 6 dígitos, digita o código e cr
 
 - Dono: a plataforma cria a empresa (`criar_empresa`) e coloca o e-mail do dono em `acessos_autorizados`. Quando o dono se cadastra com esse e-mail, já entra na empresa.
 - Gestor: o dono coloca o e-mail do gestor em `acessos_autorizados`, com o mesmo vínculo automático.
-- Motorista: depois do cadastro, digita o código da empresa (`empresas.codigo_entrada`), que o dono ou gestor passa por WhatsApp. Isso cria um pedido de entrada pendente. O gestor confere nome e CPF e aprova ou recusa no painel. Enquanto espera, o app mostra Aguardando aprovação do seu patrão. O gestor pode gerar outro código quando quiser, e o anterior deixa de valer.
+- Motorista: depois do cadastro, digita o código da empresa (`empresas.codigo_entrada`), que o dono ou gestor passa por WhatsApp. Isso cria um pedido de entrada pendente. O gestor confere nome e CPF e aprova ou recusa no painel. Enquanto espera, o app mostra Aguardando aprovação do seu patrão. O gestor pode gerar outro código quando quiser, e o anterior deixa de valer. (Atualizado em 17/10/2026, a pedido do usuário: o gestor cadastra o motorista com nome e CPF e o painel gera um código individual, de uso único, válido por 7 dias e preso ao CPF; com ele o motorista entra na hora. Ver docs/PASSAGEM.md.)
 - Conta sem vínculo com empresa não enxerga nenhum dado (RLS). Como o cadastro é aberto, limitar pedidos de código por e-mail e por aparelho e usar captcha se aparecer abuso.
 
 ### Trocar de caminhão (motorista)
