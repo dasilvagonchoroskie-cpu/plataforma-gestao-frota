@@ -31,6 +31,10 @@ env:
   FLUTTER_VERSION: '3.47.5'
   SUPABASE_CLI_VERSION: '2.121.0'
   PUBLICAR: ${{ github.event_name != 'pull_request' }}
+  # Repositório público só com o painel web (o código pode ficar privado).
+  # Com o segredo PAINEL_TOKEN, o painel vai para lá; sem ele, para o ramo
+  # gh-pages deste repositório (docs/REPOSITORIO-PRIVADO.md).
+  PAINEL_REPO_NOME: painel-frota
 
 jobs:
   banco:
@@ -53,7 +57,10 @@ jobs:
           set -o pipefail
           mkdir -p registros
           supabase --version 2>&1 | tee registros/banco.log
-          supabase start -x studio,imgproxy,realtime,storage-api,logflare,vector 2>&1 | tee -a registros/banco.log
+          # As chaves do Supabase local são padrão (iguais para todos), mas não vão para o registro público.
+          supabase start -x studio,imgproxy,realtime,storage-api,logflare,vector 2>&1 \
+            | sed -E 's/(sb_(secret|publishable)_)[A-Za-z0-9_-]+/\1(oculta)/g; s/eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/(oculta)/g' \
+            | tee -a registros/banco.log
       - name: Testes do banco
         run: |
           set -o pipefail
@@ -202,6 +209,20 @@ jobs:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         with:
           persist-credentials: false
+      - name: Onde o painel web fica no ar
+        id: painel
+        env:
+          TEM_TOKEN: ${{ secrets.PAINEL_TOKEN != '' }}
+          DONO: ${{ github.repository_owner }}
+          REPO: ${{ github.event.repository.name }}
+        run: |
+          if [ "$TEM_TOKEN" = true ]; then
+            { echo "repo=$DONO/$PAINEL_REPO_NOME"; echo "ramo=main"; echo "base=/$PAINEL_REPO_NOME/"; } >> "$GITHUB_OUTPUT"
+            echo "url=https://$DONO.github.io/$PAINEL_REPO_NOME/" >> "$GITHUB_OUTPUT"
+          else
+            { echo "repo=$GITHUB_REPOSITORY"; echo "ramo=gh-pages"; echo "base=/$REPO/"; } >> "$GITHUB_OUTPUT"
+            echo "url=https://$DONO.github.io/$REPO/" >> "$GITHUB_OUTPUT"
+          fi
       - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5.7.0
         with:
           distribution: temurin
@@ -223,9 +244,13 @@ jobs:
         run: flutter test --tags capturas --update-goldens 2>&1 | tail -5
       - name: Compilar o painel web
         working-directory: apps/gestor
+        env:
+          BASE: ${{ steps.painel.outputs.base }}
         run: |
           set -o pipefail
-          flutter build web --release --base-href /plataforma-gestao-frota/ 2>&1 | tail -5 | tee -a ../../registros/gestor.log
+          flutter build web --release --base-href "$BASE" 2>&1 | tail -5 | tee -a ../../registros/gestor.log
+          # Marca a versão publicada (a esteira confere depois se esta versão está no ar).
+          echo "${GITHUB_SHA::7}" > build/web/versao.txt
       - name: Compilar o APK (ofuscado, encolhido e assinado)
         id: apk
         working-directory: apps/gestor
@@ -251,20 +276,46 @@ jobs:
           name: apk-gestor
           path: saida/
           retention-days: 14
-      - name: Publicar o painel web (ramo gh-pages)
+      - name: Publicar o painel web
         if: env.PUBLICAR == 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PAINEL_TOKEN: ${{ secrets.PAINEL_TOKEN }}
+          DESTINO: ${{ steps.painel.outputs.repo }}
+          RAMO: ${{ steps.painel.outputs.ramo }}
         run: |
           cd apps/gestor/build/web
           touch .nojekyll
-          git init -q -b gh-pages
+          printf '%s\n' "# Painel web da Plataforma de Gestão de Frota" "" \
+            "Publicado sozinho pela esteira do repositório do código. Não edite aqui: cada publicação substitui tudo." \
+            > README.md
+          git init -q -b "$RAMO"
           git config user.name "esteira"
           git config user.email "esteira@users.noreply.github.com"
           git add -A
           git commit -q -m "Painel web do gestor (${GITHUB_SHA::7})"
-          git push -q -f "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" gh-pages
-          echo "commit ${GITHUB_SHA::7} | painel web publicado no ramo gh-pages" >> ../../../../registros/gestor.log
+          TOKEN="${PAINEL_TOKEN:-$GH_TOKEN}"
+          git push -q -f "https://x-access-token:${TOKEN}@github.com/${DESTINO}.git" "$RAMO"
+          echo "commit ${GITHUB_SHA::7} | painel web publicado em $DESTINO ($RAMO)" >> ../../../../registros/gestor.log
+      - name: Conferir o painel no ar
+        if: env.PUBLICAR == 'true'
+        continue-on-error: true
+        env:
+          URL_PAINEL: ${{ steps.painel.outputs.url }}
+          BASE: ${{ steps.painel.outputs.base }}
+        run: |
+          # O GitHub Pages leva 1 ou 2 minutos para pôr a versão nova no ar.
+          for i in $(seq 1 8); do
+            sleep 30
+            VERSAO=$(curl -s "${URL_PAINEL}versao.txt?v=$i" | tr -d '[:space:]')
+            [ "$VERSAO" = "${GITHUB_SHA::7}" ] && break
+          done
+          CODIGO=$(curl -s -o painel.html -w '%{http_code}' "$URL_PAINEL")
+          if [ "$VERSAO" = "${GITHUB_SHA::7}" ] && [ "$CODIGO" = 200 ] && grep -q "<base href=\"$BASE\"" painel.html; then
+            echo "ok: painel no ar em $URL_PAINEL (versão ${GITHUB_SHA::7})" | tee -a registros/gestor.log
+          else
+            echo "FALHOU: painel em $URL_PAINEL respondeu $CODIGO, versão no ar '${VERSAO}' (GitHub Pages ligado?)" | tee -a registros/gestor.log
+          fi
       - name: Conferir as Edge Functions na nuvem
         if: env.PUBLICAR == 'true'
         continue-on-error: true

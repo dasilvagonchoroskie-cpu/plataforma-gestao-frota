@@ -169,8 +169,12 @@ jobs:
             echo "tentativa $i falhou; de novo em 30 s" | tee -a registros/banco-nuvem.log; sleep 30
           done
 
-      - name: Regras de login (senha forte, sessões)
+      - name: Regras de login (senha forte, sessões, e-mails)
         if: steps.segredos.outputs.acao == 'backup-e-aplicar'
+        env:
+          # Com o segredo PAINEL_TOKEN, o painel fica no repositório público painel-frota
+          # (a Esteira publica lá) e os links dos e-mails passam a abrir nele.
+          PAINEL_URL: ${{ secrets.PAINEL_TOKEN != '' && format('https://{0}.github.io/painel-frota/', github.repository_owner) || '' }}
         run: |
           set -o pipefail
           python3 ferramentas/seguranca/aplicar_auth.py supabase/auth-nuvem.json 2>&1 | tee -a registros/banco-nuvem.log

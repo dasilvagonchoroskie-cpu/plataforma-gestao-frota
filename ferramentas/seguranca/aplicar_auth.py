@@ -4,7 +4,7 @@
 Usa a Management API com SUPABASE_ACCESS_TOKEN (segredo do GitHub). Só mexe
 nos campos do arquivo e só imprime esses campos: a configuração completa tem
 segredos (por exemplo a senha do e-mail) e nunca aparece no registro.
-Uso: PROJETO=ref python3 ferramentas/seguranca/aplicar_auth.py supabase/auth-nuvem.json
+Uso: PROJETO=ref [PAINEL_URL=https://.../] python3 ferramentas/seguranca/aplicar_auth.py supabase/auth-nuvem.json
 """
 import json
 import os
@@ -29,6 +29,13 @@ def main(caminho: str) -> int:
     raiz = os.path.dirname(os.path.dirname(os.path.abspath(caminho)))
     for campo, arquivo in alvo.get("modelos", {}).items():
         alvo["config"][campo] = open(os.path.join(raiz, arquivo), encoding="utf-8").read()
+    # Painel em outro endereço (repositório público só do painel): os links dos
+    # e-mails passam a abrir lá; o endereço antigo continua aceito.
+    painel = os.environ.get("PAINEL_URL", "").strip()
+    if painel:
+        antigos = [u for u in alvo["config"].get("uri_allow_list", "").split(",") if u]
+        alvo["config"]["site_url"] = painel
+        alvo["config"]["uri_allow_list"] = ",".join([painel + "**"] + [u for u in antigos if u != painel + "**"])
     atual = chamar("GET")
     mudar = {k: v for k, v in alvo["config"].items() if atual.get(k) != v}
     for k in alvo["config"]:
