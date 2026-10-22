@@ -12,13 +12,20 @@ on:
     branches: [main]
     # Tudo menos ferramentas, documentos e textos; os scripts usados aqui entram.
     paths: ['**', '!ferramentas/**', 'ferramentas/backup/**', 'ferramentas/chaves/**',
-            'ferramentas/seguranca/**', 'ferramentas/diagnostico/**', '!docs/**', 'docs/legal/**', '!**.md']
+            'ferramentas/seguranca/**', 'ferramentas/diagnostico/**', 'ferramentas/legal/**',
+            '!docs/**', 'docs/legal/**', '!**.md']
   pull_request:
     branches: [main]
   workflow_dispatch: {}
 
 # Cada job pede só a permissão que usa.
 permissions: {}
+
+# Um envio novo cancela a execução anterior ainda rodando (a versão mais nova é
+# a que vale e nada velho é publicado por cima dela).
+concurrency:
+  group: esteira-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 env:
   FLUTTER_VERSION: '3.47.5'
@@ -97,6 +104,11 @@ jobs:
           flutter-version: ${{ env.FLUTTER_VERSION }}
           channel: stable
           cache: true
+      - name: Textos legais dos apps iguais aos de docs/legal (e versão igual à do banco)
+        run: |
+          python3 ferramentas/legal/gerar.py
+          git diff --exit-code -- packages/visual/lib/src/textos_legais.dart apps/gestor/web/termos.html apps/gestor/web/privacidade.html \
+            || { echo "::error::Rode python3 ferramentas/legal/gerar.py e envie os arquivos gerados."; exit 1; }
       - name: Análise e testes
         working-directory: packages/nucleo
         run: |
