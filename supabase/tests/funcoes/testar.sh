@@ -235,6 +235,10 @@ curl -s -X PUT "$A/auth/v1/user" -H "apikey: $K" -H "Authorization: Bearer $TR" 
 [ "$(token dono@teste.com donoNova2026)" != "null" ] && ok "o dono entra com a senha nova criada pelo link" || falha "senha nova do dono"
 igual "$(token dono@teste.com donosenha1)" "null" "a senha antiga do dono deixa de valer"
 igual "$(verificar_link recovery "$TH")" "" "o link só funciona uma vez"
+TDN=$(token dono@teste.com donoNova2026)
+R=$(curl -s -o /dev/null -w '%{http_code}' -X PUT "$A/auth/v1/user" -H "apikey: $K" -H "Authorization: Bearer $TDN" \
+  -H "Content-Type: application/json" -d '{"email":"invasor@teste.com"}')
+[ "$R" != "200" ] && ok "o dono não troca o próprio e-mail pelo app (só pela plataforma)" || falha "troca de e-mail do dono" "$R"
 
 # Motorista: cadastra um e-mail dele, confirma pelo link e recupera a senha pelo CPF
 R=$(funcao entrar_com_cpf "" '{"cpf":"11144477735","senha":"senha4567","aparelho":"email-1"}')

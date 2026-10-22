@@ -15,7 +15,7 @@
 begin;
 \ir apoio/fixtures.psql
 
-select plan(36);
+select plan(39);
 
 -- --------------------------------------------------- estrutura e permissões
 
@@ -248,6 +248,15 @@ select is((select email from public.perfis where id = pg_temp.fx('u_a')), 'motor
   'e-mail trocado no login (confirmado) vai para o perfil');
 select is((select email from public.motoristas where perfil_id = pg_temp.fx('u_a')), 'motorista.a.real@exemplo.com',
   'e para o cadastro de motorista');
+
+-- ------------------------------- troca de e-mail pelo próprio usuário: só motorista
+
+select throws_ok($q$update auth.users set email_change = 'novo.dono@exemplo.com' where id = pg_temp.fx('u_dono_x')$q$,
+  '42501', 'O e-mail de dono ou gestor só muda pela plataforma.', 'dono não pede troca do próprio e-mail');
+select throws_ok($q$update auth.users set email_change = 'novo.gestor@exemplo.com' where id = pg_temp.fx('u_gestor_x')$q$,
+  '42501', 'O e-mail de dono ou gestor só muda pela plataforma.', 'gestor não pede troca do próprio e-mail');
+select lives_ok($q$update auth.users set email_change = 'motorista.b.real@exemplo.com' where id = pg_temp.fx('u_b')$q$,
+  'motorista pede a troca para cadastrar o e-mail dele');
 
 select * from finish();
 rollback;
