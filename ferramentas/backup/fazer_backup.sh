@@ -8,7 +8,8 @@
 #
 # Gera backup-frota-AAAAMMDD-HHMMSS.tar.gz.gpg com:
 #   1-papeis.sql (papéis), 2-estrutura.sql (tabelas, funções, regras),
-#   3-dados.sql (dados do app, logins do Supabase Auth e agendamentos),
+#   3-dados.sql (dados do app, logins do Supabase Auth sem as sessões, e
+#   agendamentos),
 #   contagens.txt (linhas por tabela, para conferir a restauração) e
 #   conferencia.sha256. Nada fica aberto no disco: a pasta temporária é apagada.
 # Nunca imprime senha nem dado pessoal: só nomes de tabela e quantidades.
@@ -25,8 +26,13 @@ mkdir -p "$D"
 supabase db dump $ALVO --role-only -f "$D/1-papeis.sql"
 supabase db dump $ALVO -f "$D/2-estrutura.sql"
 # O dump de dados do Supabase já traz os logins (schema auth) e os
-# agendamentos (cron), sem as tabelas de controle de versão.
-supabase db dump $ALVO --data-only --use-copy -f "$D/3-dados.sql"
+# agendamentos (cron), sem as tabelas de controle de versão. Ficam de fora as
+# sessões e os códigos temporários do login (tokens de sessão, links e códigos
+# em andamento, registro de entradas): não devem ficar guardados num backup e,
+# depois de uma restauração, cada pessoa só entra de novo com a senha.
+TEMPORARIOS=(auth.sessions auth.refresh_tokens auth.mfa_amr_claims auth.flow_state
+  auth.one_time_tokens auth.audit_log_entries)
+supabase db dump $ALVO --data-only --use-copy "${TEMPORARIOS[@]/#/--exclude=}" -f "$D/3-dados.sql"
 
 # Linhas de cada tabela no backup (para conferir na restauração).
 python3 "$(dirname "$0")/contar_linhas.py" "$D/3-dados.sql" > "$D/contagens.txt"

@@ -37,7 +37,15 @@ echo "papéis aplicados ($(grep -c 'ERROR' "$TMP/papeis.txt" || true) avisos de 
 if ! psql "$DESTINO" -X -q --single-transaction -v ON_ERROR_STOP=1 -v VERBOSITY=sqlstate \
      -f "$D/2-estrutura.sql" -f "$D/3-dados.sql" > "$TMP/saida.txt" 2> "$TMP/erros.txt"; then
   echo "ERRO na restauração (nada foi gravado):"
-  grep -E "ERROR" "$TMP/erros.txt" | sed -E 's#^psql:[^:]*/([^/:]+):#\1:#' | head -5
+  grep -E "ERROR" "$TMP/erros.txt" | sed -E 's#^psql:[^:]*/([^/:]+):#\1:#' | head -5 | while IFS= read -r ERRO; do
+    echo "$ERRO"
+    # Qual comando falhou: só o começo (tabela ou sequência), nunca os dados.
+    PARTE=$(echo "$ERRO" | cut -d: -f1); LINHA=$(echo "$ERRO" | cut -d: -f2)
+    if [ -f "$D/$PARTE" ] && [[ "$LINHA" =~ ^[0-9]+$ ]]; then
+      awk -v n="$LINHA" 'NR <= n && /^(COPY |INSERT INTO |SELECT pg_catalog.setval\(|ALTER |CREATE |GRANT |SET |COMMENT )/ {u = $0} END {print u}' \
+        "$D/$PARTE" | sed -E 's/ \(.*$//; s/, [0-9].*$//' | cut -c1-120 | sed 's/^/  no comando: /'
+    fi
+  done
   exit 1
 fi
 echo "restauração aplicada (estrutura e dados)"
