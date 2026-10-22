@@ -70,7 +70,7 @@ class ServidorFalso implements Servidor {
   bool get precisaTrocarSenha => trocarSenha;
 
   /// E-mail do motorista: confirmado e esperando confirmação.
-  String? emailConfirmadoNaNuvem;
+  String? emailConfirmadoNaNuvem = 'motorista@teste.com';
   String? emailEsperandoNaNuvem;
   final emailsCadastrados = <String>[];
   final linksPedidos = <String>[];

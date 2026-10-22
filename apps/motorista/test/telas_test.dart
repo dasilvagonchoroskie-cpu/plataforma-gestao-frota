@@ -163,7 +163,7 @@ void main() {
     await tester.tap(find.text('Criar minha conta'));
     await tester.pumpAndSettle();
     expect(find.textContaining('Confira o CPF'), findsOneWidget);
-    expect(find.text('Confira o e-mail (ou deixe em branco).'), findsOneWidget);
+    expect(find.text('Digite o seu e-mail. É com ele que você recupera a senha.'), findsOneWidget);
     expect(s.cadastros, isEmpty);
 
     await tester.enterText(campos.at(1), '52998224725');
@@ -177,16 +177,8 @@ void main() {
     expect(find.text('Código de entrada'), findsOneWidget);
   });
 
-  testWidgets('criar conta sem e-mail também funciona', (tester) async {
-    final s = ServidorFalso()
-      ..sessao = false
-      ..situacaoFixa = {
-        'logado': true,
-        'perfil': {'id': 'u-novo', 'nome': 'Sem Email', 'papel': 'motorista', 'ativo': true},
-        'empresa': null,
-        'motorista': null,
-        'pedido': null,
-      };
+  testWidgets('criar conta exige o e-mail (para recuperar a senha sem o patrão)', (tester) async {
+    final s = ServidorFalso()..sessao = false;
     await abrir(tester, a: await celularNovo(), s: s);
     s.online = true;
     await tester.tap(find.text('Criar minha conta'));
@@ -197,9 +189,48 @@ void main() {
     await tester.enterText(campos.at(2), 'senha123');
     await tester.tap(find.text('Criar minha conta'));
     await tester.pumpAndSettle();
-    expect(s.cadastros, ['52998224725']);
-    expect(s.emailsCadastrados, isEmpty);
-    expect(find.text('Código de entrada'), findsOneWidget);
+    expect(s.cadastros, isEmpty);
+    expect(find.text('Digite o seu e-mail. É com ele que você recupera a senha.'), findsOneWidget);
+  });
+
+  testWidgets('conta antiga sem e-mail: pede o e-mail antes de continuar', (tester) async {
+    final s = servidorComCadastros()..emailConfirmadoNaNuvem = null;
+    await abrir(tester, s: s);
+    expect(find.text('Cadastre o seu e-mail'), findsOneWidget);
+    expect(find.text('Você tem para receber'), findsNothing);
+    s.online = true;
+    await tester.enterText(find.byType(TextField), 'Joao@Gmail.com');
+    await tester.tap(find.text('Mandar o link de confirmação'));
+    await tester.pumpAndSettle();
+    expect(s.emailsCadastrados, ['joao@gmail.com']);
+    expect(find.text('Você tem para receber'), findsOneWidget);
+    expect(find.text('Confirme o seu e-mail'), findsOneWidget, reason: 'o Resumo lembra de confirmar');
+  });
+
+  testWidgets('sem internet: o e-mail fica para depois', (tester) async {
+    final s = servidorComCadastros()..emailConfirmadoNaNuvem = null;
+    await abrir(tester, s: s);
+    await tester.enterText(find.byType(TextField), 'joao@gmail.com');
+    await tester.tap(find.text('Mandar o link de confirmação'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Fazer depois (sem internet agora)'));
+    await tester.pumpAndSettle();
+    expect(find.text('Você tem para receber'), findsOneWidget);
+  });
+
+  testWidgets('aviso no Resumo até confirmar: mandar o link de novo', (tester) async {
+    final s = servidorComCadastros()
+      ..emailConfirmadoNaNuvem = null
+      ..emailEsperandoNaNuvem = 'joao@gmail.com';
+    await abrir(tester, s: s);
+    expect(find.text('Confirme o seu e-mail'), findsOneWidget);
+    s.online = true;
+    await tester.tap(find.text('Mandar de novo'));
+    await tester.pumpAndSettle();
+    expect(s.emailsCadastrados, ['joao@gmail.com']);
+    await tester.tap(find.text('Já confirmei'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('Ainda não aparece confirmado'), findsOneWidget);
   });
 
   Future<ServidorFalso> abrirSemDados(WidgetTester tester, Map<String, Object?> situacao, {bool termos = true}) async {
@@ -287,7 +318,9 @@ void main() {
   });
 
   testWidgets('configurações: cadastrar o e-mail para recuperar a senha', (tester) async {
-    final s = servidorComCadastros();
+    final s = servidorComCadastros()
+      ..emailConfirmadoNaNuvem = null
+      ..emailEsperandoNaNuvem = 'antigo@gmail.com';
     await abrir(tester, s: s);
     s.online = true;
     await tester.tap(find.byTooltip('Configurações'));
@@ -296,6 +329,7 @@ void main() {
     await tester.tap(find.text('E-mail para recuperar a senha'));
     await tester.pumpAndSettle();
     expect(find.text('Nenhum e-mail confirmado ainda.'), findsOneWidget);
+    expect(find.text('Falta confirmar'), findsOneWidget);
     await tester.enterText(find.byType(TextField), 'joao@');
     await tester.tap(find.text('Mandar o link de confirmação'));
     await tester.pumpAndSettle();

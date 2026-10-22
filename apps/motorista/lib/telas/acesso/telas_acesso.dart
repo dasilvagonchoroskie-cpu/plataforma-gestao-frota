@@ -207,8 +207,8 @@ class _TelaEntrarState extends ConsumerState<TelaEntrar> {
 
 // ----------------------------------------------------------- criar conta
 
-/// Cadastro numa tela só: nome, CPF, senha e, se quiser, o e-mail para
-/// recuperar a senha. Os termos já foram aceitos na abertura do app.
+/// Cadastro numa tela só: nome, CPF, senha e o e-mail para recuperar a senha
+/// sozinho. Os termos já foram aceitos na abertura do app.
 class TelaCriarConta extends ConsumerStatefulWidget {
   const TelaCriarConta({super.key});
 
@@ -244,7 +244,7 @@ class _TelaCriarContaState extends ConsumerState<TelaCriarConta> {
       _erroNome = _nome.text.trim().length < 2 ? 'Escreva o seu nome.' : null;
       _erroCpf = cpfValido(_cpf.text) ? null : 'Confira o CPF: tem 11 números.';
       _erroSenha = senhaAceita(_senha.text) ? null : ajudaSenha;
-      _erroEmail = email.isEmpty || emailValido(email) ? null : 'Confira o e-mail (ou deixe em branco).';
+      _erroEmail = emailValido(email) ? null : 'Digite o seu e-mail. É com ele que você recupera a senha.';
     });
     if (_erroNome != null || _erroCpf != null || _erroSenha != null || _erroEmail != null) return;
     setState(() => _ocupado = true);
@@ -254,20 +254,18 @@ class _TelaCriarContaState extends ConsumerState<TelaCriarConta> {
       final cpf = soDigitos(_cpf.text);
       await s.cadastrarMotorista(_nome.text, cpf, _senha.text, aparelho, termos: versaoTermos);
       await s.entrarComCpf(cpf, _senha.text, aparelho);
-      String? recado;
-      if (email.isNotEmpty) {
-        try {
-          await s.cadastrarEmail(email);
-          recado = 'Conta criada. Mandamos um link para $email: abra o e-mail e toque em "Confirmar e-mail".';
-        } on ErroServidor catch (e) {
-          recado = 'Conta criada, mas o e-mail não foi cadastrado: ${e.mensagem} '
-              'Dá para cadastrar depois em Configurações.';
-        }
+      String recado;
+      try {
+        await s.cadastrarEmail(email);
+        recado = 'Conta criada. Mandamos um link para $email: abra o e-mail e toque em "Confirmar e-mail".';
+      } on ErroServidor catch (e) {
+        // A conta já existe: a tela seguinte pede o e-mail de novo.
+        recado = 'Conta criada, mas o e-mail não foi cadastrado: ${e.mensagem}';
       }
       await ref.read(acessoProvider.notifier).recarregar();
       if (!mounted) return;
       Navigator.of(context).popUntil((r) => r.isFirst);
-      if (recado != null) mostrarMensagem(context, recado);
+      mostrarMensagem(context, recado);
     } on ErroServidor catch (e) {
       setState(() => _erro = e.mensagem);
     } finally {
@@ -279,7 +277,8 @@ class _TelaCriarContaState extends ConsumerState<TelaCriarConta> {
   Widget build(BuildContext context) {
     return PaginaAcesso(
       titulo: 'Criar conta',
-      texto: 'O seu nome, o CPF e uma senha. Depois você digita o código da empresa que o seu patrão mandar.',
+      texto: 'O seu nome, o CPF, uma senha e o seu e-mail. Depois você digita o código da empresa que o seu '
+          'patrão mandar.',
       botao: 'Criar minha conta',
       aoTocar: _criar,
       ocupado: _ocupado,
@@ -301,7 +300,8 @@ class _TelaCriarContaState extends ConsumerState<TelaCriarConta> {
           rotulo: 'E-mail (para recuperar a senha)',
           tipo: TipoCampo.email,
           erro: _erroEmail,
-          ajuda: 'Se esquecer a senha, o link para criar outra chega neste e-mail. Pode deixar em branco.',
+          ajuda: 'Se esquecer a senha, o link para criar outra chega neste e-mail. Assim você não depende do '
+              'patrão.',
           acaoTeclado: TextInputAction.done,
         ),
         MensagemErro(_erro),
@@ -412,6 +412,158 @@ class TelaEsqueciSenha extends ConsumerWidget {
           child: const Text('Já tenho a senha provisória'),
         ),
       ],
+    );
+  }
+}
+
+/// Conta sem e-mail (criada antes do e-mail ser obrigatório): cadastra antes
+/// de continuar. Sem internet, dá para deixar para depois.
+class TelaCadastrarEmail extends ConsumerStatefulWidget {
+  const TelaCadastrarEmail({super.key});
+
+  @override
+  ConsumerState<TelaCadastrarEmail> createState() => _TelaCadastrarEmailState();
+}
+
+class _TelaCadastrarEmailState extends ConsumerState<TelaCadastrarEmail> {
+  final _email = TextEditingController();
+  String? _erro;
+  bool _semInternet = false;
+  bool _ocupado = false;
+
+  @override
+  void dispose() {
+    _email.dispose();
+    super.dispose();
+  }
+
+  Future<void> _enviar() async {
+    final email = _email.text.trim().toLowerCase();
+    if (!emailValido(email)) {
+      setState(() => _erro = 'Confira o e-mail.');
+      return;
+    }
+    setState(() {
+      _erro = null;
+      _ocupado = true;
+    });
+    try {
+      await ref.read(servidorProvider).cadastrarEmail(email);
+      if (!mounted) return;
+      mostrarMensagem(context, 'Mandamos um link para $email. Abra o e-mail e toque em "Confirmar e-mail".');
+      await ref.read(acessoProvider.notifier).recarregar();
+    } on ErroServidor catch (e) {
+      if (mounted) {
+        setState(() {
+          _erro = e.mensagem;
+          _semInternet = e.semInternet;
+        });
+      }
+    } finally {
+      if (mounted) setState(() => _ocupado = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return PaginaAcesso(
+      titulo: 'Cadastre o seu e-mail',
+      texto: 'Se um dia você esquecer a senha, o link para criar outra chega neste e-mail. Assim você não '
+          'depende do patrão. Mandamos um link para confirmar.',
+      botao: 'Mandar o link de confirmação',
+      aoTocar: _enviar,
+      ocupado: _ocupado,
+      voltar: false,
+      filhos: [
+        Campo(
+          controle: _email,
+          rotulo: 'Seu e-mail',
+          tipo: TipoCampo.email,
+          autofoco: true,
+          acaoTeclado: TextInputAction.done,
+        ),
+        MensagemErro(_erro),
+        if (_semInternet) ...[
+          const SizedBox(height: 12),
+          OutlinedButton(
+            onPressed: () => ref.read(acessoProvider.notifier).adiarEmail(),
+            child: const Text('Fazer depois (sem internet agora)'),
+          ),
+        ],
+        const SizedBox(height: 24),
+        TextButton.icon(
+          onPressed: () => ref.read(acessoProvider.notifier).sair(),
+          icon: const Icon(Icons.logout),
+          label: const Text('Sair desta conta'),
+        ),
+      ],
+    );
+  }
+}
+
+/// Lembrete no Resumo enquanto o e-mail não é confirmado pelo link.
+class AvisoConfirmarEmail extends ConsumerStatefulWidget {
+  const AvisoConfirmarEmail({super.key});
+
+  @override
+  ConsumerState<AvisoConfirmarEmail> createState() => _AvisoConfirmarEmailState();
+}
+
+class _AvisoConfirmarEmailState extends ConsumerState<AvisoConfirmarEmail> {
+  bool _ocupado = false;
+
+  Future<void> _fazer(Future<void> Function() acao, String sucesso) async {
+    setState(() => _ocupado = true);
+    try {
+      await acao();
+      if (mounted) mostrarMensagem(context, sucesso);
+    } on ErroServidor catch (e) {
+      if (mounted) mostrarMensagem(context, e.mensagem);
+    } finally {
+      if (mounted) setState(() => _ocupado = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final s = ref.read(servidorProvider);
+    final esperando = s.emailEsperando;
+    if (s.emailConfirmado != null || esperando == null) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 4, 20, 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Aviso(
+            icone: Icons.mark_email_unread_outlined,
+            titulo: 'Confirme o seu e-mail',
+            texto: 'Abra o e-mail que mandamos para $esperando e toque em "Confirmar e-mail". Sem isso, o link '
+                'de senha esquecida não chega.',
+          ),
+          Wrap(
+            alignment: WrapAlignment.end,
+            children: [
+              TextButton(
+                onPressed: _ocupado
+                    ? null
+                    : () => _fazer(() => s.cadastrarEmail(esperando), 'Mandamos o link de novo para $esperando.'),
+                child: const Text('Mandar de novo'),
+              ),
+              TextButton(
+                onPressed: _ocupado
+                    ? null
+                    : () => _fazer(() async {
+                          await s.atualizarConta();
+                          if (s.emailConfirmado == null) {
+                            throw const ErroServidor('Ainda não aparece confirmado. Toque no link do e-mail e tente de novo.');
+                          }
+                        }, 'E-mail confirmado.'),
+                child: const Text('Já confirmei'),
+              ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 }

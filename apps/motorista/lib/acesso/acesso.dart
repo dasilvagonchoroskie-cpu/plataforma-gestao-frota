@@ -20,6 +20,10 @@ enum Etapa {
   contaDeGestor,
   trocarSenha,
   termos,
+
+  /// Conta sem e-mail: cadastrar antes de continuar (para recuperar a senha
+  /// sozinho, sem depender do patrão).
+  cadastrarEmail,
   bloqueada,
   semInternet,
   pronto,
@@ -46,6 +50,13 @@ const chaveTermosAparelho = 'termos_local';
 
 class Acesso extends AsyncNotifier<EstadoAcesso> {
   Servidor get _s => ref.read(servidorProvider);
+
+  /// Sem internet na tela do e-mail: deixa para depois (até fechar o app).
+  bool _emailAdiado = false;
+
+  /// Logado e sem e-mail nenhum (nem confirmado, nem esperando confirmação).
+  bool get _precisaEmail =>
+      _s.temSessao && !_emailAdiado && _s.emailConfirmado == null && _s.emailEsperando == null;
 
   @override
   Future<EstadoAcesso> build() => _decidir();
@@ -84,7 +95,7 @@ class Acesso extends AsyncNotifier<EstadoAcesso> {
     if (pronto && !conferir) {
       final g = guardada ?? const <String, Object?>{};
       if (!_termosPendentes(g) && !_empresaBloqueada(g)) {
-        return const EstadoAcesso(Etapa.pronto);
+        return EstadoAcesso(_precisaEmail ? Etapa.cadastrarEmail : Etapa.pronto);
       }
     }
     if (!_s.temSessao) return EstadoAcesso(pronto ? Etapa.pronto : Etapa.boasVindas);
@@ -123,6 +134,7 @@ class Acesso extends AsyncNotifier<EstadoAcesso> {
     if (pronto) await a.gravarEstado('situacao', situacaoParaGuardar(s));
     if (_termosPendentes(s)) return const EstadoAcesso(Etapa.termos);
     if (_empresaBloqueada(s)) return _bloqueada(s);
+    if (_precisaEmail) return const EstadoAcesso(Etapa.cadastrarEmail);
 
     final motorista = _mapa(s['motorista']);
     if (motorista != null) {
@@ -177,6 +189,12 @@ class Acesso extends AsyncNotifier<EstadoAcesso> {
   Future<void> conferirEmSilencio() async {
     final novo = await AsyncValue.guard(() => _decidir(conferir: true));
     if (novo.hasValue && novo.value!.etapa != state.value?.etapa) state = novo;
+  }
+
+  /// Sem internet para cadastrar o e-mail agora: segue e pede de novo depois.
+  Future<void> adiarEmail() async {
+    _emailAdiado = true;
+    await recarregar();
   }
 
   /// Aceite dos termos na primeira abertura: fica guardado no celular e, com

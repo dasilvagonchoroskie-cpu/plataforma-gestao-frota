@@ -4,8 +4,11 @@ Desde 22/10/2026 quem esquece a senha recebe um **link no e-mail** (o código de
 
 - **Dono e gestor:** "Esqueci a senha" > digitam o e-mail > chega o link > o link abre o painel web, onde
   criam a senha nova. Depois disso, todas as sessões abertas em outros aparelhos são encerradas.
-- **Motorista:** cadastra um e-mail (no cadastro ou em Configurações > "E-mail para recuperar a senha") e
-  confirma pelo link. Depois, em "Esqueci a senha", digita o **CPF**: o link vai para o e-mail confirmado.
+- **Motorista:** o e-mail é **obrigatório** no cadastro (desde 22/10/2026, decisão do dono: o motorista não
+  pode depender do patrão para recuperar a senha). Contas antigas sem e-mail cadastram no próximo login,
+  antes de continuar (sem internet, dá para deixar para depois). Ele confirma pelo link; até confirmar, o
+  Resumo mostra um lembrete com "Mandar de novo". Também dá para trocar em Configurações > "E-mail para
+  recuperar a senha". Depois, em "Esqueci a senha", digita o **CPF**: o link vai para o e-mail confirmado.
   Sem e-mail confirmado, o patrão cria uma senha provisória no painel (Motoristas > o nome > Redefinir o
   acesso).
 - Quem pede a função `pedir_link_senha`: resposta e tempo iguais exista ou não a conta; até 3 pedidos por

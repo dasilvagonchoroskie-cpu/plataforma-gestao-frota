@@ -79,6 +79,8 @@ class Raiz extends ConsumerWidget {
               aceitar: () => ref.read(acessoProvider.notifier).aceitarTermos(versaoTermos),
               sair: () => ref.read(acessoProvider.notifier).sair(),
             );
+          case Etapa.cadastrarEmail:
+            return const TelaCadastrarEmail();
           case Etapa.bloqueada:
             return TelaAcessoEncerrado(empresaNome: a.empresaNome, motivo: a.mensagem);
           case Etapa.semInternet:

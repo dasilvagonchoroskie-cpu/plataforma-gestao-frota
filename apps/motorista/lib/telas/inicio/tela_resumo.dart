@@ -4,6 +4,7 @@ import 'package:nucleo/nucleo.dart';
 import 'package:visual/visual.dart';
 
 import '../../componentes/comuns.dart';
+import '../acesso/telas_acesso.dart';
 import '../configuracoes/tela_configuracoes.dart';
 import '../diesel/form_abastecimento.dart';
 import '../fretes/form_frete.dart';
@@ -96,6 +97,7 @@ class _TelaResumoState extends ConsumerState<TelaResumo> {
         children: [
           const TopoCaminhao(),
           const LinhaEnvio(),
+          const AvisoConfirmarEmail(),
           if (dados.info.suspensa)
             const Padding(
               padding: EdgeInsets.fromLTRB(20, 4, 20, 8),

@@ -162,6 +162,12 @@ Pedido do Evandro: cadastrar e cuidar das empresas pelo app, sem abrir o Supabas
   sem problemas; `flutter test --exclude-tags capturas` → 40 testes.
 - **anotado** — Verificação em duas etapas para a área Plataforma (melhoria futura, `docs/PASSAGEM.md`).
 
+## E-mail obrigatório para o motorista — 22/10/2026
+
+- **feito e testado** — Frota Motorista 0.4.0: e-mail obrigatório no cadastro, tela para cadastrar o e-mail
+  nas contas antigas (antes de continuar; adiável sem internet), lembrete no Resumo até confirmar ("Mandar
+  de novo" e "Já confirmei"). `flutter analyze` sem problemas; `flutter test --exclude-tags capturas` → 34.
+
 ## Fase 7 — acabamento e piloto
 
 - **em andamento** — SMTP próprio (Brevo, configuração no painel do Supabase pelo dono).
