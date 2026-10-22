@@ -44,10 +44,10 @@ jobs:
     permissions:
       contents: write   # guardar o registro no Release "registros"
     steps:
-      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: supabase/setup-cli@1dedf2c611547ede7232d26866dd3c56ab903bbb # v1.7.3
+      - uses: supabase/setup-cli@45a513f8c64c0bc8e0e3dfe572b5c95be85f6359 # v3.0.1
         with:
           version: ${{ env.SUPABASE_CLI_VERSION }}
       - name: Migrations que apagam dados têm aprovação do dono
@@ -103,7 +103,7 @@ jobs:
     permissions:
       contents: write   # guardar o registro
     steps:
-      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
@@ -140,10 +140,10 @@ jobs:
       assinatura: ${{ steps.apk.outputs.assinatura }}
       impressao: ${{ steps.apk.outputs.impressao }}
     steps:
-      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5.7.0
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
         with:
           distribution: temurin
           java-version: '17'
@@ -184,7 +184,7 @@ jobs:
           python3 ferramentas/seguranca/conferir_apk.py saida/Frota-Motorista.apk 2>&1 | tee -a registros/motorista.log
           ASSINADOR=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)/apksigner
           "$ASSINADOR" verify --print-certs saida/Frota-Motorista.apk | grep -E "SHA-256" | tee -a registros/motorista.log
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: apk-motorista
           path: saida/
@@ -206,7 +206,7 @@ jobs:
     outputs:
       assinatura: ${{ steps.apk.outputs.assinatura }}
     steps:
-      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       - name: Onde o painel web fica no ar
@@ -223,7 +223,7 @@ jobs:
             { echo "repo=$GITHUB_REPOSITORY"; echo "ramo=gh-pages"; echo "base=/$REPO/"; } >> "$GITHUB_OUTPUT"
             echo "url=https://$DONO.github.io/$REPO/" >> "$GITHUB_OUTPUT"
           fi
-      - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5.7.0
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
         with:
           distribution: temurin
           java-version: '17'
@@ -271,7 +271,7 @@ jobs:
           python3 ferramentas/seguranca/conferir_apk.py saida/Frota-Gestor.apk 2>&1 | tee -a registros/gestor.log
           ASSINADOR=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)/apksigner
           "$ASSINADOR" verify --print-certs saida/Frota-Gestor.apk | grep -E "SHA-256" | tee -a registros/gestor.log
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: apk-gestor
           path: saida/
@@ -364,7 +364,7 @@ jobs:
     permissions:
       contents: write   # guardar o resultado no Release "registros"
     steps:
-      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       - name: Liberar a aceleração do emulador (KVM)
@@ -373,7 +373,7 @@ jobs:
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
       - name: Baixar os APKs desta execução
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           pattern: apk-*
           path: apks
@@ -412,7 +412,7 @@ jobs:
           if [ "${{ needs.motorista.outputs.assinatura }}" != "oficial" ] || [ "${{ needs.gestor.outputs.assinatura }}" != "oficial" ]; then
             echo "::warning::APKs não publicados: falta o segredo CHAVE_MESTRA (veja docs/OPERACAO.md)."
           fi
-      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         if: needs.motorista.outputs.assinatura == 'oficial' && needs.gestor.outputs.assinatura == 'oficial'
         with:
           pattern: apk-*
