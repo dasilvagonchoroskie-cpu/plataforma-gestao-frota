@@ -1,6 +1,8 @@
 -- Contas, termos e controle da plataforma (parte 4 de 4): exclusão de dados e
 -- limpeza diária. Explicação completa na parte 2.
 --
+-- aprovado-por: Evandro em 22/10/2026 (Etapa 1 da segurança, com as três condições abaixo)
+--
 -- Aprovado pelo usuário em 22/10/2026 com três condições: (1) backup antes de
 -- ligar o pg_cron (o fluxo "Banco: backup e atualização" faz o backup antes de
 -- aplicar esta migration); (2) a limpeza diária começa em modo simulação, só

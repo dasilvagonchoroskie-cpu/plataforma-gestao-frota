@@ -20,7 +20,9 @@ else
   trap 'psql -q -X -d postgres -c "drop database if exists $BANCO" >/dev/null' EXIT
   ALVO="$BANCO"
   psql -q -X -v ON_ERROR_STOP=1 -d "$ALVO" -f "$RAIZ/supabase/tests/local/supabase_simulado.sql" >/dev/null
-  psql -q -X -d "$ALVO" -f "$PGTAP_SQL" >/dev/null 2>&1
+  # pgTAP no schema extensions, como no Supabase (o public fica só com o app).
+  psql -q -X -d postgres -c "alter database $BANCO set search_path = \"\$user\", public, extensions" >/dev/null
+  PGOPTIONS='-c search_path=extensions' psql -q -X -d "$ALVO" -f "$PGTAP_SQL" >/dev/null 2>&1
   for m in "$RAIZ"/supabase/migrations/*.sql; do
     echo "migration: $(basename "$m")"
     psql -q -X -v ON_ERROR_STOP=1 -d "$ALVO" -f "$m" >/dev/null
