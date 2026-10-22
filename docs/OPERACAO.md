@@ -81,6 +81,9 @@ New repository secret ("Novo segredo do repositório"). Criar dois:
    ("Preferências da conta") > Access Tokens ("Tokens de acesso") > Generate new token ("Gerar novo
    token"), nome `github-frota`, validade de 1 ano. Copie e cole direto no GitHub (não mande em chat).
    Com ele o fluxo entra no banco com um login temporário; a senha do banco não é usada.
+   Na tela "Gerar token": Acesso a recursos = Projeto (só o `plataforma-gestao-frota`); Permissões =
+   acesso total (fica limitado a este projeto). O token vence (ex.: 90 dias); quando vencer, o fluxo do
+   banco falha e o GitHub manda e-mail: gere outro igual e troque o segredo (Update ("Atualizar")).
 2. `CHAVE_MESTRA` — uma frase longa inventada na hora: **8 palavras ou mais, sem sentido entre si, com um
    número no meio** (pelo menos 24 caracteres; quanto mais longa, melhor). Escreva **à mão em papel** e
    guarde em casa, longe do celular. Sem ela nenhum backup abre e os APKs mudam de assinatura.
