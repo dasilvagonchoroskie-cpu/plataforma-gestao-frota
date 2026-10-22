@@ -270,6 +270,13 @@ jobs:
           conferir redefinir_acesso '{}' 401
           conferir criar_acesso_gestor '{}' 401
           conferir recuperar_acesso '{"identificador":"123","codigo":"x","senha_nova":"x"}' 400
+          # CORS: só o painel recebe liberação (site estranho não).
+          cors() { curl -s -o /dev/null -D - -X OPTIONS "$F/entrar_com_cpf" -H "$K" -H "Origin: $1" \
+            | tr -d '\r' | grep -i '^access-control-allow-origin:' | cut -d' ' -f2; }
+          [ -z "$(cors https://site-estranho.example)" ] && R=ok || R=FALHOU
+          echo "$R: CORS para site estranho: '$(cors https://site-estranho.example)' (esperado vazio)" | tee -a registros/gestor.log
+          [ "$(cors https://dasilvagonchoroskie-cpu.github.io)" = "https://dasilvagonchoroskie-cpu.github.io" ] && R=ok || R=FALHOU
+          echo "$R: CORS para o painel: '$(cors https://dasilvagonchoroskie-cpu.github.io)'" | tee -a registros/gestor.log
       - name: Guardar o registro
         if: always() && env.PUBLICAR == 'true'
         env:
