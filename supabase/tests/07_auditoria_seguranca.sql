@@ -8,13 +8,14 @@
 --     (SECURITY DEFINER) com search_path fixo;
 --   - objetos novos já nascem fechados (permissões padrão);
 --   - uma empresa nunca vê dados de outra e um motorista não vê os de outro;
---   - empresa suspensa não vê mais nada;
+--   - empresa bloqueada (acesso encerrado) não vê nem grava mais nada
+--     (empresa com status 'suspensa' lê e não envia: teste 02);
 --   - o registro das ações da plataforma (sem dado pessoal, só inclusão);
 --   - IP verdadeiro e regra de senha.
 begin;
 \ir apoio/fixtures.psql
 
-select plan(31);
+select plan(34);
 
 -- --------------------------------------------------- estrutura e permissões
 
@@ -172,7 +173,7 @@ end;
 $$;
 select is(pg_temp.anon_le(), '{}'::text[], 'sem login, toda tabela e visão responde "sem permissão"');
 
--- Empresa suspensa: ninguém dela vê mais nada (fora o próprio perfil e o próprio pedido de entrada).
+-- Empresa bloqueada: ninguém dela vê mais nada (fora o próprio perfil e o próprio pedido de entrada).
 select public.bloquear_empresa(pg_temp.fx('empresa_x'), 'Teste de suspensão', 30);
 create or replace function pg_temp.ve_algo(p_uid uuid) returns text[] language plpgsql as $$
 declare
@@ -190,9 +191,19 @@ begin
   return r;
 end;
 $$;
-select is(pg_temp.ve_algo(pg_temp.fx('u_dono_x')), '{}'::text[], 'empresa suspensa: o dono não vê mais nada');
-select is(pg_temp.ve_algo(pg_temp.fx('u_gestor_x')), '{}'::text[], 'empresa suspensa: o gestor não vê mais nada');
-select is(pg_temp.ve_algo(pg_temp.fx('u_a')), '{}'::text[], 'empresa suspensa: o motorista não vê mais nada');
+select is(pg_temp.ve_algo(pg_temp.fx('u_dono_x')), '{}'::text[], 'empresa bloqueada: o dono não vê mais nada');
+select is(pg_temp.ve_algo(pg_temp.fx('u_gestor_x')), '{}'::text[], 'empresa bloqueada: o gestor não vê mais nada');
+select is(pg_temp.ve_algo(pg_temp.fx('u_a')), '{}'::text[], 'empresa bloqueada: o motorista não vê mais nada');
+select isnt(pg_temp.erro_como(pg_temp.fx('u_gestor_x'), format($q$
+  insert into public.caminhoes (id, empresa_id, placa, modelo, confirmado)
+  values (gen_random_uuid(), %L, 'BLQ1A23', 'Teste', true) $q$, pg_temp.fx('empresa_x'))), 'ok',
+  'empresa bloqueada: o gestor não cadastra nada');
+select is((select count(*)::int from public.fretes where empresa_id = pg_temp.fx('empresa_x')
+  and id not in (pg_temp.fx('frete_a'), pg_temp.fx('frete_b'))), 0, 'antes do envio: só os fretes do teste');
+select pg_temp.erro_como(pg_temp.fx('u_a'), format('select public.sincronizar_lote(%L)',
+  jsonb_build_object('itens', jsonb_build_array(pg_temp.frete(gen_random_uuid(), pg_temp.fx('cam_x1'))))));
+select is((select count(*)::int from public.fretes where empresa_id = pg_temp.fx('empresa_x')
+  and id not in (pg_temp.fx('frete_a'), pg_temp.fx('frete_b'))), 0, 'empresa bloqueada: o envio do motorista não grava nada');
 
 -- ------------------------------------------- auditoria das ações da plataforma
 
