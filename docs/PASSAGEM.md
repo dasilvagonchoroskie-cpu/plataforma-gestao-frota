@@ -168,6 +168,17 @@ tudo), anotadas aqui:
 - **Registro das ações da plataforma** (`auditoria_plataforma`) por gatilho no banco: pega também o que o
   dono da plataforma fizer direto no SQL Editor. Só inclusão; sem dado pessoal.
 
+- **Transição dos termos:** a nuvem continua na versão 2026-10-17 até os segredos existirem (a migration
+  `termos_operador_pessoa_fisica` vai junto com as outras). O painel web já publicado traz o texto novo;
+  como o dono e o motorista de teste já aceitaram a versão 17/10, nada muda para eles até lá. Quando a
+  versão 22/10 entrar, todos aceitam de novo — com os APKs novos (os antigos não conseguem aceitar a versão
+  nova, então reinstalar é obrigatório nessa hora).
+- **Etiquetas antigas dos Releases:** esta sessão não pode mexer em etiquetas do GitHub; a Esteira move as
+  quatro etiquetas para a versão publicada assim que publicar o primeiro APK oficial.
+- **Proteções do GitHub** (varredura de segredos do GitHub, bloqueio no envio, alertas do Dependabot e relato
+  privado de vulnerabilidade): esta sessão não pode mudar configurações do repositório; ficam para o dono
+  ligar em Settings > Code security (passo a passo no PROJETO).
+
 ### Pendências de segurança (dependem do usuário)
 
 1. **Criar os dois segredos no GitHub** (`SUPABASE_ACCESS_TOKEN` e `CHAVE_MESTRA`) — passo a passo em

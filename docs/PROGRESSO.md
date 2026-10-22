@@ -92,12 +92,39 @@ abaixo rodou e passou; o resto está marcado como não testado.
   `flutter build web` compilou (com termos.html e privacidade.html).
 - **feito** — Na nuvem: partes 1 a 3 da atualização (estrutura, funções, controle da plataforma), hash
   conferido com os arquivos; Edge Functions `recuperar_acesso` (nova) e `cadastrar_motorista` (grava o aceite).
-- **não feito** — Parte 4 na nuvem (`20261017213600_contas_termos_exclusao.sql`: funções de exclusão e
-  limpeza diária). A ferramenta do Supabase exige a confirmação do dono da conta para funções que apagam
-  dados, e o pedido de confirmação não aparece no app do usuário. Até aplicar, "Excluir" nos apps
-  responde com erro. Ver PASSAGEM.
+- **aprovado, falta o segredo** — Parte 4 na nuvem (`20261017213600_contas_termos_exclusao.sql`): aprovada
+  pelo Evandro em 22/10/2026 com condições; aplicada sozinha pelo fluxo do banco quando os segredos do
+  GitHub existirem (ver "Segurança", abaixo).
+
+## Segurança "nível empresa" (22/10/2026)
+
+Relatório completo (achado, gravidade, correção): `docs/SEGURANCA.md`.
+
+- **feito e testado** — Banco: permissões padrão fechadas para `anon`/PUBLIC, IP verdadeiro, regra de
+  senha (8–72, letras e números), registro das ações da plataforma (`auditoria_plataforma`, só inclusão),
+  teste 07 de auditoria geral (RLS em tudo, nada para `anon`, nenhuma função para PUBLIC, isolamento entre
+  empresas e motoristas em todas as tabelas, empresa suspensa sem acesso).
+  Local: `PGTAP_SQL=... supabase/tests/local/rodar.sh` → `total de verificações que passaram: 271`.
+  Esteira (Supabase local, Postgres 17): 271 pgTAP e `verificações: 62, falhas: 0` nas Edge Functions.
+- **feito e testado** — Backup criptografado + restauração num Supabase vazio na Esteira:
+  `tabelas conferidas: 52, diferenças: 0`. Fluxo diário na nuvem pronto (`banco-nuvem.yml`).
+- **feito e publicado na nuvem** — Edge Functions novas (login interno sorteado, IP verdadeiro, senha
+  forte, CORS só do painel, limite de 16 KB, erro técnico escondido). Códigos de entrada de todas as
+  empresas trocados (migration `rotacionar_codigos_empresa`).
+- **feito e testado** — Apps: regra de senha nova, CPF e e-mail fora do celular, sem backup do Android,
+  tráfego só HTTPS, R8 ligado e Dart ofuscado, assinatura derivada da `CHAVE_MESTRA`.
+  Motorista: `flutter analyze` sem problemas, `flutter test --exclude-tags capturas` → 28 testes.
+  Gestor: `flutter analyze` sem problemas, 27 testes. Núcleo: `dart test` → 39 testes.
+  APKs: `conferir_apk.py` → `segredos achados: 0`.
+- **feito** — Esteira com ações fixadas por SHA, permissão mínima por job, gitleaks em todo envio (histórico
+  limpo: `no leaks found`), conferência de aprovação de migrations, Dependabot; histórico reescrito sem a
+  chave de teste e sem o código antigo; textos legais com o operador pessoa física (versão 22/10/2026);
+  `docs/INCIDENTES.md`, `docs/EMAIL.md`, `docs/REPOSITORIO-PRIVADO.md`, `SECURITY.md`.
+- **depende do usuário** — Criar os segredos `SUPABASE_ACCESS_TOKEN` e `CHAVE_MESTRA` e ligar as proteções
+  do GitHub (Settings > Code security). Até lá: sem backup automático, parte 4 e migrations novas não vão
+  para a nuvem, APKs novos não são publicados.
 
 ## Fase 7 — acabamento e piloto
 
-- **não feito** — SMTP próprio, Sentry, chave de assinatura definitiva, teste fechado no Google Play,
-  hospedagem do painel quando o repositório voltar a ser privado, piloto com uma empresa real.
+- **não feito** — SMTP próprio, Sentry, teste fechado no Google Play, hospedagem do painel quando o
+  repositório voltar a ser privado, piloto com uma empresa real.

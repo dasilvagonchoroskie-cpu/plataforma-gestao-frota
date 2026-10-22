@@ -89,6 +89,11 @@ New repository secret ("Novo segredo do repositório"). Criar dois:
 
 Quando o cofre de senhas existir (projeto futuro), a frase vai para lá também.
 
+Depois, ainda em Settings ("Configurações") > Code security ("Segurança do código"), ligar (botão
+Enable ("Ativar")): Dependabot alerts ("Alertas do Dependabot"), Dependabot security updates
+("Atualizações de segurança do Dependabot"), Secret Protection ("Proteção de segredos") com Push
+protection ("Bloqueio no envio") e Private vulnerability reporting ("Relato privado de vulnerabilidade").
+
 ## Atualizações do banco da nuvem (automático)
 
 Depois de cada Esteira verde no ramo `main`, o fluxo "Banco - backup diário e atualização na nuvem"
