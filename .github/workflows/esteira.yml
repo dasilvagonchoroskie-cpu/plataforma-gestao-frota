@@ -270,6 +270,12 @@ jobs:
           conferir redefinir_acesso '{}' 401
           conferir criar_acesso_gestor '{}' 401
           conferir recuperar_acesso '{"identificador":"123","codigo":"x","senha_nova":"x"}' 400
+          # Versão nova no ar: senha sem número é recusada antes de gravar qualquer coisa,
+          # e pedido grande demais é recusado.
+          conferir cadastrar_motorista '{"nome":"Teste","cpf":"52998224725","senha":"semnumero","aparelho":"esteira"}' 400
+          grep -q '"senha_fraca"' resposta.json && echo "ok: regra de senha nova no ar" | tee -a registros/gestor.log \
+            || echo "FALHOU: regra de senha nova não está no ar" | tee -a registros/gestor.log
+          conferir entrar_com_cpf "{\"cpf\":\"$(printf 'x%.0s' $(seq 1 20000))\"}" 413
           # CORS: só o painel recebe liberação (site estranho não).
           cors() { curl -s -o /dev/null -D - -X OPTIONS "$F/entrar_com_cpf" -H "$K" -H "Origin: $1" \
             | tr -d '\r' | grep -i '^access-control-allow-origin:' | cut -d' ' -f2; }
