@@ -25,9 +25,11 @@ supabase db dump $ALVO -f "$D/2-estrutura.sql"
 supabase db dump $ALVO --data-only --use-copy -f "$D/3-dados.sql"
 supabase db dump $ALVO --data-only --use-copy --schema auth -x auth.schema_migrations -f "$D/4-logins.sql"
 
-# Linhas de cada tabela no backup (blocos COPY ... FROM stdin; até "\.").
-awk '/^COPY /{t=$2; n=0; next} /^\\\.$/{if (t != "") print t, n; t=""; next} t != ""{n++}' \
-  "$D/3-dados.sql" "$D/4-logins.sql" > "$D/contagens.txt"
+# Linhas de cada tabela no backup (para conferir na restauração).
+python3 "$(dirname "$0")/contar_linhas.py" "$D/3-dados.sql" "$D/4-logins.sql" > "$D/contagens.txt"
+for f in "$D"/*.sql; do
+  echo "$(basename "$f"): $(wc -l < "$f") linhas, $(grep -c '^COPY ' "$f" || true) COPY, $(grep -c '^INSERT ' "$f" || true) INSERT"
+done
 (cd "$D" && sha256sum ./*.sql contagens.txt > conferencia.sha256)
 
 tar -C "$TMP" -czf "$TMP/backup-$DATA.tar.gz" "backup-$DATA"
@@ -42,4 +44,4 @@ cmp -s "$TMP/conferir.tar.gz" "$TMP/backup-$DATA.tar.gz" || { echo "ERRO: o back
 
 echo "backup criptografado: $(basename "$ARQ") ($(du -h "$ARQ" | cut -f1))"
 echo "linhas por tabela:"
-cat "$D/contagens.txt"
+[ -s "$D/contagens.txt" ] && cat "$D/contagens.txt" || echo "(nenhuma linha encontrada)"
