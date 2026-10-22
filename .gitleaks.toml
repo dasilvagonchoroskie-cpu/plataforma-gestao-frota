@@ -28,3 +28,14 @@ regexes = ['''sb_publishable_[A-Za-z0-9_-]{20,}''']
 [[allowlists]]
 description = "Arquivos gerados na máquina (não vão para o repositório)"
 paths = ['''(^|/)build/''', '''(^|/)\.dart_tool/''']
+
+[[allowlists]]
+description = "Senhas de teste antigas já tiradas do histórico (trocadas por REMOVIDO em 22/10/2026)"
+regexTarget = "match"
+regexes = ['''Password = "REMOVIDO"''']
+
+[[allowlists]]
+description = "Resumo SHA-256 da versão fixa do gitleaks (não é segredo)"
+condition = "AND"
+paths = ['''^\.github/workflows/seguranca\.yml$''']
+regexes = ['''[0-9a-f]{64}''']
