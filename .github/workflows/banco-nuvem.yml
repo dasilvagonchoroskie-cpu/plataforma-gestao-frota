@@ -1,0 +1,89 @@
+name: Banco - backup e atualização na nuvem
+
+# Só roda quando o dono aperta "Run workflow" ("Executar fluxo de trabalho")
+# no GitHub, pelo celular ou pelo computador.
+#   so-backup:        faz o backup criptografado do banco da nuvem.
+#   backup-e-aplicar: faz o backup e, se ele der certo, aplica as migrations
+#                     pendentes (exige digitar APLICAR na confirmação).
+# O backup fica guardado nesta execução por 90 dias (fora do Supabase),
+# criptografado com a senha BACKUP_SENHA. Segredos ficam só em
+# Settings > Secrets and variables > Actions, nunca no código:
+#   SUPABASE_ACCESS_TOKEN, SUPABASE_DB_PASSWORD, BACKUP_SENHA.
+on:
+  workflow_dispatch:
+    inputs:
+      acao:
+        description: 'O que fazer'
+        type: choice
+        options: [so-backup, backup-e-aplicar]
+        default: so-backup
+      confirmacao:
+        description: 'Para aplicar no banco, digite APLICAR'
+        required: false
+        default: ''
+
+permissions:
+  contents: read
+
+concurrency:
+  group: banco-nuvem
+  cancel-in-progress: false
+
+jobs:
+  banco:
+    name: Backup e atualização do banco da nuvem
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      PROJETO: uinvhwhqhudniipobslu
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+      BACKUP_SENHA: ${{ secrets.BACKUP_SENHA }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Conferir os segredos e a confirmação
+        env:
+          ACAO: ${{ inputs.acao }}
+          CONFIRMACAO: ${{ inputs.confirmacao }}
+        run: |
+          for s in SUPABASE_ACCESS_TOKEN SUPABASE_DB_PASSWORD BACKUP_SENHA; do
+            if [ -z "${!s}" ]; then
+              echo "::error::Falta o segredo $s (Settings > Secrets and variables > Actions)."; exit 1
+            fi
+          done
+          if [ ${#BACKUP_SENHA} -lt 16 ]; then
+            echo "::error::A senha do backup (BACKUP_SENHA) precisa ter pelo menos 16 caracteres."; exit 1
+          fi
+          if [ "$ACAO" = "backup-e-aplicar" ] && [ "$CONFIRMACAO" != "APLICAR" ]; then
+            echo "::error::Para aplicar no banco, digite APLICAR no campo de confirmação."; exit 1
+          fi
+
+      - name: Ligar ao projeto do Supabase
+        run: supabase link --project-ref "$PROJETO" -p "$SUPABASE_DB_PASSWORD"
+
+      - name: Backup criptografado
+        run: bash ferramentas/backup/fazer_backup.sh backup-nuvem
+
+      - name: Guardar o backup (90 dias)
+        uses: actions/upload-artifact@v4
+        with:
+          name: backup-frota-${{ github.run_number }}
+          path: backup-nuvem/*.gpg
+          retention-days: 90
+          if-no-files-found: error
+
+      - name: Migrations pendentes
+        if: inputs.acao == 'backup-e-aplicar'
+        run: supabase db push --linked --dry-run
+
+      - name: Aplicar as migrations pendentes
+        if: inputs.acao == 'backup-e-aplicar'
+        run: supabase db push --linked --yes
+
+      - name: Histórico de migrations na nuvem
+        if: inputs.acao == 'backup-e-aplicar'
+        run: supabase migration list --linked

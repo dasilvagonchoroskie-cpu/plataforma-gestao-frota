@@ -3,7 +3,7 @@
 begin;
 \ir apoio/fixtures.psql
 
-select plan(66);
+select plan(82);
 
 -- Dois motoristas novos, ainda sem empresa.
 insert into fx values
@@ -161,10 +161,21 @@ select is(pg_temp.mensagem_como(pg_temp.fx('u_dono_y'), format('select public.ex
   'Motorista não encontrado.', 'outra empresa não exclui motorista que não é dela');
 select is(pg_temp.erro_como(pg_temp.fx('u_a'), format('select public.excluir_motorista(%L)', pg_temp.fx('mot_a'))), '42501',
   'motorista não exclui ninguém');
+select is((select count(*)::int from public.registro_exclusoes
+  where empresa_id = pg_temp.fx('empresa_x') and tipo = 'motorista' and pedido_por = 'gestor'), 1,
+  'a exclusão do motorista deixa um registro: empresa, data e quem pediu (gestor)');
+select is((select array_agg(column_name::text order by column_name::text) from information_schema.columns
+  where table_schema = 'public' and table_name = 'registro_exclusoes'),
+  array['empresa_id', 'id', 'pedido_por', 'quando', 'tipo'], 'o registro não tem nome, CPF, e-mail nem id de pessoa');
+select is(pg_temp.erro_como(pg_temp.fx('u_gestor_x'), 'select count(*) from public.registro_exclusoes'), '42501',
+  'o registro de exclusões não é lido pelos apps');
 
 select is(pg_temp.como(pg_temp.fx('u_b'), $q$select public.excluir_minha_conta()$q$) ->> 'apagada', 'true',
   'sem empresa, a conta do motorista some na hora');
 select is((select count(*)::int from auth.users where id = pg_temp.fx('u_b')), 0, 'inclusive o login');
+select is((select count(*)::int from public.registro_exclusoes
+  where empresa_id is null and tipo = 'conta_motorista' and pedido_por = 'motorista'), 1,
+  'a exclusão da própria conta também deixa registro');
 
 select is(pg_temp.como(pg_temp.fx('u_a'), $q$select public.excluir_minha_conta()$q$) ->> 'apagada', 'false',
   'ligado a uma empresa, o pedido de exclusão fica registrado');
@@ -174,11 +185,25 @@ select is(pg_temp.como(pg_temp.fx('u_gestor_x'), format(
   'select to_jsonb(exclusao_pedida_em is not null) from public.perfis where id = %L', pg_temp.fx('u_a')))::text, 'true',
   'o gestor vê o pedido de exclusão');
 update public.perfis set exclusao_pedida_em = now() - interval '16 days' where id = pg_temp.fx('u_a');
+select is((select valor from public.configuracao_plataforma where chave = 'limpeza_modo'), 'simulacao',
+  'a limpeza diária começa em modo simulação');
+select is(public.limpeza_diaria() -> 'motoristas' -> 0 ->> 'motorista_id', pg_temp.fx('mot_a')::text,
+  'em simulação, a limpeza lista o motorista que apagaria');
+select is((select count(*)::int from public.perfis where id = pg_temp.fx('u_a'))
+  + (select count(*)::int from public.fretes where id = pg_temp.fx('frete_a')), 2, 'e não apaga nada');
+select is((select modo || ':' || (resultado -> 'motoristas' -> 0 ->> 'motorista_id') from public.limpeza_execucoes
+  order by id desc limit 1), 'simulacao:' || pg_temp.fx('mot_a'), 'a lista fica guardada para conferir');
+select is(pg_temp.erro_como(pg_temp.fx('u_dono_x'), $q$select public.definir_modo_limpeza('valendo')$q$), '42501',
+  'só a plataforma confirma a limpeza de verdade');
+select public.definir_modo_limpeza('valendo');
 select public.limpeza_diaria();
 select is((select count(*)::int from public.perfis where id = pg_temp.fx('u_a'))
   + (select count(*)::int from auth.users where id = pg_temp.fx('u_a'))
   + (select count(*)::int from public.fretes where id = pg_temp.fx('frete_a')), 0,
   'depois de 15 dias, tudo do motorista é apagado sozinho');
+select is((select count(*)::int from public.registro_exclusoes
+  where empresa_id = pg_temp.fx('empresa_x') and tipo = 'motorista' and pedido_por = 'limpeza_diaria'), 1,
+  'a limpeza deixa o registro de cada exclusão');
 
 select is(pg_temp.erro_como(pg_temp.fx('u_gestor_x'), $q$select public.excluir_minha_empresa('Transportes X')$q$), '42501',
   'gestor não exclui a empresa');
@@ -197,15 +222,29 @@ select is((select count(*)::int from public.perfis where empresa_id = pg_temp.fx
   'donos, gestores, motoristas, logins, caminhões e auditoria são apagados');
 select is((select count(*)::int from public.registros_acesso where perfil_id = pg_temp.fx('u_gestor_x')), 1,
   'os registros de acesso ficam (obrigação legal de 6 meses)');
+select is((select count(*)::int from public.registro_exclusoes
+  where empresa_id = pg_temp.fx('empresa_x') and tipo = 'empresa' and pedido_por = 'dono'), 1,
+  'a exclusão da empresa pelo dono deixa registro');
+select is((select count(*)::int from public.registro_exclusoes where empresa_id = pg_temp.fx('empresa_x')), 4,
+  'e os registros anteriores da empresa continuam depois da exclusão');
 select is((pg_temp.como(pg_temp.fx('u_dono_y'), $q$select to_jsonb(count(*)) from public.fretes$q$))::int, 1,
   'a outra empresa não perde nada');
 
 select public.bloquear_empresa(pg_temp.fx('empresa_y'), null, 0);
+select is(public.limpeza_diaria('simulacao') -> 'empresas' ->> 0, pg_temp.fx('empresa_y')::text,
+  'em simulação, lista a empresa com prazo vencido');
+select is((select count(*)::int from public.fretes where empresa_id = pg_temp.fx('empresa_y')), 1,
+  'sem apagar os dados dela');
 select public.limpeza_diaria();
 select ok((select excluida_em is not null from public.empresas where id = pg_temp.fx('empresa_y')),
   'prazo vencido: a limpeza diária apaga a empresa sozinha');
 select is((select count(*)::int from public.fretes where empresa_id = pg_temp.fx('empresa_y')), 0, 'com todos os dados');
+select is((select count(*)::int from public.registro_exclusoes
+  where empresa_id = pg_temp.fx('empresa_y') and tipo = 'empresa' and pedido_por = 'limpeza_diaria'), 1,
+  'e deixa o registro da exclusão');
 select is(pg_temp.erro_como(pg_temp.fx('u_e'), $q$select public.limpeza_diaria()$q$), '42501', 'o app não chama a limpeza');
+select is(pg_temp.erro_como(pg_temp.fx('u_e'), 'select count(*) from public.limpeza_execucoes'), '42501',
+  'nem lê o resultado da limpeza');
 
 select * from finish();
 rollback;

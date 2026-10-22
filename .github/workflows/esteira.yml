@@ -40,6 +40,15 @@ jobs:
         run: |
           set -o pipefail
           bash supabase/tests/funcoes/testar.sh 2>&1 | tee -a registros/banco.log
+      - name: Testar o backup criptografado (banco local) e o agendamento da limpeza
+        run: |
+          set -o pipefail
+          export BACKUP_SENHA="$(openssl rand -hex 24)"
+          ALVO=--local bash ferramentas/backup/fazer_backup.sh /tmp/backup-teste 2>&1 | tee -a registros/banco.log
+          psql postgresql://postgres:postgres@127.0.0.1:54322/postgres -tA \
+            -c "select 'pg_cron: ' || coalesce(string_agg(jobname || ' ' || schedule, ', '), 'nenhum') from cron.job" \
+            -c "select 'limpeza_modo: ' || valor from public.configuracao_plataforma where chave = 'limpeza_modo'" \
+            2>&1 | tee -a registros/banco.log
       - name: Guardar o registro
         if: always()
         env:

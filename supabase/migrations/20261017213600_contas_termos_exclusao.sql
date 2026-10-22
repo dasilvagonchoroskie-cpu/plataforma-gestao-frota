@@ -1,5 +1,60 @@
 -- Contas, termos e controle da plataforma (parte 4 de 4): exclusão de dados e
 -- limpeza diária. Explicação completa na parte 2.
+--
+-- Aprovado pelo usuário em 22/10/2026 com três condições: (1) backup antes de
+-- ligar o pg_cron (o fluxo "Banco: backup e atualização" faz o backup antes de
+-- aplicar esta migration); (2) a limpeza diária começa em modo simulação, só
+-- anotando o que apagaria, até ele confirmar (definir_modo_limpeza); (3) cada
+-- exclusão deixa um registro mínimo, sem dado pessoal (registro_exclusoes).
+
+-- ------------------------------------------------- registros e configuração
+
+-- Registro mínimo de cada exclusão: qual empresa, o que foi excluído, quem
+-- pediu (só o papel) e quando. Sem nome, CPF, e-mail ou id de pessoa. Fica
+-- guardado mesmo depois de a empresa ser excluída.
+create table if not exists public.registro_exclusoes (
+  id bigint generated always as identity primary key,
+  empresa_id uuid,
+  tipo text not null check (tipo in ('empresa', 'motorista', 'conta_motorista')),
+  pedido_por text not null check (pedido_por in ('dono', 'gestor', 'motorista', 'plataforma', 'limpeza_diaria')),
+  quando timestamptz not null default pg_catalog.now()
+);
+create index if not exists registro_exclusoes_empresa_idx on public.registro_exclusoes (empresa_id, quando);
+
+-- Configurações da plataforma (só o servidor). limpeza_modo: 'simulacao' (a
+-- limpeza diária só anota o que apagaria) ou 'valendo'.
+create table if not exists public.configuracao_plataforma (
+  chave text primary key,
+  valor text not null,
+  atualizado_em timestamptz not null default pg_catalog.now()
+);
+insert into public.configuracao_plataforma (chave, valor) values ('limpeza_modo', 'simulacao')
+on conflict (chave) do nothing;
+
+-- Resultado de cada limpeza: modo, quantidades e ids (sem dado pessoal).
+create table if not exists public.limpeza_execucoes (
+  id bigint generated always as identity primary key,
+  quando timestamptz not null default pg_catalog.now(),
+  modo text not null check (modo in ('simulacao', 'valendo')),
+  resultado jsonb not null
+);
+
+alter table public.registro_exclusoes enable row level security;
+alter table public.configuracao_plataforma enable row level security;
+alter table public.limpeza_execucoes enable row level security;
+revoke all on table public.registro_exclusoes, public.configuracao_plataforma, public.limpeza_execucoes
+  from public, anon, authenticated;
+
+-- Papel de quem está chamando (dono, gestor ou motorista), para o registro.
+create or replace function public.papel_do_usuario()
+returns text
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select p.papel from public.perfis p where p.id = (select auth.uid())
+$$;
 
 -- ------------------------------------------------------ exclusão de dados
 
@@ -153,6 +208,8 @@ begin
   insert into public.auditoria (empresa_id, autor_id, acao, tabela, registro_id, depois)
   values (m.empresa_id, auth.uid(), 'excluir_motorista', 'motoristas', m.id,
           pg_catalog.jsonb_build_object('conta_apagada', coalesce(v_apagar_conta, false)));
+  insert into public.registro_exclusoes (empresa_id, tipo, pedido_por)
+  values (m.empresa_id, 'motorista', coalesce(public.papel_do_usuario(), 'gestor'));
   return pg_catalog.jsonb_build_object('ok', true, 'conta_apagada', coalesce(v_apagar_conta, false));
 end;
 $$;
@@ -180,6 +237,8 @@ begin
       'nao_motorista');
   end if;
   select m.id into v_motorista from public.motoristas m where m.perfil_id = v_uid;
+  insert into public.registro_exclusoes (empresa_id, tipo, pedido_por)
+  values (v_perfil.empresa_id, 'conta_motorista', 'motorista');
   if v_motorista is null then
     perform public.expurgar_perfil(v_uid);
     return pg_catalog.jsonb_build_object('ok', true, 'apagada', true);
@@ -221,63 +280,127 @@ begin
     perform public.erro('Para confirmar, digite o nome da empresa igual aparece na tela.', 'confirmacao');
   end if;
   perform public.expurgar_empresa(v_empresa.id, 'Excluída pelo dono');
+  insert into public.registro_exclusoes (empresa_id, tipo, pedido_por) values (v_empresa.id, 'empresa', 'dono');
   return pg_catalog.jsonb_build_object('ok', true);
 end;
 $$;
 
--- Roda uma vez por dia (pg_cron): apaga empresas cujo prazo acabou, contas de
--- motoristas que pediram exclusão há mais de 15 dias, registros de acesso com
--- mais de 6 meses, tentativas de login antigas e códigos vencidos.
-create or replace function public.limpeza_diaria()
+-- A plataforma exclui uma empresa (refeita aqui para deixar o registro).
+create or replace function public.excluir_empresa_plataforma(p_empresa uuid)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  if not exists (select 1 from public.empresas e where e.id = p_empresa and e.excluida_em is null) then
+    perform public.erro('Empresa não encontrada.', 'empresa_inexistente');
+  end if;
+  perform public.expurgar_empresa(p_empresa, 'Excluída pela plataforma');
+  insert into public.registro_exclusoes (empresa_id, tipo, pedido_por) values (p_empresa, 'empresa', 'plataforma');
+  return pg_catalog.jsonb_build_object('ok', true);
+end;
+$$;
+
+-- Roda uma vez por dia (pg_cron). Primeiro calcula o que está vencido:
+-- empresas cujo prazo acabou, motoristas e contas que pediram exclusão há mais
+-- de 15 dias, registros de acesso com mais de 6 meses, tentativas de login com
+-- mais de 30 dias e códigos de entrada usados ou vencidos há mais de 90 dias.
+-- No modo 'simulacao' (o padrão até o dono da plataforma confirmar) só anota a
+-- lista em limpeza_execucoes; no modo 'valendo' apaga e deixa o registro.
+create or replace function public.limpeza_diaria(p_modo text default null)
 returns jsonb
 language plpgsql
 security definer
 set search_path = ''
 as $$
 declare
+  v_modo text := coalesce(p_modo,
+    (select c.valor from public.configuracao_plataforma c where c.chave = 'limpeza_modo'), 'simulacao');
+  v_empresas uuid[];
+  v_motoristas jsonb;
+  v_contas uuid[];
+  v_resultado jsonb;
   v_id uuid;
-  v_empresas integer := 0;
-  v_motoristas integer := 0;
-  v_contas integer := 0;
-  v_registros integer;
+  v_item jsonb;
 begin
-  for v_id in
-    select e.id from public.empresas e
-    where e.excluida_em is null and e.apagado_em is null
-      and (e.excluir_em <= pg_catalog.now()
-           or (e.excluir_em is null and e.bloqueada_em is null
-               and e.acesso_ate + interval '30 days' <= pg_catalog.now()))
-  loop
-    perform public.expurgar_empresa(v_id, 'Excluída automaticamente depois do fim do acesso');
-    v_empresas := v_empresas + 1;
-  end loop;
+  if v_modo not in ('simulacao', 'valendo') then
+    perform public.erro('Modo da limpeza inválido.', 'modo_invalido');
+  end if;
 
-  for v_id in
-    select m.id from public.motoristas m join public.perfis p on p.id = m.perfil_id
-    where p.exclusao_pedida_em <= pg_catalog.now() - interval '15 days'
-  loop
-    perform public.expurgar_motorista(v_id, true);
-    v_motoristas := v_motoristas + 1;
-  end loop;
+  select coalesce(pg_catalog.array_agg(e.id order by e.id), '{}') into v_empresas
+  from public.empresas e
+  where e.excluida_em is null and e.apagado_em is null
+    and (e.excluir_em <= pg_catalog.now()
+         or (e.excluir_em is null and e.bloqueada_em is null
+             and e.acesso_ate + interval '30 days' <= pg_catalog.now()));
 
-  for v_id in
-    select p.id from public.perfis p
-    where p.exclusao_pedida_em <= pg_catalog.now() - interval '15 days'
-      and not exists (select 1 from public.motoristas m where m.perfil_id = p.id)
-  loop
-    perform public.expurgar_perfil(v_id);
-    v_contas := v_contas + 1;
-  end loop;
+  select coalesce(pg_catalog.jsonb_agg(pg_catalog.jsonb_build_object('motorista_id', m.id, 'empresa_id', m.empresa_id)
+           order by m.id), '[]') into v_motoristas
+  from public.motoristas m join public.perfis p on p.id = m.perfil_id
+  where p.exclusao_pedida_em <= pg_catalog.now() - interval '15 days'
+    and m.empresa_id <> all (v_empresas);
 
-  delete from public.registros_acesso where quando < pg_catalog.now() - interval '6 months';
-  get diagnostics v_registros = row_count;
-  delete from public.tentativas_acesso where criado_em < pg_catalog.now() - interval '30 days';
-  delete from public.convites_motorista
-  where criado_em < pg_catalog.now() - interval '90 days'
-    and (usado_em is not null or cancelado_em is not null or expira_em < pg_catalog.now());
+  select coalesce(pg_catalog.array_agg(p.id order by p.id), '{}') into v_contas
+  from public.perfis p
+  where p.exclusao_pedida_em <= pg_catalog.now() - interval '15 days'
+    and not exists (select 1 from public.motoristas m where m.perfil_id = p.id);
 
-  return pg_catalog.jsonb_build_object('empresas_excluidas', v_empresas, 'motoristas_excluidos', v_motoristas,
-    'contas_excluidas', v_contas, 'registros_antigos', v_registros);
+  v_resultado := pg_catalog.jsonb_build_object(
+    'empresas', pg_catalog.to_jsonb(v_empresas),
+    'motoristas', v_motoristas,
+    'contas_sem_empresa', pg_catalog.cardinality(v_contas),
+    'registros_acesso_antigos', (select count(*) from public.registros_acesso r
+                                 where r.quando < pg_catalog.now() - interval '6 months'),
+    'tentativas_antigas', (select count(*) from public.tentativas_acesso t
+                           where t.criado_em < pg_catalog.now() - interval '30 days'),
+    'codigos_antigos', (select count(*) from public.convites_motorista c
+                        where c.criado_em < pg_catalog.now() - interval '90 days'
+                          and (c.usado_em is not null or c.cancelado_em is not null or c.expira_em < pg_catalog.now())));
+
+  if v_modo = 'valendo' then
+    foreach v_id in array v_empresas loop
+      perform public.expurgar_empresa(v_id, 'Excluída automaticamente depois do fim do acesso');
+      insert into public.registro_exclusoes (empresa_id, tipo, pedido_por) values (v_id, 'empresa', 'limpeza_diaria');
+    end loop;
+    for v_item in select x from pg_catalog.jsonb_array_elements(v_motoristas) x loop
+      perform public.expurgar_motorista((v_item ->> 'motorista_id')::uuid, true);
+      insert into public.registro_exclusoes (empresa_id, tipo, pedido_por)
+      values ((v_item ->> 'empresa_id')::uuid, 'motorista', 'limpeza_diaria');
+    end loop;
+    foreach v_id in array v_contas loop
+      perform public.expurgar_perfil(v_id);
+      insert into public.registro_exclusoes (empresa_id, tipo, pedido_por) values (null, 'conta_motorista', 'limpeza_diaria');
+    end loop;
+    delete from public.registros_acesso where quando < pg_catalog.now() - interval '6 months';
+    delete from public.tentativas_acesso where criado_em < pg_catalog.now() - interval '30 days';
+    delete from public.convites_motorista
+    where criado_em < pg_catalog.now() - interval '90 days'
+      and (usado_em is not null or cancelado_em is not null or expira_em < pg_catalog.now());
+    delete from public.limpeza_execucoes where quando < pg_catalog.now() - interval '1 year';
+  end if;
+
+  insert into public.limpeza_execucoes (modo, resultado) values (v_modo, v_resultado);
+  return v_resultado || pg_catalog.jsonb_build_object('modo', v_modo);
+end;
+$$;
+
+-- O dono da plataforma confirma: 'valendo' passa a apagar de verdade;
+-- 'simulacao' volta a só anotar. Só o servidor (SQL Editor) usa.
+create or replace function public.definir_modo_limpeza(p_modo text)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  if p_modo is null or p_modo not in ('simulacao', 'valendo') then
+    perform public.erro('Use simulacao ou valendo.', 'modo_invalido');
+  end if;
+  insert into public.configuracao_plataforma (chave, valor, atualizado_em)
+  values ('limpeza_modo', p_modo, pg_catalog.now())
+  on conflict (chave) do update set valor = excluded.valor, atualizado_em = excluded.atualizado_em;
+  return pg_catalog.jsonb_build_object('limpeza_modo', p_modo);
 end;
 $$;
 
@@ -289,17 +412,23 @@ revoke all on function public.expurgar_empresa(uuid, text) from public, anon, au
 revoke all on function public.excluir_motorista(uuid) from public, anon;
 revoke all on function public.excluir_minha_conta() from public, anon;
 revoke all on function public.excluir_minha_empresa(text) from public, anon;
-revoke all on function public.limpeza_diaria() from public, anon, authenticated;
+revoke all on function public.limpeza_diaria(text) from public, anon, authenticated;
+revoke all on function public.definir_modo_limpeza(text) from public, anon, authenticated;
+revoke all on function public.papel_do_usuario() from public, anon, authenticated;
+revoke all on function public.excluir_empresa_plataforma(uuid) from public, anon, authenticated;
 
 grant execute on function public.excluir_motorista(uuid) to authenticated;
 grant execute on function public.excluir_minha_conta() to authenticated;
 grant execute on function public.excluir_minha_empresa(text) to authenticated;
-grant execute on function public.limpeza_diaria() to service_role;
+grant execute on function public.limpeza_diaria(text) to service_role;
+grant execute on function public.definir_modo_limpeza(text) to service_role;
+grant execute on function public.excluir_empresa_plataforma(uuid) to service_role;
 
 -- ---------------------------------------------------- limpeza todo dia (pg_cron)
 
 -- Onde o pg_cron existe (Supabase), agenda a limpeza diária às 03:20 de
--- Brasília (06:20 UTC). Num PostgreSQL sem pg_cron (testes locais), pula.
+-- Brasília (06:20 UTC). Ela começa em modo simulação (ver acima). Num
+-- PostgreSQL sem pg_cron (testes locais), pula.
 do $$
 begin
   if exists (select 1 from pg_catalog.pg_available_extensions where name = 'pg_cron') then
