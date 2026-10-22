@@ -11,7 +11,8 @@ name: Banco - backup diário e atualização na nuvem
 # O registro (sem segredo nem dado pessoal) vai para o Release "registros"
 # como banco-nuvem.log.
 # O backup fica guardado nesta execução por 90 dias (fora do Supabase),
-# criptografado com uma senha derivada da CHAVE_MESTRA.
+# criptografado com uma senha derivada da CHAVE_MESTRA. Leva os dados do app,
+# os logins (sem sessões) e a limpeza agendada (ferramentas/backup/fazer_backup.sh).
 # Segredos (Settings > Secrets and variables > Actions), nunca no código:
 #   SUPABASE_ACCESS_TOKEN  token de acesso da conta do Supabase;
 #   CHAVE_MESTRA           a chave única da plataforma (ferramentas/chaves/derivar.py).
