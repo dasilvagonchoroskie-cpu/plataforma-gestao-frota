@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:gestor/config.dart';
 import 'package:gestor/dados/link_email.dart';
 import 'package:gestor/servidor/servidor.dart';
 import 'package:gestor/telas/lancamentos/detalhe_lancamento.dart';
+import 'package:gestor/telas/plataforma/tela_plataforma.dart';
 
 import 'package:nucleo/nucleo.dart' show mensagemSenha;
 import 'package:visual/visual.dart' show versaoTermos;
@@ -374,5 +376,102 @@ void main() {
     expect(LinkDoEmail.doEndereco(Uri.parse('https://x.io/p/?token_hash=abc123def456&type=signup')), isNull);
     expect(LinkDoEmail.doEndereco(Uri.parse('https://x.io/p/?token_hash=<script>&type=recovery')), isNull);
     expect(LinkDoEmail.doEndereco(Uri.parse('https://x.io/p/')), isNull);
+  });
+
+  testWidgets('super administrador: cadastra a empresa e recebe o recado para o dono', (tester) async {
+    final s = servidorComAmostra()..admin = true;
+    await abrirApp(tester, s);
+    await tester.tap(find.byTooltip('Plataforma').first);
+    await tester.pumpAndSettle();
+    expect(find.text('Transportes Alfa'), findsOneWidget);
+    expect(find.text('Esperando o primeiro acesso do dono'), findsOneWidget);
+    await tester.tap(find.text('Cadastrar empresa'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Cadastrar empresa').last);
+    await tester.pumpAndSettle();
+    expect(find.text('Escreva o nome da empresa.'), findsOneWidget);
+    final campos = find.byType(TextField);
+    await tester.enterText(campos.at(0), 'Transportes Beta');
+    await tester.enterText(campos.at(1), 'Bruno Lima');
+    await tester.enterText(campos.at(2), 'Bruno@Beta.com');
+    await tester.tap(find.text('Cadastrar empresa').last);
+    await tester.pumpAndSettle();
+    expect(s.acoesPlataforma, ['criar Transportes Beta Bruno Lima bruno@beta.com 30 5']);
+    expect(find.text('Acesso de Bruno'), findsOneWidget);
+    expect(find.text('K7MPQ2RXZ9'), findsOneWidget);
+    await tester.tap(find.text('Pronto'));
+    await tester.pumpAndSettle();
+    expect(find.text('Transportes Beta'), findsOneWidget, reason: 'a lista mostra a empresa nova');
+  });
+
+  testWidgets('super administrador: bloqueia uma empresa com o motivo', (tester) async {
+    final s = servidorComAmostra()..admin = true;
+    await abrirApp(tester, s);
+    await tester.tap(find.byTooltip('Plataforma').first);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Transportes Alfa'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Bloquear o acesso'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(FilledButton, 'Bloquear'));
+    await tester.pumpAndSettle();
+    expect(s.acoesPlataforma, ['bloquear emp-a Falta de pagamento.']);
+  });
+
+  testWidgets('super administrador: senha provisória nova para o dono', (tester) async {
+    final s = servidorComAmostra()..admin = true;
+    await abrirApp(tester, s);
+    await tester.tap(find.byTooltip('Plataforma').first);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Transportes Alfa'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Gerar senha provisória para o dono'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(FilledButton, 'Gerar'));
+    await tester.pumpAndSettle();
+    expect(s.acoesPlataforma, ['senha emp-a']);
+    expect(find.text('W3ZQ8MNP2T'), findsOneWidget);
+  });
+
+  testWidgets('quem não é super administrador não vê a Plataforma', (tester) async {
+    await abrirApp(tester, servidorComAmostra());
+    expect(find.byTooltip('Plataforma'), findsNothing);
+  });
+
+  testWidgets('super administrador sem empresa abre direto na Plataforma', (tester) async {
+    final s = servidorComAmostra(usuario: 'u-admin')..admin = true;
+    await abrirApp(tester, s);
+    expect(find.text('Plataforma'), findsOneWidget);
+    expect(find.text('Transportes Alfa'), findsOneWidget);
+    await tester.tap(find.byTooltip('Sair'));
+    await tester.pumpAndSettle();
+    expect(find.text('Esqueci a senha'), findsOneWidget);
+  });
+
+  testWidgets('senha provisória ainda não trocada (o banco avisa): pede a senha nova', (tester) async {
+    final s = servidorComAmostra()..situacaoExtra = {'senha_provisoria': true};
+    await abrirApp(tester, s);
+    expect(find.text('Crie a sua senha'), findsOneWidget);
+    expect(find.text('Faturamento'), findsNothing);
+  });
+
+  test('o recado para o dono leva o e-mail, a senha e o endereço do painel', () {
+    final r = recadoDono(dono: 'Bruno Lima', empresa: 'Transportes Beta', email: 'bruno@beta.com', senha: 'K7MPQ2RXZ9');
+    expect(r, startsWith('Olá, Bruno!'));
+    expect(r, contains('bruno@beta.com'));
+    expect(r, contains('K7MPQ2RXZ9'));
+    expect(r, contains(enderecoPainel));
+    expect(r, contains('Esqueci a senha'));
+  });
+
+  testWidgets('Plataforma no celular: lista e cadastro sem cortar nada', (tester) async {
+    final s = servidorComAmostra()..admin = true;
+    await abrirApp(tester, s, tela: celular, densidade: 2.75);
+    await tester.tap(find.byTooltip('Plataforma').first);
+    await tester.pumpAndSettle();
+    expect(find.text('Transportes Alfa'), findsOneWidget);
+    await tester.tap(find.text('Cadastrar empresa'));
+    await tester.pumpAndSettle();
+    expect(find.text('Prazo de teste'), findsOneWidget);
   });
 }

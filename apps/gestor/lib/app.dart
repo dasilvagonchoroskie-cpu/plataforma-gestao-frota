@@ -9,6 +9,7 @@ import 'dados/provedores.dart';
 import 'servidor/servidor.dart';
 import 'telas/acesso/telas_acesso.dart';
 import 'telas/casca.dart';
+import 'telas/plataforma/tela_plataforma.dart';
 
 class AplicativoGestor extends StatelessWidget {
   const AplicativoGestor({super.key, this.inicio});
@@ -85,6 +86,8 @@ class Raiz extends ConsumerWidget {
             return TelaAcessoEncerrado(estado: a);
           case Etapa.pronto:
             return const _ComDados();
+          case Etapa.plataforma:
+            return const TelaPlataforma(sozinha: true);
         }
       },
     );

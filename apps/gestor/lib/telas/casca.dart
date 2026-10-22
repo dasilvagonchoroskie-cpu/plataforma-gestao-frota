@@ -11,6 +11,7 @@ import 'configuracoes/tela_configuracoes.dart';
 import 'lancamentos/tela_lancamentos.dart';
 import 'motoristas/tela_motoristas.dart';
 import 'painel/tela_painel.dart';
+import 'plataforma/tela_plataforma.dart';
 import 'relatorios/tela_relatorios.dart';
 
 enum Secao {
@@ -189,6 +190,12 @@ class _CascaState extends ConsumerState<Casca> with WidgetsBindingObserver {
 /// Ações da barra de cima comuns às partes do painel: atualizar e, no
 /// celular, o atalho para Configurações.
 List<Widget> acoesPadrao(BuildContext context, WidgetRef ref) => [
+  if (ref.watch(acessoProvider).value?.adminPlataforma == true)
+    IconButton(
+      tooltip: 'Plataforma',
+      icon: const Icon(Icons.admin_panel_settings_outlined),
+      onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const TelaPlataforma())),
+    ),
   const BotaoAtualizar(),
   if (!telaLarga(context))
     IconButton(

@@ -11,6 +11,7 @@ import '../../dados/modelos.dart';
 import '../../dados/provedores.dart';
 import '../acesso/telas_acesso.dart';
 import '../casca.dart';
+import '../plataforma/tela_plataforma.dart';
 
 /// Configurações: dados e regras da empresa, categorias de gasto, gestores,
 /// celulares dos motoristas e a conta de quem está usando.
@@ -105,6 +106,16 @@ class TelaConfiguracoes extends ConsumerWidget {
             trailing: const Icon(Icons.chevron_right),
             onTap: () => abrir(const TelaAparelhos()),
           ),
+          if (acesso?.adminPlataforma == true) ...[
+            const Padding(padding: EdgeInsets.symmetric(horizontal: 16), child: TituloSecao('Plataforma')),
+            ListTile(
+              leading: const Icon(Icons.admin_panel_settings_outlined),
+              title: const Text('Área da Plataforma'),
+              subtitle: const Text('Cadastrar empresas e cuidar do acesso delas (super administrador)'),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => abrir(const TelaPlataforma()),
+            ),
+          ],
           const Padding(padding: EdgeInsets.symmetric(horizontal: 16), child: TituloSecao('Minha conta')),
           ListTile(
             leading: const Icon(Icons.person_outline),

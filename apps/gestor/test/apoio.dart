@@ -102,6 +102,71 @@ class ServidorFalso implements Servidor {
   String? termosAceitos;
   String? empresaExcluida;
 
+  /// Super administrador da plataforma e o que ele fez.
+  bool admin = false;
+  final acoesPlataforma = <String>[];
+  final empresasPlataforma = <Map<String, Object?>>[
+    {
+      'id': 'emp-a', 'nome': 'Transportes Alfa', 'dono_nome': 'Ana Souza', 'dono_email': 'ana@alfa.com',
+      'situacao': 'teste', 'acesso_ate': '2026-11-21T12:00:00Z', 'limite_caminhoes': 5, 'motoristas': 3,
+      'caminhoes': 2, 'ultimo_envio': null, 'dono_primeiro_acesso_pendente': true,
+    },
+  ];
+
+  void _admin() {
+    if (!admin) {
+      throw const ErroServidor('Só o administrador da plataforma pode fazer isso.', codigo: 'sem_permissao');
+    }
+  }
+
+  @override
+  Future<List<Map<String, Object?>>> plataformaEmpresas() async {
+    _rede();
+    _admin();
+    return [...empresasPlataforma];
+  }
+
+  @override
+  Future<Map<String, Object?>> plataformaCriarEmpresa({
+    required String nome,
+    required String donoNome,
+    required String donoEmail,
+    required int? diasTeste,
+    required int limiteCaminhoes,
+  }) async {
+    _rede();
+    _admin();
+    acoesPlataforma.add('criar $nome $donoNome $donoEmail ${diasTeste ?? 'sem prazo'} $limiteCaminhoes');
+    empresasPlataforma.add({
+      'id': 'emp-${empresasPlataforma.length}', 'nome': nome, 'dono_nome': donoNome, 'dono_email': donoEmail,
+      'situacao': diasTeste == null ? 'liberada' : 'teste', 'limite_caminhoes': limiteCaminhoes,
+      'motoristas': 0, 'caminhoes': 0, 'dono_primeiro_acesso_pendente': true,
+    });
+    return {'nome': nome, 'dono_nome': donoNome, 'dono_email': donoEmail, 'senha_provisoria': 'K7MPQ2RXZ9'};
+  }
+
+  @override
+  Future<void> plataformaLiberar(String empresaId, {int? dias}) async {
+    _rede();
+    _admin();
+    acoesPlataforma.add('liberar $empresaId ${dias ?? 'sem prazo'}');
+  }
+
+  @override
+  Future<void> plataformaBloquear(String empresaId, String motivo) async {
+    _rede();
+    _admin();
+    acoesPlataforma.add('bloquear $empresaId $motivo');
+  }
+
+  @override
+  Future<Map<String, Object?>> plataformaNovaSenhaDono(String empresaId) async {
+    _rede();
+    _admin();
+    acoesPlataforma.add('senha $empresaId');
+    return {'dono_nome': 'Ana Souza', 'dono_email': 'ana@alfa.com', 'senha_provisoria': 'W3ZQ8MNP2T'};
+  }
+
   /// Links pedidos por e-mail e links abertos (token_hash válidos).
   final linksPedidos = <String>[];
   final linksValidos = <String>{};
@@ -195,6 +260,7 @@ class ServidorFalso implements Servidor {
       'empresa': {...empresa, ...empresaExtra},
       'motorista': null,
       'pedido': null,
+      'admin_plataforma': admin,
       ...situacaoExtra,
     };
   }

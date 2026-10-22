@@ -8,3 +8,10 @@ const supabaseChavePublica = String.fromEnvironment(
 );
 
 const versaoApp = '0.1.0';
+
+/// Endereço do painel web (vai no recado para o dono de uma empresa nova).
+/// A esteira passa o endereço certo na compilação (--dart-define=PAINEL_URL).
+const enderecoPainel = String.fromEnvironment(
+  'PAINEL_URL',
+  defaultValue: 'https://dasilvagonchoroskie-cpu.github.io/plataforma-gestao-frota/',
+);

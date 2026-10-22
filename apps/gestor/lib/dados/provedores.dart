@@ -32,6 +32,9 @@ enum Etapa {
   termos,
   bloqueada,
   pronto,
+
+  /// Super administrador sem empresa: só a área da Plataforma.
+  plataforma,
 }
 
 class EstadoAcesso {
@@ -43,8 +46,12 @@ class EstadoAcesso {
     this.mensagem,
     this.dono = false,
     this.excluirEm,
+    this.adminPlataforma = false,
   });
   final Etapa etapa;
+
+  /// Super administrador da plataforma (vê a área Plataforma).
+  final bool adminPlataforma;
   final String email;
   final String nome;
   final String empresaNome;
@@ -80,15 +87,23 @@ class Acesso extends AsyncNotifier<EstadoAcesso> {
       rethrow;
     }
     final email = _s.emailDaSessao ?? '';
+    final admin = s['admin_plataforma'] == true;
+    // Senha provisória: o banco nega tudo até trocar (o app pede antes).
+    final trocar = _s.precisaTrocarSenha || s['senha_provisoria'] == true;
     final perfil = (s['perfil'] as Map?)?.cast<String, Object?>();
-    if (perfil == null) return EstadoAcesso(Etapa.completarCadastro, email: email);
+    if (perfil == null) {
+      if (admin) {
+        return EstadoAcesso(trocar ? Etapa.trocarSenha : Etapa.plataforma, email: email, adminPlataforma: true);
+      }
+      return EstadoAcesso(Etapa.completarCadastro, email: email);
+    }
     final nome = '${perfil['nome'] ?? ''}';
     if (perfil['papel'] == 'motorista') return EstadoAcesso(Etapa.contaMotorista, email: email, nome: nome);
     final empresa = (s['empresa'] as Map?)?.cast<String, Object?>();
     if (empresa == null || perfil['ativo'] == false) {
       return EstadoAcesso(Etapa.naoAutorizado, email: email, nome: nome);
     }
-    if (_s.precisaTrocarSenha) return EstadoAcesso(Etapa.trocarSenha, email: email, nome: nome);
+    if (trocar) return EstadoAcesso(Etapa.trocarSenha, email: email, nome: nome);
     if ((s['termos'] as Map?)?['aceito'] == false) {
       // Já aceitou neste aparelho ao abrir: o aceite vai para a conta. Se não
       // der agora (sem internet), pede de novo na tela de termos.
@@ -113,7 +128,7 @@ class Acesso extends AsyncNotifier<EstadoAcesso> {
       _acessoRegistrado = true;
       unawaited(_s.registrarAcesso(kIsWeb ? 'web' : 'gestor'));
     }
-    return EstadoAcesso(Etapa.pronto, email: email, nome: nome);
+    return EstadoAcesso(Etapa.pronto, email: email, nome: nome, adminPlataforma: admin);
   }
 
   Future<void> recarregar() async {

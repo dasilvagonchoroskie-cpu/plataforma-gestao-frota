@@ -107,6 +107,27 @@ abstract class Servidor {
   /// Muda colunas de uma linha (só as que o banco libera para cada perfil).
   Future<void> alterar(String tabela, String id, Map<String, Object?> campos);
 
+  // Área da Plataforma (só o super administrador; o banco confere em cada ação).
+
+  /// Todas as empresas, com o dono, a situação e o uso.
+  Future<List<Map<String, Object?>>> plataformaEmpresas();
+
+  /// Cadastra a empresa e o dono; devolve a senha provisória (mostrada uma vez).
+  Future<Map<String, Object?>> plataformaCriarEmpresa({
+    required String nome,
+    required String donoNome,
+    required String donoEmail,
+    required int? diasTeste,
+    required int limiteCaminhoes,
+  });
+
+  /// Libera a empresa por [dias] a partir de agora (nulo = sem prazo).
+  Future<void> plataformaLiberar(String empresaId, {int? dias});
+  Future<void> plataformaBloquear(String empresaId, String motivo);
+
+  /// Senha provisória nova para o dono (perdeu o acesso ao e-mail).
+  Future<Map<String, Object?>> plataformaNovaSenhaDono(String empresaId);
+
   /// Sai da conta. Com [todosOsAparelhos], encerra também as outras sessões
   /// (depois de criar a senha nova pelo link).
   Future<void> sair({bool todosOsAparelhos = false});
@@ -359,6 +380,47 @@ class ServidorSupabase implements Servidor {
       );
     }
   });
+
+  @override
+  Future<List<Map<String, Object?>>> plataformaEmpresas() => _tentar(() async {
+    final r = await cliente.rpc('plataforma_empresas');
+    return [for (final e in (r as List? ?? const [])) _mapa(e)];
+  });
+
+  @override
+  Future<Map<String, Object?>> plataformaCriarEmpresa({
+    required String nome,
+    required String donoNome,
+    required String donoEmail,
+    required int? diasTeste,
+    required int limiteCaminhoes,
+  }) => _tentar(
+    () async => _mapa(
+      await cliente.rpc(
+        'plataforma_criar_empresa',
+        params: {
+          'p_nome': nome,
+          'p_dono_nome': donoNome,
+          'p_dono_email': donoEmail,
+          'p_dias_teste': diasTeste,
+          'p_limite_caminhoes': limiteCaminhoes,
+        },
+      ),
+    ),
+  );
+
+  @override
+  Future<void> plataformaLiberar(String empresaId, {int? dias}) =>
+      _tentar(() => cliente.rpc('plataforma_liberar', params: {'p_empresa': empresaId, 'p_dias': dias}));
+
+  @override
+  Future<void> plataformaBloquear(String empresaId, String motivo) =>
+      _tentar(() => cliente.rpc('plataforma_bloquear', params: {'p_empresa': empresaId, 'p_motivo': motivo}));
+
+  @override
+  Future<Map<String, Object?>> plataformaNovaSenhaDono(String empresaId) => _tentar(
+    () async => _mapa(await cliente.rpc('plataforma_nova_senha_dono', params: {'p_empresa': empresaId})),
+  );
 
   @override
   Future<void> sair({bool todosOsAparelhos = false}) async {
