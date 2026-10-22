@@ -36,8 +36,12 @@ MINIMO = 24
 
 def raiz() -> bytes:
     chave = os.environ.get("CHAVE_MESTRA", "")
+    if not chave:
+        sys.exit("::error::Falta o segredo CHAVE_MESTRA no GitHub.")
     if len(chave) < MINIMO:
-        sys.exit(f"CHAVE_MESTRA ausente ou curta (mínimo {MINIMO} caracteres).")
+        sys.exit(f"::error::A CHAVE_MESTRA é curta demais: precisa de pelo menos {MINIMO} caracteres. "
+                 "Troque no GitHub (Settings > Secrets and variables > Actions > CHAVE_MESTRA > Update) "
+                 "por uma frase maior, de 8 palavras ou mais.")
     # scrypt deixa cada tentativa de adivinhar a chave lenta e cara.
     return hashlib.scrypt(chave.encode("utf-8"), salt=SAL, n=2**17, r=8, p=1,
                           maxmem=256 * 1024 * 1024, dklen=32)
