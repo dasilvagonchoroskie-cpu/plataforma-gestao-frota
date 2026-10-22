@@ -31,7 +31,7 @@ abaixo rodou e passou; o resto está marcado como não testado.
   (conferidas por hash com os arquivos) e as 2 Edge Functions (verify_jwt desligado, a função confere
   o acesso sozinha). Conselheiro de segurança do Supabase: só avisos esperados (ver PASSAGEM).
 - **feito** — Empresa piloto criada com `criar_empresa`: "Empresa Teste (piloto)", dono
-  gestaodefrota2027@gmail.com, código CODIGO-TROCADO.
+  gestaodefrota2027@gmail.com (o código de entrada foi trocado em 22/10/2026 e não fica nos documentos).
 
 ## Fase 2 — núcleo de regras (`packages/nucleo`)
 

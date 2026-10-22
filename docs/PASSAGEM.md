@@ -35,7 +35,7 @@ nela (seção 14) e anotada aqui. Qualquer item pode ser mudado.
     (NoSuchMethodError, achado abrindo os APKs num emulador). Sem R8 o APK fica um pouco maior.
     A esteira agora abre os dois APKs num emulador Android a cada envio (job "aparelho").
 14. **Sentry ainda não ligado** (precisa de conta; fica para a Fase 7).
-15. **Empresa piloto:** "Empresa Teste (piloto)", dono gestaodefrota2027@gmail.com, código CODIGO-TROCADO,
+15. **Empresa piloto:** "Empresa Teste (piloto)", dono gestaodefrota2027@gmail.com (código de entrada trocado em 22/10/2026; não fica nos documentos),
     plano piloto com 5 caminhões, status teste. Para a empresa real do piloto, rodar `criar_empresa` com
     o nome e o e-mail do dono.
 16. **Versões das migrations:** os arquivos foram renomeados para a versão que o Supabase gravou ao
@@ -82,8 +82,8 @@ configurar SMTP e modelos no painel do Supabase, então o acesso do piloto passo
   estados): textos em `docs/legal/`, mostrados nos apps e publicados no painel web (`termos.html` e
   `privacidade.html`). Aceite obrigatório, guardado com versão, data e IP. Mudou o texto: trocar a data em
   `public.versao_termos()` (migration nova) e em `ferramentas/legal/gerar.py`, rodar o gerador; todos
-  aceitam de novo. Papéis: a empresa é controladora dos dados dos motoristas; a Fortaleza Digital Security
-  é operadora (e controladora dos dados de conta e de acesso). Dados no Supabase em São Paulo (sa-east-1).
+  aceitam de novo. Papéis: a empresa é controladora dos dados dos motoristas; o operador (Evandro,
+  pessoa física, marca Fortaleza Digital Security) trata em nome dela (e controla os dados de conta e acesso). Dados no Supabase em São Paulo (sa-east-1).
 - **Exclusão:** o dono exclui a empresa e todos os dados (digitando o nome da empresa), mesmo com o
   acesso encerrado; a gestão exclui um motorista e os lançamentos dele (digitando EXCLUIR) — a conta dele
   fica sem empresa; o motorista exclui a própria conta (sem empresa: na hora; com empresa: o acesso fecha
@@ -98,18 +98,17 @@ configurar SMTP e modelos no painel do Supabase, então o acesso do piloto passo
 
 ### Pendências (dependem do usuário)
 
-0. **Parte 4 da atualização do banco** (`supabase/migrations/20261017213600_contas_termos_exclusao.sql`):
-   a ferramenta do Supabase usada pelo Claude pede a confirmação do dono da conta para criar funções que
-   apagam dados, e esse pedido não aparece no app do Evandro. Formas de aplicar: (a) abrir o Chrome com a
-   extensão do Claude conectada, para o Claude rodar no SQL Editor; ou (b) o Evandro cola o arquivo no
-   SQL Editor do Supabase e roda. Depois, o Claude registra a migration no histórico
-   (`supabase_migrations.schema_migrations`) com o mesmo conteúdo do arquivo e confere o agendamento
-   `frota-limpeza-diaria` do pg_cron.
+0. **Parte 4 da atualização do banco** (`20261017213600_contas_termos_exclusao.sql`): aprovada pelo
+   Evandro em 22/10/2026 com três condições (backup antes, limpeza em simulação, registro mínimo). É
+   aplicada sozinha pelo fluxo "Banco - backup diário e atualização na nuvem" assim que os dois segredos
+   do GitHub existirem (ver "Segurança", abaixo).
 
 1. **Revisão dos textos legais por um advogado** antes de vender a plataforma. Foram escritos com cuidado,
    mas não substituem a revisão profissional.
-2. **CNPJ e endereço completo** da Fortaleza Digital Security para colocar nos Termos e na Política (hoje
-   só "Goiatuba (GO)"). Ao incluir, mudar a versão e todos aceitam de novo.
+2. **Operador nos textos legais:** desde 22/10/2026 é o Evandro como pessoa física (marca Fortaleza
+   Digital Security), em `docs/legal/operador.json`. Falta o **nome completo** (hoje só "Evandro"). Quando
+   houver CNPJ: trocar `tipo` para `pessoa_juridica`, `nome` para a razão social e `documento` para o CNPJ,
+   mudar a versão e rodar `ferramentas/legal/gerar.py`; todos aceitam de novo.
 3. **E-mail de contato:** os textos usam gestaodefrota2027@gmail.com como canal do titular. Trocar se houver
    outro e-mail oficial.
 
@@ -137,3 +136,49 @@ configurar SMTP e modelos no painel do Supabase, então o acesso do piloto passo
 3. **GitHub Pages (opcional, painel no navegador):** se o endereço do painel não abrir, em Settings > Pages escolher a fonte
    "Deploy from a branch", ramo `gh-pages`, pasta `/ (root)`.
 4. Nome definitivo do produto.
+
+## Segurança "nível empresa" (22/10/2026, pedido do usuário)
+
+Relatório completo em `docs/SEGURANCA.md`. Decisões tomadas sem perguntar (o usuário pediu para fazer
+tudo), anotadas aqui:
+
+- **Um segredo só (`CHAVE_MESTRA`)**, porque o dono ainda não tem cofre de senhas. A senha do backup e a
+  chave de assinatura dos APKs saem dela, sempre iguais (`ferramentas/chaves/derivar.py`: scrypt + HMAC;
+  RSA 3072 determinístico com certificado de datas fixas). Nada disso fica gravado. Cópia da frase em papel
+  com o dono. O segundo segredo é o `SUPABASE_ACCESS_TOKEN`; a senha do banco não é mais necessária
+  (o CLI usa um login temporário pelo token).
+- **Chave de teste aposentada:** `chave-teste.jks` (senha "android") estava no repositório público.
+  Apagada e tirada do histórico. Os APKs só são publicados com a chave oficial e depois de abrir no
+  emulador. Quem tem os APKs antigos reinstala uma vez.
+- **Histórico do repositório reescrito** (git filter-repo) para tirar as chaves de teste, as senhas delas e
+  o código antigo da empresa piloto. Cópias antigas podem ficar em cache do GitHub até a limpeza deles;
+  como a chave e o código foram trocados, o que vazou não vale mais.
+- **Atualização automática do banco da nuvem** depois de cada Esteira verde (com backup antes e a regra
+  de aprovação para migrations que apagam dados). O dono não precisa mais apertar botão.
+- **Backup** diário às 02:30, guardado 90 dias nos artefatos do GitHub (fora do Supabase), com teste de
+  restauração diário. Enquanto o repositório for público, o arquivo cifrado pode ser baixado por quem tem
+  conta no GitHub; a criptografia (AES-256, senha derivada) protege o conteúdo. Plano para privado em
+  `docs/REPOSITORIO-PRIVADO.md`.
+- **Login interno do motorista sorteado** (antes era `m<CPF>@...`, o que permitia tentar senhas direto no
+  Supabase Auth sem o bloqueio). Contas antigas trocam no próximo login certo.
+- **Regra de senha**: 8 a 72 caracteres, com letras e números, igual em todo lugar. Senhas antigas mais
+  fracas continuam valendo até a pessoa trocar (o Supabase só confere ao criar ou trocar).
+- **R8 religado** (com regras para as classes chamadas por JNI) e código Dart ofuscado. Os símbolos da
+  ofuscação não são guardados enquanto o repositório for público.
+- **Registro das ações da plataforma** (`auditoria_plataforma`) por gatilho no banco: pega também o que o
+  dono da plataforma fizer direto no SQL Editor. Só inclusão; sem dado pessoal.
+
+### Pendências de segurança (dependem do usuário)
+
+1. **Criar os dois segredos no GitHub** (`SUPABASE_ACCESS_TOKEN` e `CHAVE_MESTRA`) — passo a passo em
+   `docs/OPERACAO.md`, "Segredos do GitHub". Sem eles: não há backup automático, a parte 4 não é aplicada
+   e os APKs novos não são publicados.
+2. **Depois do primeiro backup e da parte 4 na nuvem:** olhar `limpeza_execucoes` por alguns dias e, se
+   estiver certo, ligar a limpeza de verdade (`definir_modo_limpeza('valendo')`).
+3. **Reinstalar os apps** quando sair o primeiro APK com a chave oficial (assinatura nova).
+4. **Plano Pro do Supabase** (quando houver cliente pagando): liga a proteção contra senha vazada, o
+   limite de sessão e o backup do próprio Supabase (com restauração a qualquer ponto).
+5. **Repositório privado + Cloudflare Pages** (`docs/REPOSITORIO-PRIVADO.md`).
+6. **SMTP próprio** (`docs/EMAIL.md`), e então tirar dos apps a tela antiga de "código por e-mail" e
+   desligar o cadastro aberto do Supabase Auth (hoje ligado só por causa dessa tela).
+7. **Nome completo do Evandro** para os textos legais.

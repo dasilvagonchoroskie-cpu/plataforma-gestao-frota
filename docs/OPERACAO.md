@@ -1,6 +1,7 @@
 # Operação
 
-Guia de operação do piloto. Segredos (senhas, chave service_role) nunca entram aqui nem no repositório.
+Guia de operação do piloto. Segredos (senhas, chave service_role, CHAVE_MESTRA) nunca entram aqui nem no
+repositório. Em caso de incidente de segurança: `docs/INCIDENTES.md`.
 
 ## Onde fica cada coisa
 
@@ -66,22 +67,73 @@ Só pelo SQL Editor (o dono da empresa não muda isso):
     update public.empresas set limite_caminhoes = 10, status = 'ativa' where id = '...';
     update public.empresas set status = 'suspensa' where id = '...';   -- motoristas não enviam; dados ficam
 
-## Aplicar mudança no banco da nuvem (sem computador)
+## Segredos do GitHub (uma vez só)
+
+A plataforma tem **um** segredo de verdade, a `CHAVE_MESTRA`. Dela saem, sempre iguais, a senha que
+cifra os backups e a chave que assina os APKs (`ferramentas/chaves/derivar.py`); nada disso fica gravado
+em lugar nenhum. O GitHub guarda os segredos e não mostra de volta para ninguém, nem para o dono.
 
 Pelo site do GitHub (no celular, use "Versão para computador" do navegador se não aparecer Settings):
+Settings ("Configurações") > Secrets and variables ("Segredos e variáveis") > Actions >
+New repository secret ("Novo segredo do repositório"). Criar dois:
 
-1. Uma vez só, criar 3 segredos em Settings ("Configurações") > Secrets and variables ("Segredos e
-   variáveis") > Actions > New repository secret ("Novo segredo do repositório"):
-   - `SUPABASE_ACCESS_TOKEN`: no Supabase, Account ("Conta") > Access Tokens ("Tokens de acesso") >
-     Generate new token ("Gerar novo token").
-   - `SUPABASE_DB_PASSWORD`: no projeto, Project Settings ("Configurações do projeto") > Database ("Banco
-     de dados") > Reset database password ("Redefinir senha do banco"). Os apps não usam esta senha.
-   - `BACKUP_SENHA`: uma frase longa (16 caracteres ou mais) inventada pelo dono e guardada em papel.
-     Sem ela nenhum backup abre. Nunca mandar no chat.
-2. Actions ("Ações") > "Banco - backup e atualização na nuvem" > Run workflow ("Executar fluxo de
-   trabalho"). `so-backup` só faz o backup; `backup-e-aplicar` (digitando APLICAR) faz o backup e, só se
-   ele der certo, aplica as migrations pendentes (`supabase db push`).
-3. O backup criptografado fica na página da execução, em Artifacts ("Artefatos"), por 90 dias.
+1. `SUPABASE_ACCESS_TOKEN` — no Supabase (conta gestaodefrota2027): foto da conta > Account preferences
+   ("Preferências da conta") > Access Tokens ("Tokens de acesso") > Generate new token ("Gerar novo
+   token"), nome `github-frota`, validade de 1 ano. Copie e cole direto no GitHub (não mande em chat).
+   Com ele o fluxo entra no banco com um login temporário; a senha do banco não é usada.
+2. `CHAVE_MESTRA` — uma frase longa inventada na hora: **8 palavras ou mais, sem sentido entre si, com um
+   número no meio** (pelo menos 24 caracteres; quanto mais longa, melhor). Escreva **à mão em papel** e
+   guarde em casa, longe do celular. Sem ela nenhum backup abre e os APKs mudam de assinatura.
+   Não troque depois: trocar muda a assinatura dos apps (todos reinstalam) e os backups antigos só abrem
+   com a frase antiga.
+
+Quando o cofre de senhas existir (projeto futuro), a frase vai para lá também.
+
+## Atualizações do banco da nuvem (automático)
+
+Depois de cada Esteira verde no ramo `main`, o fluxo "Banco - backup diário e atualização na nuvem"
+faz o backup criptografado e, com ele pronto, aplica as migrations pendentes (`supabase db push`) e as
+regras de login de `supabase/auth-nuvem.json`. Antes de aplicar ele confere a regra do dono: migration que
+apaga dados precisa da linha `-- aprovado-por: Evandro em DD/MM/AAAA` (`ferramentas/seguranca/
+conferir_aprovacao.py`); sem ela, para.
+
+Para rodar à mão: Actions ("Ações") > "Banco - backup diário e atualização na nuvem" > Run workflow
+("Executar fluxo de trabalho"). `so-backup` só faz o backup; `backup-e-aplicar` (digitando APLICAR) faz
+o backup e aplica.
+
+## Backup diário e restauração
+
+- **Quando:** todo dia às 02:30 (Brasília), antes da limpeza das 03:20, e antes de cada atualização.
+- **O quê:** papéis, estrutura e dados (inclusive os logins do Supabase Auth e o agendamento do
+  pg_cron), num arquivo `backup-frota-AAAAMMDD-HHMMSS.tar.gz.gpg` cifrado com AES-256.
+- **Onde:** na página da execução do fluxo, em Artifacts ("Artefatos"), por 90 dias (fora do Supabase).
+- **Prova de que volta:** logo depois de cada backup, o job "Teste de restauração" sobe um Supabase vazio
+  com as mesmas versões da nuvem, restaura o backup e confere as linhas de cada tabela. A Esteira faz o
+  mesmo teste com o banco local a cada envio. Se o teste falhar, o GitHub manda e-mail.
+
+### Restaurar de verdade (desastre: projeto apagado ou dados perdidos)
+
+1. Não mexa no projeto quebrado. No Supabase, crie um projeto **novo** (mesma região, São Paulo).
+2. No GitHub: Actions > "Banco - backup diário..." > a execução do dia que você quer > Artifacts >
+   baixe `backup-frota-...` (vem um .zip com o .gpg dentro).
+3. Num computador com o Supabase CLI e o `psql` (ou peça para o Claude fazer numa sessão nova):
+   - a senha do backup sai da frase do papel:
+     `CHAVE_MESTRA='a frase' python3 ferramentas/chaves/derivar.py segredo frota-backup-v1`
+   - restaure no projeto novo e confira as linhas (a ligação, "Connection string", fica em Connect
+     ("Conectar") > Session pooler no projeto novo):
+     `BACKUP_SENHA=... bash ferramentas/backup/restaurar.sh backup-frota-....tar.gz.gpg 'postgresql://...'`
+   O script aplica tudo numa transação (ou entra tudo, ou nada) e mostra "diferenças: 0" quando bate.
+4. Troque nos apps e na esteira o endereço do projeto (`uinvhwhqhudniipobslu`) e a chave pública pelos do
+   projeto novo, publique as Edge Functions nele e rode a Esteira.
+5. Siga `docs/INCIDENTES.md` (avisar empresas e, se for o caso, a ANPD).
+
+## Assinatura dos APKs
+
+A Esteira deriva a chave de assinatura da `CHAVE_MESTRA` só durante a compilação (`ferramentas/chaves/
+com_assinatura.sh`) e apaga no fim. Sem o segredo, os APKs saem com a chave de depuração e **não são
+publicados**. A impressão digital do certificado (SHA-256) aparece no job "Publicar" e serve para
+conferir o APK (`apksigner verify --print-certs`). A chave de teste antiga (`chave-teste.jks`) foi
+aposentada em 22/10/2026: quem tinha os APKs antigos reinstala uma vez.
 
 ## Limpeza diária (pg_cron)
 
@@ -95,14 +147,27 @@ Roda às 03:20 de Brasília (`frota-limpeza-diaria`). Começa em modo simulaçã
     select public.definir_modo_limpeza('valendo');
     select public.definir_modo_limpeza('simulacao');
 
+## Registro das ações da plataforma
+
+Toda ação sobre empresas (criar, bloquear, liberar, alterar, excluir, trocar código, criar login do dono)
+e toda mudança de configuração (ex.: modo da limpeza) fica em `auditoria_plataforma`, com data, o que
+mudou e quem fez (plataforma, dono, gestor, servidor ou agendamento). Sem nome, e-mail ou CPF. Ninguém
+altera nem apaga esse registro, nem o dono do banco.
+
+    select quando, acao, empresa_id, origem, campos from public.auditoria_plataforma order by id desc limit 50;
+
+## Regras de login
+
+Senha de 8 a 72 caracteres, com letras e números (apps, Edge Functions, banco e Supabase Auth). Login do
+motorista bloqueia por 15 minutos depois de 5 erros seguidos (por CPF e por aparelho); recuperação idem.
+O login interno do motorista é sorteado (não sai do CPF), então ninguém tenta senha direto no Supabase.
+Sessão: token de 1 hora renovado com rotação. A proteção contra senha vazada (HaveIBeenPwned) e o limite
+de tempo de sessão só existem no plano Pro: o fluxo tenta ligar e só avisa se o plano não deixar.
+
 ## Mudança no banco
 
-Sempre por migration nova em `supabase/migrations/`, testada na esteira (job Banco) antes de aplicar.
-
-## Backup
-
-No plano grátis do Supabase não há backup diário. Antes do piloto real: assinar o Pro (backup diário)
-e combinar uma exportação semanal (`supabase db dump`) guardada fora do Supabase.
+Sempre por migration nova em `supabase/migrations/`, testada na Esteira (job Banco) antes de aplicar.
+Se a migration apagar dados, precisa da aprovação escrita do dono no começo do arquivo.
 
 ## Problemas comuns
 
