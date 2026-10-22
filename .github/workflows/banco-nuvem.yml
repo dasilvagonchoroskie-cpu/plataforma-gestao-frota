@@ -5,7 +5,11 @@ name: Banco - backup diário e atualização na nuvem
 #     antes da limpeza diária das 03:20, e teste de restauração dele;
 #   - depois de cada Esteira verde no ramo main: backup e, com ele feito,
 #     aplica as migrations pendentes e as regras de login (supabase/auth-nuvem.json);
-#   - pelo botão "Run workflow" ("Executar fluxo de trabalho").
+#   - pelo botão "Run workflow" ("Executar fluxo de trabalho");
+#   - quando este arquivo muda: só confere (backup e lista do que aplicaria,
+#     sem aplicar nada).
+# O registro (sem segredo nem dado pessoal) vai para o Release "registros"
+# como banco-nuvem.log.
 # O backup fica guardado nesta execução por 90 dias (fora do Supabase),
 # criptografado com uma senha derivada da CHAVE_MESTRA.
 # Segredos (Settings > Secrets and variables > Actions), nunca no código:
@@ -13,6 +17,9 @@ name: Banco - backup diário e atualização na nuvem
 #   CHAVE_MESTRA           a chave única da plataforma (ferramentas/chaves/derivar.py).
 # Sem eles, o fluxo só avisa e não faz nada.
 on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/banco-nuvem.yml']
   schedule:
     - cron: '30 5 * * *'
   workflow_run:
@@ -54,7 +61,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
-      contents: read
+      contents: write   # só para guardar o registro no Release "registros"
     outputs:
       pronto: ${{ steps.segredos.outputs.pronto }}
     env:
@@ -87,6 +94,7 @@ jobs:
                 echo "::error::Para aplicar no banco, digite APLICAR no campo de confirmação."; exit 1
               fi ;;
             workflow_run) ACAO=backup-e-aplicar ;;
+            push) ACAO=conferir ;;
             *) ACAO=so-backup ;;
           esac
           echo "o que fazer: $ACAO"
@@ -104,7 +112,12 @@ jobs:
 
       - name: Ligar ao projeto do Supabase (login temporário pelo token)
         if: steps.segredos.outputs.pronto == 'sim'
-        run: supabase link --project-ref "$PROJETO"
+        run: |
+          set -o pipefail
+          mkdir -p registros
+          echo "execução ${GITHUB_RUN_ID} | ${GITHUB_SHA::7} | ação ${{ steps.segredos.outputs.acao }}" > registros/banco-nuvem.log
+          supabase --version 2>&1 | tee -a registros/banco-nuvem.log
+          supabase link --project-ref "$PROJETO" 2>&1 | tee -a registros/banco-nuvem.log
 
       - name: Backup criptografado
         if: steps.segredos.outputs.pronto == 'sim'
@@ -112,7 +125,11 @@ jobs:
           BACKUP_SENHA=$(python3 ferramentas/chaves/derivar.py segredo frota-backup-v1)
           echo "::add-mask::$BACKUP_SENHA"
           export BACKUP_SENHA
-          bash ferramentas/backup/fazer_backup.sh backup-nuvem
+          bash ferramentas/backup/fazer_backup.sh backup-nuvem > "$RUNNER_TEMP/backup.txt" 2>&1 \
+            || { cat "$RUNNER_TEMP/backup.txt"; exit 1; }
+          cat "$RUNNER_TEMP/backup.txt"
+          # No registro público vai só o resumo (sem contagem de linhas por tabela).
+          grep -E "^backup criptografado|^tabelas com linhas" "$RUNNER_TEMP/backup.txt" | tee -a registros/banco-nuvem.log
 
       - name: Guardar o backup (90 dias)
         if: steps.segredos.outputs.pronto == 'sim'
@@ -124,24 +141,40 @@ jobs:
           if-no-files-found: error
 
       - name: Migrations que apagam dados têm aprovação do dono
-        if: steps.segredos.outputs.acao == 'backup-e-aplicar'
-        run: python3 ferramentas/seguranca/conferir_aprovacao.py supabase/migrations
+        if: steps.segredos.outputs.acao == 'backup-e-aplicar' || steps.segredos.outputs.acao == 'conferir'
+        run: |
+          set -o pipefail
+          python3 ferramentas/seguranca/conferir_aprovacao.py supabase/migrations 2>&1 | tee -a registros/banco-nuvem.log
 
       - name: Migrations pendentes
-        if: steps.segredos.outputs.acao == 'backup-e-aplicar'
-        run: supabase db push --linked --include-all --dry-run
+        if: steps.segredos.outputs.acao == 'backup-e-aplicar' || steps.segredos.outputs.acao == 'conferir'
+        run: |
+          set -o pipefail
+          supabase db push --linked --include-all --dry-run 2>&1 | tee -a registros/banco-nuvem.log
 
       - name: Aplicar as migrations pendentes
         if: steps.segredos.outputs.acao == 'backup-e-aplicar'
-        run: supabase db push --linked --include-all --yes
+        run: |
+          set -o pipefail
+          supabase db push --linked --include-all --yes 2>&1 | tee -a registros/banco-nuvem.log
 
       - name: Regras de login (senha forte, sessões)
         if: steps.segredos.outputs.acao == 'backup-e-aplicar'
-        run: python3 ferramentas/seguranca/aplicar_auth.py supabase/auth-nuvem.json
+        run: |
+          set -o pipefail
+          python3 ferramentas/seguranca/aplicar_auth.py supabase/auth-nuvem.json 2>&1 | tee -a registros/banco-nuvem.log
 
       - name: Histórico de migrations na nuvem
-        if: steps.segredos.outputs.pronto == 'sim'
-        run: supabase migration list --linked
+        if: always() && steps.segredos.outputs.pronto == 'sim'
+        run: supabase migration list --linked 2>&1 | tee -a registros/banco-nuvem.log
+
+      - name: Guardar o registro (Release "registros")
+        if: always() && steps.segredos.outputs.pronto == 'sim'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "resultado: ${{ job.status }}" >> registros/banco-nuvem.log
+          gh release upload registros -R "$GITHUB_REPOSITORY" registros/banco-nuvem.log --clobber
 
   restauracao:
     name: Teste de restauração do backup (Supabase vazio)
@@ -150,7 +183,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
-      contents: read
+      contents: write   # só para guardar o registro no Release "registros"
     env:
       SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
       CHAVE_MESTRA: ${{ secrets.CHAVE_MESTRA }}
@@ -173,4 +206,14 @@ jobs:
           BACKUP_SENHA=$(python3 ferramentas/chaves/derivar.py segredo frota-backup-v1)
           echo "::add-mask::$BACKUP_SENHA"
           export BACKUP_SENHA
-          bash ferramentas/backup/testar_restauracao.sh backup/*.gpg "$PWD/supabase/.temp"
+          set -o pipefail
+          mkdir -p registros
+          echo "execução ${GITHUB_RUN_ID} | ${GITHUB_SHA::7} | teste de restauração" > registros/banco-restauracao.log
+          bash ferramentas/backup/testar_restauracao.sh backup/*.gpg "$PWD/supabase/.temp" 2>&1 | tee -a registros/banco-restauracao.log
+      - name: Guardar o registro (Release "registros")
+        if: always()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "resultado: ${{ job.status }}" >> registros/banco-restauracao.log
+          gh release upload registros -R "$GITHUB_REPOSITORY" registros/banco-restauracao.log --clobber
