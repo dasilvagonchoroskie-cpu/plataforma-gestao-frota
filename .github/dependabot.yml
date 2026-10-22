@@ -1,0 +1,31 @@
+# Atualizações automáticas (Dependabot): toda semana abre pedidos de
+# atualização para as ações do GitHub e os pacotes Dart/Flutter. A Esteira
+# testa cada pedido; nada entra sem passar nos testes.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    groups:
+      acoes:
+        patterns: ['*']
+    commit-message:
+      prefix: 'Esteira'
+
+  - package-ecosystem: pub
+    directories:
+      - /packages/nucleo
+      - /packages/visual
+      - /apps/motorista
+      - /apps/gestor
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    groups:
+      pacotes-pequenos:
+        update-types: [minor, patch]
+    commit-message:
+      prefix: 'Pacotes'

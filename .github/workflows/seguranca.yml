@@ -1,0 +1,51 @@
+name: Segurança - segredos e aprovações
+
+# A cada envio (de qualquer arquivo) e toda segunda-feira:
+#   - procura segredos em TODO o histórico do repositório (gitleaks, versão
+#     fixa conferida pelo resumo SHA-256), com as regras de .gitleaks.toml;
+#   - confere que migration que apaga dados tem a aprovação escrita do dono.
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: '0 9 * * 1'
+  workflow_dispatch: {}
+
+permissions: {}
+
+jobs:
+  segredos:
+    name: Segredos no histórico (gitleaks)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Varredura
+        env:
+          VERSAO: '8.30.1'
+          RESUMO: '551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb'
+        run: |
+          curl -sSfL -o "$RUNNER_TEMP/gitleaks.tgz" \
+            "https://github.com/gitleaks/gitleaks/releases/download/v${VERSAO}/gitleaks_${VERSAO}_linux_x64.tar.gz"
+          echo "$RESUMO  $RUNNER_TEMP/gitleaks.tgz" | sha256sum -c -
+          tar -xzf "$RUNNER_TEMP/gitleaks.tgz" -C "$RUNNER_TEMP" gitleaks
+          "$RUNNER_TEMP/gitleaks" git . --config .gitleaks.toml --redact --no-banner -v
+
+  aprovacoes:
+    name: Migrations que apagam dados têm aprovação
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false
+      - run: python3 ferramentas/seguranca/conferir_aprovacao.py supabase/migrations

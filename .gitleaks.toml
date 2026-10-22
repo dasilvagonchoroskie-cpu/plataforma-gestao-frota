@@ -1,0 +1,30 @@
+# Varredura de segredos (gitleaks) da esteira: regras padrão + regras do projeto.
+title = "plataforma-gestao-frota"
+
+[extend]
+useDefault = true
+
+[[rules]]
+id = "supabase-chave-secreta"
+description = "Chave secreta do Supabase (nunca pode ir para o repositório nem para o app)"
+regex = '''sb_secret_[A-Za-z0-9_-]{20,}'''
+keywords = ["sb_secret_"]
+
+[[rules]]
+id = "android-arquivo-de-chave"
+description = "Arquivo de chave de assinatura Android no repositório"
+path = '''(?i)\.(jks|keystore|p12|pfx)$'''
+
+[[rules]]
+id = "android-senha-de-assinatura"
+description = "Senha de chave Android escrita no código"
+regex = '''(?i)(store|key)Password\s*=\s*"[^"$]+"'''
+keywords = ["storepassword", "keypassword"]
+
+[[allowlists]]
+description = "Chave pública do Supabase: é feita para ficar nos apps e no painel"
+regexes = ['''sb_publishable_[A-Za-z0-9_-]{20,}''']
+
+[[allowlists]]
+description = "Arquivos gerados na máquina (não vão para o repositório)"
+paths = ['''(^|/)build/''', '''(^|/)\.dart_tool/''']

@@ -1,32 +1,46 @@
 name: Esteira
 
 # A cada envio: testa o banco num Supabase local (migrations do zero + testes
-# pgTAP), o núcleo de regras e os dois apps; compila os APKs e publica o
-# painel web do gestor no ramo gh-pages (GitHub Pages) e abre os dois APKs num
-# emulador Android para garantir que eles abrem de verdade. Os registros de cada parte ficam no Release
-# "registros" (para conferir de fora do GitHub).
+# pgTAP + testes das Edge Functions + backup e restauração), o núcleo de regras
+# e os dois apps; compila os APKs (assinados com a chave derivada da
+# CHAVE_MESTRA), confere que não levam segredo, abre os dois num emulador
+# Android e só então publica. O painel web vai para o ramo gh-pages.
+# Os registros de cada parte ficam no Release "registros".
+# Pedidos de atualização (Dependabot) rodam os mesmos testes, sem publicar nada.
 on:
   push:
     branches: [main]
-    # Tudo menos ferramentas, documentos e textos; o script de backup entra (o job Banco testa).
-    paths: ['**', '!ferramentas/**', 'ferramentas/backup/**', '!docs/**', '!**.md']
+    # Tudo menos ferramentas, documentos e textos; os scripts usados aqui entram.
+    paths: ['**', '!ferramentas/**', 'ferramentas/backup/**', 'ferramentas/chaves/**',
+            'ferramentas/seguranca/**', 'ferramentas/diagnostico/**', '!docs/**', 'docs/legal/**', '!**.md']
+  pull_request:
+    branches: [main]
   workflow_dispatch: {}
 
-permissions:
-  contents: write
+# Cada job pede só a permissão que usa.
+permissions: {}
 
 env:
   FLUTTER_VERSION: '3.47.5'
+  SUPABASE_CLI_VERSION: '2.121.0'
+  PUBLICAR: ${{ github.event_name != 'pull_request' }}
 
 jobs:
   banco:
-    name: Banco (migrations e testes pgTAP)
+    name: Banco (migrations, testes, backup e restauração)
     runs-on: ubuntu-latest
+    timeout-minutes: 40
+    permissions:
+      contents: write   # guardar o registro no Release "registros"
     steps:
-      - uses: actions/checkout@v5
-      - uses: supabase/setup-cli@v1
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         with:
-          version: latest
+          persist-credentials: false
+      - uses: supabase/setup-cli@1dedf2c611547ede7232d26866dd3c56ab903bbb # v1.7.3
+        with:
+          version: ${{ env.SUPABASE_CLI_VERSION }}
+      - name: Migrations que apagam dados têm aprovação do dono
+        run: python3 ferramentas/seguranca/conferir_aprovacao.py supabase/migrations
       - name: Subir o Supabase local com as migrations
         run: |
           set -o pipefail
@@ -37,27 +51,34 @@ jobs:
         run: |
           set -o pipefail
           BANCO_URL=postgresql://postgres:postgres@127.0.0.1:54322/postgres bash supabase/tests/local/rodar.sh 2>&1 | tee -a registros/banco.log
-      - name: Testes das Edge Functions (login por CPF e redefinir acesso)
+      - name: Testes das Edge Functions (login, cadastro, recuperação e proteções)
         run: |
           set -o pipefail
           bash supabase/tests/funcoes/testar.sh 2>&1 | tee -a registros/banco.log
-      - name: Testar o backup criptografado (banco local) e o agendamento da limpeza
+      - name: Backup criptografado (banco local) e agendamento da limpeza
         run: |
           set -o pipefail
-          export BACKUP_SENHA="$(openssl rand -hex 24)"
-          ALVO=--local bash ferramentas/backup/fazer_backup.sh /tmp/backup-teste 2>&1 | tee -a registros/banco.log
+          openssl rand -hex 24 > "$RUNNER_TEMP/senha-teste"
+          BACKUP_SENHA="$(cat "$RUNNER_TEMP/senha-teste")" ALVO=--local \
+            bash ferramentas/backup/fazer_backup.sh "$RUNNER_TEMP/backup-teste" 2>&1 | tee -a registros/banco.log
           psql postgresql://postgres:postgres@127.0.0.1:54322/postgres -tA \
             -c "select 'pg_cron: ' || coalesce(string_agg(jobname || ' ' || schedule, ', '), 'nenhum') from cron.job" \
             -c "select 'limpeza_modo: ' || valor from public.configuracao_plataforma where chave = 'limpeza_modo'" \
             2>&1 | tee -a registros/banco.log
+      - name: Restaurar o backup num Supabase vazio e conferir as linhas
+        run: |
+          set -o pipefail
+          supabase stop --no-backup >/dev/null
+          BACKUP_SENHA="$(cat "$RUNNER_TEMP/senha-teste")" \
+            bash ferramentas/backup/testar_restauracao.sh "$RUNNER_TEMP"/backup-teste/*.gpg 2>&1 | tee -a registros/banco.log
       - name: Guardar o registro
-        if: always()
+        if: always() && env.PUBLICAR == 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           echo "commit ${GITHUB_SHA::7} | resultado ${{ job.status }}" >> registros/banco.log
-          gh release view registros >/dev/null 2>&1 || gh release create registros --prerelease --title "Registros da esteira (uso interno)" --notes "Registros das execuções. Não é o aplicativo."
-          gh release upload registros registros/banco.log --clobber
+          gh release view registros -R "$GITHUB_REPOSITORY" >/dev/null 2>&1 || gh release create registros -R "$GITHUB_REPOSITORY" --prerelease --title "Registros da esteira (uso interno)" --notes "Registros das execuções. Não é o aplicativo."
+          gh release upload registros -R "$GITHUB_REPOSITORY" registros/banco.log --clobber
       - name: Parar
         if: always()
         run: supabase stop --no-backup || true
@@ -65,9 +86,13 @@ jobs:
   nucleo:
     name: Núcleo de regras (análise e testes)
     runs-on: ubuntu-latest
+    permissions:
+      contents: write   # guardar o registro
     steps:
-      - uses: actions/checkout@v5
-      - uses: subosito/flutter-action@v2
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
         with:
           flutter-version: ${{ env.FLUTTER_VERSION }}
           channel: stable
@@ -79,24 +104,31 @@ jobs:
           mkdir -p ../../registros
           (dart pub get && dart analyze --fatal-infos && dart test) 2>&1 | tee ../../registros/nucleo.log
       - name: Guardar o registro
-        if: always()
+        if: always() && env.PUBLICAR == 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           echo "commit ${GITHUB_SHA::7} | resultado ${{ job.status }}" >> registros/nucleo.log
-          gh release view registros >/dev/null 2>&1 || gh release create registros --prerelease --title "Registros da esteira (uso interno)" --notes "Registros das execuções. Não é o aplicativo."
-          gh release upload registros registros/nucleo.log --clobber
+          gh release view registros -R "$GITHUB_REPOSITORY" >/dev/null 2>&1 || gh release create registros -R "$GITHUB_REPOSITORY" --prerelease --title "Registros da esteira (uso interno)" --notes "Registros das execuções. Não é o aplicativo."
+          gh release upload registros -R "$GITHUB_REPOSITORY" registros/nucleo.log --clobber
 
   motorista:
     name: App do motorista (análise, testes e APK)
     runs-on: ubuntu-latest
+    permissions:
+      contents: write   # guardar o registro
+    outputs:
+      assinatura: ${{ steps.apk.outputs.assinatura }}
+      impressao: ${{ steps.apk.outputs.impressao }}
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-java@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5.7.0
         with:
           distribution: temurin
           java-version: '17'
-      - uses: subosito/flutter-action@v2
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
         with:
           flutter-version: ${{ env.FLUTTER_VERSION }}
           channel: stable
@@ -111,44 +143,58 @@ jobs:
         working-directory: apps/motorista
         continue-on-error: true
         run: flutter test --tags capturas --update-goldens 2>&1 | tail -5
-      - name: Compilar o APK de teste
+      # Os símbolos da ofuscação (build/simbolos) não são publicados: com eles
+      # daria para desfazer a ofuscação. Ficam só na máquina da esteira.
+      - name: Compilar o APK (ofuscado, encolhido e assinado)
+        id: apk
         working-directory: apps/motorista
+        env:
+          CHAVE_MESTRA: ${{ secrets.CHAVE_MESTRA }}
         run: |
           set -o pipefail
           NUMERO=$((100 + ${{ github.run_number }}))
-          flutter build apk --release --build-number=$NUMERO 2>&1 | tee -a ../../registros/motorista.log
+          bash ../../ferramentas/chaves/com_assinatura.sh flutter build apk --release --build-number=$NUMERO \
+            --obfuscate --split-debug-info=build/simbolos 2>&1 | tee -a ../../registros/motorista.log
           mkdir -p ../../saida
           cp build/app/outputs/flutter-apk/app-release.apk ../../saida/Frota-Motorista.apk
           (cd test && zip -qr ../../../saida/telas-motorista.zip capturas) || true
           ls -la ../../saida
-      - name: Publicar o APK de teste (Release "motorista-teste")
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: O APK não leva segredo e está assinado
         run: |
-          gh release view motorista-teste >/dev/null 2>&1 || gh release create motorista-teste --prerelease \
-            --title "App do motorista - teste" --notes "APK de teste do app do motorista (chave de teste). Versão da esteira."
-          gh release upload motorista-teste saida/Frota-Motorista.apk --clobber
-          [ -f saida/telas-motorista.zip ] && gh release upload motorista-teste saida/telas-motorista.zip --clobber || true
-          echo "commit ${GITHUB_SHA::7} | APK publicado" >> registros/motorista.log
+          set -o pipefail
+          python3 ferramentas/seguranca/conferir_apk.py saida/Frota-Motorista.apk 2>&1 | tee -a registros/motorista.log
+          ASSINADOR=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)/apksigner
+          "$ASSINADOR" verify --print-certs saida/Frota-Motorista.apk | grep -E "SHA-256" | tee -a registros/motorista.log
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: apk-motorista
+          path: saida/
+          retention-days: 14
       - name: Guardar o registro
-        if: always()
+        if: always() && env.PUBLICAR == 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          echo "commit ${GITHUB_SHA::7} | resultado ${{ job.status }}" >> registros/motorista.log
-          gh release view registros >/dev/null 2>&1 || gh release create registros --prerelease --title "Registros da esteira (uso interno)" --notes "Registros das execuções. Não é o aplicativo."
-          gh release upload registros registros/motorista.log --clobber
+          echo "commit ${GITHUB_SHA::7} | assinatura ${{ steps.apk.outputs.assinatura }} | resultado ${{ job.status }}" >> registros/motorista.log
+          gh release view registros -R "$GITHUB_REPOSITORY" >/dev/null 2>&1 || gh release create registros -R "$GITHUB_REPOSITORY" --prerelease --title "Registros da esteira (uso interno)" --notes "Registros das execuções. Não é o aplicativo."
+          gh release upload registros -R "$GITHUB_REPOSITORY" registros/motorista.log --clobber
 
   gestor:
     name: App e painel do gestor (análise, testes, APK e site)
     runs-on: ubuntu-latest
+    permissions:
+      contents: write   # guardar o registro e publicar o painel no ramo gh-pages
+    outputs:
+      assinatura: ${{ steps.apk.outputs.assinatura }}
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-java@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5.7.0
         with:
           distribution: temurin
           java-version: '17'
-      - uses: subosito/flutter-action@v2
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
         with:
           flutter-version: ${{ env.FLUTTER_VERSION }}
           channel: stable
@@ -168,26 +214,35 @@ jobs:
         run: |
           set -o pipefail
           flutter build web --release --base-href /plataforma-gestao-frota/ 2>&1 | tail -5 | tee -a ../../registros/gestor.log
-      - name: Compilar o APK de teste
+      - name: Compilar o APK (ofuscado, encolhido e assinado)
+        id: apk
         working-directory: apps/gestor
+        env:
+          CHAVE_MESTRA: ${{ secrets.CHAVE_MESTRA }}
         run: |
           set -o pipefail
           NUMERO=$((100 + ${{ github.run_number }}))
-          flutter build apk --release --build-number=$NUMERO 2>&1 | tail -5 | tee -a ../../registros/gestor.log
+          bash ../../ferramentas/chaves/com_assinatura.sh flutter build apk --release --build-number=$NUMERO \
+            --obfuscate --split-debug-info=build/simbolos 2>&1 | tail -8 | tee -a ../../registros/gestor.log
           mkdir -p ../../saida
           cp build/app/outputs/flutter-apk/app-release.apk ../../saida/Frota-Gestor.apk
           (cd test && zip -qr ../../../saida/telas-gestor.zip capturas) || true
           ls -la ../../saida
-      - name: Publicar o APK de teste (Release "gestor-teste")
+      - name: O APK não leva segredo e está assinado
+        run: |
+          set -o pipefail
+          python3 ferramentas/seguranca/conferir_apk.py saida/Frota-Gestor.apk 2>&1 | tee -a registros/gestor.log
+          ASSINADOR=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)/apksigner
+          "$ASSINADOR" verify --print-certs saida/Frota-Gestor.apk | grep -E "SHA-256" | tee -a registros/gestor.log
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: apk-gestor
+          path: saida/
+          retention-days: 14
+      - name: Publicar o painel web (ramo gh-pages)
+        if: env.PUBLICAR == 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          gh release view gestor-teste >/dev/null 2>&1 || gh release create gestor-teste --prerelease \
-            --title "App do gestor - teste" --notes "APK de teste do app do gestor e do dono (chave de teste). Versão da esteira."
-          gh release upload gestor-teste saida/Frota-Gestor.apk --clobber
-          [ -f saida/telas-gestor.zip ] && gh release upload gestor-teste saida/telas-gestor.zip --clobber || true
-          echo "commit ${GITHUB_SHA::7} | APK publicado" >> registros/gestor.log
-      - name: Publicar o painel web (ramo gh-pages)
         run: |
           cd apps/gestor/build/web
           touch .nojekyll
@@ -196,9 +251,10 @@ jobs:
           git config user.email "esteira@users.noreply.github.com"
           git add -A
           git commit -q -m "Painel web do gestor (${GITHUB_SHA::7})"
-          git push -q -f "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" gh-pages
+          git push -q -f "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" gh-pages
           echo "commit ${GITHUB_SHA::7} | painel web publicado no ramo gh-pages" >> ../../../../registros/gestor.log
       - name: Conferir as Edge Functions na nuvem
+        if: env.PUBLICAR == 'true'
         continue-on-error: true
         run: |
           F=https://uinvhwhqhudniipobslu.supabase.co/functions/v1
@@ -215,35 +271,38 @@ jobs:
           conferir criar_acesso_gestor '{}' 401
           conferir recuperar_acesso '{"identificador":"123","codigo":"x","senha_nova":"x"}' 400
       - name: Guardar o registro
-        if: always()
+        if: always() && env.PUBLICAR == 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          echo "commit ${GITHUB_SHA::7} | resultado ${{ job.status }}" >> registros/gestor.log
-          gh release view registros >/dev/null 2>&1 || gh release create registros --prerelease --title "Registros da esteira (uso interno)" --notes "Registros das execuções. Não é o aplicativo."
-          gh release upload registros registros/gestor.log --clobber
+          echo "commit ${GITHUB_SHA::7} | assinatura ${{ steps.apk.outputs.assinatura }} | resultado ${{ job.status }}" >> registros/gestor.log
+          gh release view registros -R "$GITHUB_REPOSITORY" >/dev/null 2>&1 || gh release create registros -R "$GITHUB_REPOSITORY" --prerelease --title "Registros da esteira (uso interno)" --notes "Registros das execuções. Não é o aplicativo."
+          gh release upload registros -R "$GITHUB_REPOSITORY" registros/gestor.log --clobber
 
   aparelho:
     name: Abrir os dois APKs num celular Android (emulador)
     needs: [motorista, gestor]
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    permissions:
+      contents: write   # guardar o resultado no Release "registros"
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false
       - name: Liberar a aceleração do emulador (KVM)
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
       - name: Baixar os APKs desta execução
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          mkdir -p apks
-          gh release download motorista-teste -p 'Frota-Motorista.apk' -D apks
-          gh release download gestor-teste -p 'Frota-Gestor.apk' -D apks
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          pattern: apk-*
+          path: apks
+          merge-multiple: true
       - name: Abrir os apps no Android 14
-        uses: reactivecircus/android-emulator-runner@v2
+        uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2.38.0
         with:
           api-level: 34
           arch: x86_64
@@ -252,11 +311,48 @@ jobs:
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -no-snapshot
           script: bash ferramentas/diagnostico/rodar.sh
       - name: Guardar o resultado
-        if: always()
+        if: always() && env.PUBLICAR == 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           mkdir -p diagnostico
           echo "commit ${GITHUB_SHA::7} | resultado ${{ job.status }}" >> diagnostico/resumo.txt
           zip -qr diagnostico.zip diagnostico
-          gh release upload registros diagnostico.zip --clobber
+          gh release upload registros -R "$GITHUB_REPOSITORY" diagnostico.zip --clobber
+
+  publicar:
+    name: Publicar os APKs (só com a assinatura oficial e depois de abrir no emulador)
+    needs: [motorista, gestor, aparelho]
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write   # publicar os APKs nos Releases
+    steps:
+      - name: Assinatura
+        run: |
+          echo "motorista: ${{ needs.motorista.outputs.assinatura }} | gestor: ${{ needs.gestor.outputs.assinatura }}"
+          echo "impressão digital do certificado: ${{ needs.motorista.outputs.impressao }}"
+          if [ "${{ needs.motorista.outputs.assinatura }}" != "oficial" ] || [ "${{ needs.gestor.outputs.assinatura }}" != "oficial" ]; then
+            echo "::warning::APKs não publicados: falta o segredo CHAVE_MESTRA (veja docs/OPERACAO.md)."
+          fi
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        if: needs.motorista.outputs.assinatura == 'oficial' && needs.gestor.outputs.assinatura == 'oficial'
+        with:
+          pattern: apk-*
+          path: saida
+          merge-multiple: true
+      - name: Publicar nos Releases "motorista-teste" e "gestor-teste"
+        if: needs.motorista.outputs.assinatura == 'oficial' && needs.gestor.outputs.assinatura == 'oficial'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          R="-R $GITHUB_REPOSITORY"
+          gh release view motorista-teste $R >/dev/null 2>&1 || gh release create motorista-teste $R --prerelease \
+            --title "App do motorista - teste" --notes "APK do app do motorista (assinatura oficial). Versão da esteira."
+          gh release view gestor-teste $R >/dev/null 2>&1 || gh release create gestor-teste $R --prerelease \
+            --title "App do gestor - teste" --notes "APK do app do gestor e do dono (assinatura oficial). Versão da esteira."
+          gh release upload motorista-teste $R saida/Frota-Motorista.apk --clobber
+          gh release upload gestor-teste $R saida/Frota-Gestor.apk --clobber
+          [ -f saida/telas-motorista.zip ] && gh release upload motorista-teste $R saida/telas-motorista.zip --clobber || true
+          [ -f saida/telas-gestor.zip ] && gh release upload gestor-teste $R saida/telas-gestor.zip --clobber || true
+          echo "APKs publicados (commit ${GITHUB_SHA::7})"
