@@ -82,6 +82,11 @@ configurar SMTP e modelos no painel do Supabase, então o acesso do piloto passo
   0.2.0 e pode ser retirada depois. Dono e gestor não trocam o próprio e-mail pelo app (o banco recusa).
   Para chegar a qualquer e-mail é preciso o SMTP próprio (Brevo, `docs/EMAIL.md`); sem ele, só a equipe do
   projeto recebe.
+- **Código privado, painel público à parte (decisão do dono, 22/10/2026, opção A):** repositório público
+  `painel-frota` só com o painel compilado; a Esteira publica lá com o segredo `PAINEL_TOKEN` e o fluxo do
+  banco troca o Site URL do Supabase para o painel novo. Passo a passo em `docs/REPOSITORIO-PRIVADO.md`.
+  O 404 dos links de 22/10 era o GitHub Pages nunca ligado no repositório (os arquivos já estavam no
+  `gh-pages`); a Esteira agora confere se o painel está no ar.
 - **Termos na primeira abertura (pedido do dono, 22/10/2026):** os apps e o painel mostram os termos antes
   de qualquer tela; sem aceitar não dá para usar ("Não aceito" fecha o app). O aceite fica guardado no
   aparelho (sobrevive a "Sair da conta") e vai para a conta no cadastro ou no próximo login. Versão nova

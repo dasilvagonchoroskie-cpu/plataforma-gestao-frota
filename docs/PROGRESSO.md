@@ -140,8 +140,13 @@ Pedido do Evandro: recuperar a senha sem código (link no e-mail) e aceitar os t
   sem problemas, 32 testes; `flutter build web` compilou. Núcleo: `dart analyze` sem problemas.
 - **feito** — Banco da nuvem: partes 4, segurança e termos aplicadas pelo fluxo (histórico conferido no
   registro `banco-nuvem.log`). Backup sem sessões e tokens; restauração mostra a tabela que falhou.
-- **depende do usuário** — SMTP próprio (Brevo) no painel do Supabase, para o link chegar a qualquer
-  e-mail (`docs/EMAIL.md`).
+- **feito** — SMTP próprio (Brevo) ligado pelo dono e conferido pelo fluxo do banco ("e-mail próprio
+  (SMTP): ligado"). Backup na nuvem com teste de restauração passando: `tabelas conferidas: 45,
+  diferenças: 0`.
+- **em andamento** — Link do e-mail abria 404: o GitHub Pages nunca tinha sido ligado. Opção A do dono:
+  código privado e painel no repositório público `painel-frota` (Esteira pronta; faltam os passos do dono
+  em `docs/REPOSITORIO-PRIVADO.md`). Varredura de segredos (histórico atual, commits antigos, registros
+  públicos): nenhum segredo válido.
 
 ## Fase 7 — acabamento e piloto
 

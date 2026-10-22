@@ -8,7 +8,10 @@ repositório. Em caso de incidente de segurança: `docs/INCIDENTES.md`.
 - Banco, login e Edge Functions: Supabase, projeto `uinvhwhqhudniipobslu` (conta gestaodefrota2027).
 - Código e esteira: GitHub `dasilvagonchoroskie-cpu/plataforma-gestao-frota`, ramo `main`.
 - APK do motorista: Release `motorista-teste`. APK do gestor: Release `gestor-teste`.
-- Painel web: ramo `gh-pages` (GitHub Pages), https://dasilvagonchoroskie-cpu.github.io/plataforma-gestao-frota/
+- Painel web (GitHub Pages): com o segredo `PAINEL_TOKEN`, no repositório público `painel-frota`,
+  https://dasilvagonchoroskie-cpu.github.io/painel-frota/ ; sem ele, no ramo `gh-pages` deste repositório,
+  https://dasilvagonchoroskie-cpu.github.io/plataforma-gestao-frota/ (docs/REPOSITORIO-PRIVADO.md). O Pages
+  precisa estar ligado em Settings > Pages do repositório onde o painel é publicado.
 - Registros da esteira: Release `registros` (banco.log, nucleo.log, motorista.log, gestor.log).
 
 ## Criar uma empresa cliente
