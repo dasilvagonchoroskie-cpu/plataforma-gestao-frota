@@ -194,6 +194,14 @@ igual "${R%% *}" "413" "pedido grande demais é recusado"
 R=$(funcao redefinir_acesso "$TD" '{"motorista_id":"nao-e-uuid"}')
 igual "${R%% *} $(echo "${R#* }" | jq -r .mensagem)" "403 Motorista não encontrado." "erro técnico não aparece para quem chamou"
 
+# Bloqueio por endereço IP (por último: o IP da esteira fica bloqueado 15 minutos)
+for i in $(seq 1 30); do
+  R=$(funcao entrar_com_cpf "" "{\"cpf\":\"$(printf '9%010d' "$i")\",\"senha\":\"errada1\",\"aparelho\":\"ip-$i\"}")
+  [ "${R%% *}" = "429" ] && break
+done
+R=$(funcao entrar_com_cpf "" '{"cpf":"98765432100","senha":"errada1","aparelho":"ip-novo"}')
+igual "${R%% *}" "429" "30 erros do mesmo IP, mesmo com CPFs e aparelhos diferentes, bloqueiam o IP"
+
 echo "1..$N"
 echo "verificações: $N, falhas: $FALHAS"
 [ "$FALHAS" -eq 0 ]

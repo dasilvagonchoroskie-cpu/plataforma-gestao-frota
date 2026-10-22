@@ -4,7 +4,9 @@
 // devolve a sessão. O erro é sempre o mesmo ("CPF ou senha incorretos"),
 // exista ou não o CPF, com o mesmo tempo de resposta, e depois de 5 erros
 // seguidos o CPF e o aparelho ficam bloqueados por 15 minutos (contagem no
-// banco: login_cpf_preparar / login_cpf_registrar).
+// banco: login_cpf_preparar / login_cpf_registrar). Além disso, 30 erros em
+// 15 minutos vindos do mesmo endereço IP (o verdadeiro) bloqueiam esse
+// endereço: quem tenta muitos CPFs diferentes também para.
 // Contas antigas, com o login interno tirado do CPF, trocam para um login
 // sorteado aqui, no primeiro login certo (ninguém consegue mais adivinhar o
 // login interno e tentar senhas direto no Supabase Auth).
@@ -15,12 +17,15 @@ import {
   emailInternoAntigo,
   emailInternoNovo,
   espera,
+  ipDoCliente,
   lerCorpo,
   resposta,
   servir,
 } from "../_compartilhado/apoio.ts";
 
 const ERRO = "CPF ou senha incorretos.";
+const BLOQUEADO = "Muitas tentativas erradas. Espere 15 minutos e tente de novo.";
+const ERROS_POR_IP = 30;
 
 async function trocarLoginInterno(servidor: SupabaseClient, id: string, antigo: string): Promise<void> {
   const novo = emailInternoNovo();
@@ -46,17 +51,24 @@ servir(async (req) => {
   }
 
   const servidor = clienteServidor();
+  const ip = ipDoCliente(req);
+  const chaveIp = ip === "-" ? null : `login:ip:${ip}`;
+  if (chaveIp) {
+    const desde = new Date(Date.now() - 15 * 60 * 1000).toISOString();
+    const { count } = await servidor.from("tentativas_acesso").select("id", { count: "exact", head: true })
+      .eq("tipo", "login_cpf").eq("chave", chaveIp).eq("sucesso", false).gte("criado_em", desde);
+    if ((count ?? 0) >= ERROS_POR_IP) {
+      return resposta({ ok: false, codigo: "bloqueado", mensagem: BLOQUEADO }, 429);
+    }
+  }
+
   const { data: preparo, error: erroPreparo } = await servidor.rpc("login_cpf_preparar", {
     p_cpf: cpf,
     p_aparelho: aparelho,
   });
   if (erroPreparo) throw erroPreparo;
   if (preparo?.bloqueado) {
-    return resposta({
-      ok: false,
-      codigo: "bloqueado",
-      mensagem: "Muitas tentativas erradas. Espere 15 minutos e tente de novo.",
-    }, 429);
+    return resposta({ ok: false, codigo: "bloqueado", mensagem: BLOQUEADO }, 429);
   }
 
   let sessao = null;
@@ -71,6 +83,7 @@ servir(async (req) => {
   await servidor.rpc("login_cpf_registrar", { p_cpf: cpf, p_aparelho: aparelho, p_sucesso: !!sessao });
 
   if (!sessao) {
+    if (chaveIp) await servidor.from("tentativas_acesso").insert({ tipo: "login_cpf", chave: chaveIp, sucesso: false });
     // Mesmo tempo de resposta com ou sem CPF cadastrado.
     const passou = Date.now() - inicio;
     if (passou < 700) await espera(700 - passou);
