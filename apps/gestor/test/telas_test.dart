@@ -181,7 +181,7 @@ void main() {
     final s = servidorComAmostra(usuario: euGestor)..trocarSenha = true;
     await abrirApp(tester, s);
     expect(find.text('Crie a sua senha'), findsOneWidget);
-    await tester.enterText(find.byType(TextField), 'minhasenha');
+    await tester.enterText(find.byType(TextField), 'minhasenha1');
     await tester.tap(find.text('Salvar senha'));
     await tester.pumpAndSettle();
     expect(s.chamadas, contains('senha'));
@@ -252,7 +252,7 @@ void main() {
   testWidgets('primeiro acesso: termos e código de recuperação antes do painel', (tester) async {
     final s = servidorComAmostra()
       ..situacaoExtra = {
-        'termos': {'versao': '2026-10-17', 'aceito': false},
+        'termos': {'versao': '2026-10-22', 'aceito': false},
         'recuperacao': false,
       };
     await abrirApp(tester, s);
@@ -260,7 +260,7 @@ void main() {
     await tester.tap(find.text('Li e aceito os Termos de Uso e a Política de Privacidade.'));
     await tester.tap(find.text('Aceitar e continuar'));
     await tester.pumpAndSettle();
-    expect(s.termosAceitos, '2026-10-17');
+    expect(s.termosAceitos, '2026-10-22');
     await tester.tap(find.text('Gerar o meu código'));
     await tester.pumpAndSettle();
     expect(find.text('QWER-TYUP-ASDF'), findsOneWidget);
@@ -301,10 +301,10 @@ void main() {
     final campos = find.byType(TextField);
     await tester.enterText(campos.at(0), 'Dono@Teste.com');
     await tester.enterText(campos.at(1), 'qwertyupasdf');
-    await tester.enterText(campos.at(2), 'novasenha');
+    await tester.enterText(campos.at(2), 'novasenha1');
     await tester.tap(find.text('Criar a senha nova'));
     await tester.pumpAndSettle();
-    expect(s.recuperacoes, ['dono@teste.com:QWER-TYUP-ASDF:novasenha']);
+    expect(s.recuperacoes, ['dono@teste.com:QWER-TYUP-ASDF:novasenha1']);
     expect(find.text('NOVO-CODI-GO23'), findsOneWidget);
     await tester.tap(find.text('Já anotei o código em lugar seguro.'));
     await tester.tap(find.text('Continuar'));

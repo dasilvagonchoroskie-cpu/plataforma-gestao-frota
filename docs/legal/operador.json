@@ -1,0 +1,9 @@
+{
+  "_leia": "Quem oferece a Plataforma. Os textos legais usam estes dados (ferramentas/legal/gerar.py). Quando houver CNPJ: tipo = pessoa_juridica, nome = razão social, documento = CNPJ; depois mude a versão (VERSAO no gerar.py e public.versao_termos() numa migration nova) para todos aceitarem de novo.",
+  "tipo": "pessoa_fisica",
+  "nome": "Evandro",
+  "documento": "",
+  "marca": "Fortaleza Digital Security",
+  "cidade": "Goiatuba (GO)",
+  "email": "gestaodefrota2027@gmail.com"
+}

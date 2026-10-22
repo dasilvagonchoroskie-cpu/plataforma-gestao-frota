@@ -1,14 +1,14 @@
 // Gerado por ferramentas/legal/gerar.py a partir de docs/legal. Não editar à mão.
 
 /// Versão dos Termos de Uso e da Política de Privacidade (igual a public.versao_termos()).
-const versaoTermos = '2026-10-17';
+const versaoTermos = '2026-10-22';
 
 /// Termos de Uso (docs/legal/termos-de-uso.md).
 const termosDeUso = r'''# Termos de Uso
 
-Versão de 17 de outubro de 2026.
+Versão de 22 de outubro de 2026.
 
-Estes Termos de Uso valem para a Plataforma de Gestão de Frota, formada pelos aplicativos Frota Motorista e Frota Gestor e pelo painel na internet (a "Plataforma"), oferecida por Fortaleza Digital Security, com sede em Goiatuba (GO) ("nós"). Ao criar uma conta ou usar a Plataforma, você declara que leu, entendeu e aceita estes Termos e a Política de Privacidade. Se não concordar, não use a Plataforma.
+Estes Termos de Uso valem para a Plataforma de Gestão de Frota, formada pelos aplicativos Frota Motorista e Frota Gestor e pelo painel na internet (a "Plataforma"), oferecida por Evandro, pessoa física, responsável pela marca Fortaleza Digital Security, com atendimento em Goiatuba (GO) ("nós"). Ao criar uma conta ou usar a Plataforma, você declara que leu, entendeu e aceita estes Termos e a Política de Privacidade. Se não concordar, não use a Plataforma.
 
 ## 1. Quem é quem
 
@@ -76,7 +76,7 @@ Na medida permitida pela lei, não respondemos por: decisões tomadas pela Empre
 
 ## 11. Propriedade
 
-A Plataforma (programas, marcas, telas e textos) pertence a Fortaleza Digital Security. Os dados lançados pertencem à Empresa e aos seus titulares, nos termos da Política de Privacidade. Usar a Plataforma não transfere nenhum direito sobre o programa.
+A Plataforma (programas, marcas, telas e textos) pertence a Evandro, titular da marca Fortaleza Digital Security. Os dados lançados pertencem à Empresa e aos seus titulares, nos termos da Política de Privacidade. Usar a Plataforma não transfere nenhum direito sobre o programa.
 
 ## 12. Exclusão da conta e dos dados
 
@@ -95,20 +95,20 @@ Estes Termos seguem as leis da República Federativa do Brasil e valem em todo o
 
 ## 15. Contato
 
-Dúvidas, pedidos e reclamações: gestaodefrota2027@gmail.com. Respondemos em até 15 dias.''';
+Dúvidas, pedidos e reclamações: gestaodefrota2027@gmail.com. Respondemos em até 15 dias. Responsável pela Plataforma: Evandro, pessoa física, responsável pela marca Fortaleza Digital Security, com atendimento em Goiatuba (GO).''';
 
 /// Política de Privacidade (docs/legal/politica-de-privacidade.md).
 const politicaDePrivacidade = r'''# Política de Privacidade
 
-Versão de 17 de outubro de 2026.
+Versão de 22 de outubro de 2026.
 
 Esta Política explica quais dados pessoais a Plataforma de Gestão de Frota (apps Frota Motorista e Frota Gestor e painel na internet) trata, para quê, com quem compartilha, por quanto tempo guarda e como você exerce os seus direitos, conforme a Lei Geral de Proteção de Dados Pessoais (LGPD, Lei 13.709/2018) e o Marco Civil da Internet (Lei 12.965/2014). Ela vale para usuários de todos os estados do Brasil.
 
 ## 1. Quem cuida dos seus dados
 
 - A Empresa (transportadora) é a controladora dos dados dos seus Motoristas, dos seus Gestores e dos lançamentos: é ela quem decide usar a Plataforma e para que os dados servem (acompanhar a frota e fazer os acertos).
-- Fortaleza Digital Security, com sede em Goiatuba (GO), que oferece a Plataforma, é operadora desses dados: trata os dados em nome da Empresa e conforme as instruções dela. Também é controladora dos dados necessários para manter as contas e a segurança da Plataforma (login, aceite destes textos e registros de acesso).
-- Canal de atendimento ao titular e encarregado: gestaodefrota2027@gmail.com.
+- Evandro, pessoa física, responsável pela marca Fortaleza Digital Security, com atendimento em Goiatuba (GO), que oferece a Plataforma, é operador desses dados: trata os dados em nome da Empresa e conforme as instruções dela. Também é controlador dos dados necessários para manter as contas e a segurança da Plataforma (login, aceite destes textos e registros de acesso).
+- Canal de atendimento ao titular: gestaodefrota2027@gmail.com. Como agente de tratamento de pequeno porte, mantemos este canal no lugar de um encarregado formal (Resolução CD/ANPD nº 2/2022, art. 11).
 
 ## 2. Dados que tratamos
 
@@ -142,11 +142,12 @@ Não vendemos dados e não usamos os dados para propaganda.
 - Uma Empresa nunca vê os dados de outra. Essa separação é garantida pelo próprio banco de dados, não só pelas telas.
 - Fornecedores: os dados ficam guardados em servidores da Supabase na região de São Paulo (Brasil), contratados por nós para hospedar a Plataforma. Fornecedores só tratam os dados para prestar o serviço.
 - Autoridades: só quando a lei ou uma ordem judicial obrigar.
-- Transferência internacional: os dados ficam no Brasil. Se algum fornecedor precisar acessá-los do exterior (por exemplo, para suporte técnico), isso só acontece com as garantias previstas na LGPD (art. 33).
+- Cópias de segurança: uma vez por dia fazemos uma cópia de segurança do banco, criptografada (AES-256) antes de sair do servidor, guardada por até 90 dias no GitHub (Microsoft), que pode armazená-la fora do Brasil. Só nós temos a chave; sem ela o arquivo não pode ser lido.
+- Transferência internacional: os dados em uso ficam no Brasil. A cópia de segurança criptografada pode ficar fora do Brasil, e algum fornecedor pode precisar acessar dados do exterior (por exemplo, para suporte técnico); isso só acontece com as garantias previstas na LGPD (art. 33), como cláusulas contratuais do fornecedor e a criptografia.
 
 ## 5. Como protegemos
 
-Conexão cifrada (HTTPS); senhas e códigos guardados só cifrados; separação entre empresas e entre motoristas no próprio banco de dados; histórico das correções; bloqueio depois de tentativas erradas; e acesso restrito à administração da Plataforma. Nenhum sistema é totalmente seguro: se acontecer um incidente que possa causar risco ou dano relevante, avisaremos a Empresa, os titulares afetados e a Autoridade Nacional de Proteção de Dados (ANPD), como manda a LGPD (art. 48).
+Conexão cifrada (HTTPS); senhas e códigos guardados só cifrados; cópias de segurança diárias criptografadas e testadas; registro das ações da administração da Plataforma; separação entre empresas e entre motoristas no próprio banco de dados; histórico das correções; bloqueio depois de tentativas erradas; e acesso restrito à administração da Plataforma. Nenhum sistema é totalmente seguro: se acontecer um incidente que possa causar risco ou dano relevante, avisaremos a Empresa, os titulares afetados e a Autoridade Nacional de Proteção de Dados (ANPD), como manda a LGPD (art. 48).
 
 ## 6. Por quanto tempo guardamos
 
@@ -155,7 +156,7 @@ Conexão cifrada (HTTPS); senhas e códigos guardados só cifrados; separação 
 - Fim do teste ou do contrato: 30 dias depois, tudo da Empresa é apagado.
 - Motorista que pede a exclusão da conta: apagada na hora, se não estiver ligado a uma Empresa; se estiver, em até 15 dias.
 - Registros de acesso: 6 meses. Tentativas de entrar: 30 dias. Códigos de entrada usados, cancelados ou vencidos: 90 dias.
-- Cópias de segurança do provedor podem manter dados apagados por mais alguns dias, até serem substituídas.
+- Cópias de segurança: as do provedor podem manter dados apagados por mais alguns dias; as nossas, criptografadas, por até 90 dias. Depois disso são apagadas automaticamente.
 - A Empresa é responsável por guardar, antes de excluir, o que a lei a obriga a manter (use os relatórios em PDF e planilha).
 
 ## 7. Os seus direitos
@@ -170,7 +171,7 @@ Como pedir:
 
 ## 8. Dados guardados no aparelho
 
-Os apps guardam no celular os seus lançamentos (para funcionar sem internet) e a sua sessão. O painel na internet guarda a sessão no navegador. Não usamos cookies de propaganda nem de rastreamento.
+Os apps guardam no celular os seus lançamentos (para funcionar sem internet) e a sua sessão, na área privada do app (outros apps não leem) e sem cópia para o backup do Android. O CPF e o e-mail não ficam guardados no celular. O painel na internet guarda a sessão no navegador. Não usamos cookies de propaganda nem de rastreamento.
 
 ## 9. Crianças e adolescentes
 
@@ -182,4 +183,4 @@ Quando mudarmos algo importante, os apps mostrarão a versão nova e pedirão um
 
 ## 11. Contato
 
-gestaodefrota2027@gmail.com. Fortaleza Digital Security, Goiatuba (GO).''';
+gestaodefrota2027@gmail.com. Evandro, pessoa física, responsável pela marca Fortaleza Digital Security, com atendimento em Goiatuba (GO).''';

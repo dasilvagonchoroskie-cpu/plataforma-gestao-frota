@@ -1,8 +1,8 @@
 # Termos de Uso
 
-Versão de 17 de outubro de 2026.
+Versão de 22 de outubro de 2026.
 
-Estes Termos de Uso valem para a Plataforma de Gestão de Frota, formada pelos aplicativos Frota Motorista e Frota Gestor e pelo painel na internet (a "Plataforma"), oferecida por Fortaleza Digital Security, com sede em Goiatuba (GO) ("nós"). Ao criar uma conta ou usar a Plataforma, você declara que leu, entendeu e aceita estes Termos e a Política de Privacidade. Se não concordar, não use a Plataforma.
+Estes Termos de Uso valem para a Plataforma de Gestão de Frota, formada pelos aplicativos Frota Motorista e Frota Gestor e pelo painel na internet (a "Plataforma"), oferecida por {{OPERADOR}} ("nós"). Ao criar uma conta ou usar a Plataforma, você declara que leu, entendeu e aceita estes Termos e a Política de Privacidade. Se não concordar, não use a Plataforma.
 
 ## 1. Quem é quem
 
@@ -70,7 +70,7 @@ Na medida permitida pela lei, não respondemos por: decisões tomadas pela Empre
 
 ## 11. Propriedade
 
-A Plataforma (programas, marcas, telas e textos) pertence a Fortaleza Digital Security. Os dados lançados pertencem à Empresa e aos seus titulares, nos termos da Política de Privacidade. Usar a Plataforma não transfere nenhum direito sobre o programa.
+A Plataforma (programas, marcas, telas e textos) pertence a {{OPERADOR_CURTO}}. Os dados lançados pertencem à Empresa e aos seus titulares, nos termos da Política de Privacidade. Usar a Plataforma não transfere nenhum direito sobre o programa.
 
 ## 12. Exclusão da conta e dos dados
 
@@ -85,8 +85,8 @@ Podemos atualizar estes Termos. Quando a mudança for importante, a Plataforma m
 
 ## 14. Lei aplicável e foro
 
-Estes Termos seguem as leis da República Federativa do Brasil e valem em todo o território nacional. Para questões entre a Plataforma e a Empresa, fica eleito o foro da comarca de Goiatuba (GO). Quando o Usuário for consumidor, poderá escolher o foro do próprio domicílio, como garante o Código de Defesa do Consumidor. Questões entre a Empresa e os seus Motoristas não envolvem a Plataforma.
+Estes Termos seguem as leis da República Federativa do Brasil e valem em todo o território nacional. Para questões entre a Plataforma e a Empresa, fica eleito o foro da comarca de {{CIDADE}}. Quando o Usuário for consumidor, poderá escolher o foro do próprio domicílio, como garante o Código de Defesa do Consumidor. Questões entre a Empresa e os seus Motoristas não envolvem a Plataforma.
 
 ## 15. Contato
 
-Dúvidas, pedidos e reclamações: gestaodefrota2027@gmail.com. Respondemos em até 15 dias.
+Dúvidas, pedidos e reclamações: {{EMAIL}}. Respondemos em até 15 dias. Responsável pela Plataforma: {{OPERADOR}}.
