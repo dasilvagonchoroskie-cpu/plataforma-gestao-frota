@@ -124,7 +124,27 @@ Relatório completo (achado, gravidade, correção): `docs/SEGURANCA.md`.
   do GitHub (Settings > Code security). Até lá: sem backup automático, parte 4 e migrations novas não vão
   para a nuvem, APKs novos não são publicados.
 
+## Senha por link no e-mail e termos na primeira abertura (22/10/2026)
+
+Pedido do Evandro: recuperar a senha sem código (link no e-mail) e aceitar os termos logo ao abrir o app.
+
+- **feito e testado** — Edge Function `pedir_link_senha` (publicada na nuvem, versão 1), modelos de e-mail
+  com link, gatilho que leva o e-mail confirmado para o perfil, banco recusa troca de e-mail de dono e
+  gestor. Local: `supabase/tests/local/rodar.sh` → `total de verificações que passaram: 279`. Esteira
+  (Supabase local de verdade, com caixa de e-mail): `verificações: 78, falhas: 0` (o link chega, abre a
+  sessão, cria a senha, só vale uma vez; o motorista confirma o e-mail e recupera pelo CPF).
+- **feito e testado** — Apps 0.3.0: "Esqueci a senha" pede o link; painel web abre o link do e-mail (senha
+  nova ou e-mail confirmado) e encerra as outras sessões; motorista cadastra o e-mail no cadastro ou em
+  Configurações; código de recuperação retirado; termos antes de qualquer tela (guardados no aparelho).
+  Motorista: `flutter analyze` sem problemas, `flutter test --exclude-tags capturas` → 31 testes. Gestor:
+  sem problemas, 32 testes; `flutter build web` compilou. Núcleo: `dart analyze` sem problemas.
+- **feito** — Banco da nuvem: partes 4, segurança e termos aplicadas pelo fluxo (histórico conferido no
+  registro `banco-nuvem.log`). Backup sem sessões e tokens; restauração mostra a tabela que falhou.
+- **depende do usuário** — SMTP próprio (Brevo) no painel do Supabase, para o link chegar a qualquer
+  e-mail (`docs/EMAIL.md`).
+
 ## Fase 7 — acabamento e piloto
 
-- **não feito** — SMTP próprio, Sentry, teste fechado no Google Play, hospedagem do painel quando o
+- **em andamento** — SMTP próprio (Brevo, configuração no painel do Supabase pelo dono).
+- **não feito** — Sentry, teste fechado no Google Play, hospedagem do painel quando o
   repositório voltar a ser privado, piloto com uma empresa real.

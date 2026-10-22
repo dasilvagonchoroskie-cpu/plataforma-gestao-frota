@@ -73,11 +73,19 @@ configurar SMTP e modelos no painel do Supabase, então o acesso do piloto passo
   único, válido por 7 dias e que só funciona com aquele CPF. Com ele o motorista entra na empresa na hora
   (sem aprovação). Gerar de novo para o mesmo CPF cancela o anterior. O código da empresa (pedido com
   aprovação) continua no servidor, mas saiu da tela do painel.
-- **Recuperar o acesso sem e-mail:** cada pessoa gera um código de recuperação (12 caracteres) no primeiro
-  acesso; com CPF (motorista) ou e-mail (dono e gestor) + código cria a senha nova (Edge Function
-  `recuperar_acesso`, 5 erros em 15 minutos bloqueiam). O código fica guardado só cifrado e é trocado a
-  cada uso. Sem o código: o patrão redefine o motorista, o dono redefine o gestor, a plataforma redefine o
-  dono (`criar_login_dono`).
+- **Recuperar a senha por link no e-mail (desde 22/10/2026, pedido do dono):** "Esqueci a senha" manda um
+  link (Edge Function `pedir_link_senha`); o link abre o painel web, onde a pessoa cria a senha nova, e
+  todas as sessões antigas são encerradas. Dono e gestor digitam o e-mail; o motorista digita o CPF e o
+  link vai para o e-mail que ele cadastrou (no cadastro ou em Configurações) e confirmou pelo link. Sem
+  e-mail: o patrão redefine o motorista, o dono redefine o gestor, a plataforma redefine o dono
+  (`criar_login_dono`). O código de recuperação saiu dos apps; `recuperar_acesso` fica só para os APKs
+  0.2.0 e pode ser retirada depois. Dono e gestor não trocam o próprio e-mail pelo app (o banco recusa).
+  Para chegar a qualquer e-mail é preciso o SMTP próprio (Brevo, `docs/EMAIL.md`); sem ele, só a equipe do
+  projeto recebe.
+- **Termos na primeira abertura (pedido do dono, 22/10/2026):** os apps e o painel mostram os termos antes
+  de qualquer tela; sem aceitar não dá para usar ("Não aceito" fecha o app). O aceite fica guardado no
+  aparelho (sobrevive a "Sair da conta") e vai para a conta no cadastro ou no próximo login. Versão nova
+  dos termos: aparece de novo.
 - **Termos de Uso e Política de Privacidade** (LGPD, Marco Civil, CDC; leis federais, valem em todos os
   estados): textos em `docs/legal/`, mostrados nos apps e publicados no painel web (`termos.html` e
   `privacidade.html`). Aceite obrigatório, guardado com versão, data e IP. Mudou o texto: trocar a data em

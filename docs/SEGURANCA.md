@@ -36,6 +36,9 @@ limitado), **Baixa** (defesa em profundidade).
 | 24 | Proteção contra senha vazada (HaveIBeenPwned) e limite de sessão desligados. | Baixa | Só existem no plano Pro; o fluxo tenta ligar e avisa. | Pendente (plano Pro) |
 | 25 | Cadastro aberto no Supabase Auth (e-mail com código) ainda ligado por causa da tela antiga. | Baixa | Sem confirmar o e-mail não há sessão; RLS não deixa ver nada sem perfil. Desligar junto com o SMTP próprio. | Pendente |
 | 26 | Aviso do Supabase: 19 funções `SECURITY DEFINER` chamáveis por usuário logado. | Info | São a API do app; cada uma confere quem chama. Testes 01 a 07 provam o isolamento. | Aceito |
+| 28 | Recuperação dependia de um código anotado em papel (quem perdeu ficava sem acesso). | Média | Link por e-mail (`pedir_link_senha`): mesma resposta e mesmo tempo exista ou não a conta, 3 pedidos por hora por CPF/e-mail e 10 por IP, link de 1 hora e uso único, todas as sessões encerradas depois da senha nova. Sem guardar nada no celular. | Feito; chega a todos com o SMTP próprio |
+| 29 | Troca de e-mail confirmada só no e-mail novo (necessária para o motorista, cujo login é interno): com a sessão roubada daria para trocar o e-mail do dono e depois a senha. | Média | O banco recusa o pedido de troca de e-mail de dono e gestor (gatilho `barrar_troca_email_gestor`); teste pgTAP e ponta a ponta. | Feito |
+| 30 | Backup guardava sessões e tokens de login. | Baixa | Backup sem sessões, tokens de renovação, códigos e links em andamento e registro de entradas; depois de restaurar, cada um entra com a senha. | Feito |
 | 27 | As 4 etiquetas antigas dos Releases ainda apontam para o histórico de antes da limpeza (o GitHub não deixa mudar etiquetas por esta sessão). | Baixa | A Esteira move as etiquetas para a versão publicada assim que publicar o primeiro APK oficial. A chave antiga já não vale para APKs novos. | Automático com os segredos |
 
 ## Como a segurança está montada
@@ -49,8 +52,9 @@ limitado), **Baixa** (defesa em profundidade).
   Supabase existe só dentro das Edge Functions. Os apps têm só a chave pública. Nada de senha ou chave no
   repositório, no chat ou nos registros (as senhas derivadas são mascaradas).
 - **Senhas e sessões:** regra única (8–72, letras e números); bloqueio de 15 minutos depois de 5 erros no
-  login por CPF e na recuperação; mesma mensagem e mesmo tempo de resposta exista ou não a conta; token de
-  1 hora com rotação do token de renovação.
+  login por CPF; senha esquecida por link no e-mail (limite de pedidos, link de 1 hora e uso único, sessões
+  antigas encerradas); mesma mensagem e mesmo tempo de resposta exista ou não a conta; token de 1 hora com
+  rotação do token de renovação.
 - **Mudanças no banco:** só por migration versionada, testada na Esteira, com backup antes e aprovação do
   dono para o que apaga dados.
 - **Esteira:** testes do banco (pgTAP), das Edge Functions (ponta a ponta), backup e restauração, apps,

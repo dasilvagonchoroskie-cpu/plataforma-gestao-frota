@@ -18,12 +18,12 @@ No Supabase (SQL Editor, como dono da plataforma):
     select public.criar_empresa('Nome da Transportadora', 'email-do-dono@exemplo.com', null, 'piloto', 5, 'teste');
 
 A resposta traz o id da empresa (`empresa_id`). Depois crie o login do dono com uma senha provisória (passe
-para ele; no primeiro login ele aceita os termos, cria a senha dele e anota o código de recuperação):
+para ele; no primeiro login ele cria a senha dele):
 
     select public.criar_login_dono('email-do-dono@exemplo.com', 'Nome do Dono', 'SENHA123');
 
-O mesmo comando, rodado de novo, gera outra senha para um dono que esqueceu a senha e o código de
-recuperação. O dono cria os gestores em Configurações > Donos e gestores (senha provisória). Para cada
+O mesmo comando, rodado de novo, gera outra senha para um dono que esqueceu a senha e não recebe o link
+no e-mail. O dono cria os gestores em Configurações > Donos e gestores (senha provisória). Para cada
 motorista, o gestor toca em Motoristas > Cadastrar motorista (nome e CPF) e manda o código gerado (só
 daquele motorista, vale 7 dias, uma vez só). O motorista cria a conta no app (nome, CPF e senha) e digita
 o código: entra na empresa na hora.
@@ -168,7 +168,8 @@ altera nem apaga esse registro, nem o dono do banco.
 
 Senha de 8 a 72 caracteres, com letras e números (apps, Edge Functions, banco e Supabase Auth). Login do
 motorista bloqueia por 15 minutos depois de 5 erros seguidos (por CPF e por aparelho) e o endereço IP
-fica bloqueado depois de 30 erros em 15 minutos; recuperação: 5 erros em 15 minutos.
+fica bloqueado depois de 30 erros em 15 minutos. Link de senha nova: 3 pedidos por hora por CPF ou
+e-mail e 10 por hora por IP; o link vale 1 hora e uma vez só.
 O login interno do motorista é sorteado (não sai do CPF), então ninguém tenta senha direto no Supabase.
 Sessão: token de 1 hora renovado com rotação. A proteção contra senha vazada (HaveIBeenPwned) e o limite
 de tempo de sessão só existem no plano Pro: o fluxo tenta ligar e só avisa se o plano não deixar.
@@ -180,9 +181,11 @@ Se a migration apagar dados, precisa da aprovação escrita do dono no começo d
 
 ## Problemas comuns
 
-- Esqueceu a senha: no app, "Esqueci a senha" > código de recuperação (CPF ou e-mail + código + senha
-  nova). Sem o código: motorista pede ao gestor (Motoristas > o motorista > Redefinir o acesso); gestor
-  pede ao dono (Configurações > Donos e gestores); dono pede à plataforma (`criar_login_dono`).
+- Esqueceu a senha: no app, "Esqueci a senha" > e-mail (dono e gestor) ou CPF (motorista) > chega um link
+  no e-mail > a senha nova é criada no painel web. O link não chega: conferir o spam e o SMTP próprio
+  (`docs/EMAIL.md`). Sem acesso ao e-mail: motorista pede ao gestor (Motoristas > o motorista > Redefinir
+  o acesso); gestor pede ao dono (Configurações > Donos e gestores); dono pede à plataforma
+  (`criar_login_dono`).
 - Código do motorista venceu ou foi perdido: Motoristas > Cadastrar motorista de novo (o anterior para de
   valer).
 - Pedido de titular de dados (LGPD) pelo e-mail gestaodefrota2027@gmail.com: responder em até 15 dias. Se

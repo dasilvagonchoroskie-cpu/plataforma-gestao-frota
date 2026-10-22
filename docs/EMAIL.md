@@ -1,28 +1,42 @@
-# E-mail da plataforma (recuperar senha e avisos)
+# E-mail da plataforma (link para criar senha nova e confirmar e-mail)
 
-Hoje a plataforma **não depende de e-mail**: o motorista entra com CPF e senha, o dono cria os gestores
-com senha provisória e todos recuperam o acesso com o **código de recuperação**. O e-mail serve para o
-caminho antigo de "código por e-mail" (que ainda existe nos apps) e para avisos no futuro.
+Desde 22/10/2026 quem esquece a senha recebe um **link no e-mail** (o código de recuperação saiu dos apps):
 
-## O problema do e-mail padrão do Supabase
+- **Dono e gestor:** "Esqueci a senha" > digitam o e-mail > chega o link > o link abre o painel web, onde
+  criam a senha nova. Depois disso, todas as sessões abertas em outros aparelhos são encerradas.
+- **Motorista:** cadastra um e-mail (no cadastro ou em Configurações > "E-mail para recuperar a senha") e
+  confirma pelo link. Depois, em "Esqueci a senha", digita o **CPF**: o link vai para o e-mail confirmado.
+  Sem e-mail confirmado, o patrão cria uma senha provisória no painel (Motoristas > o nome > Redefinir o
+  acesso).
+- Quem pede a função `pedir_link_senha`: resposta e tempo iguais exista ou não a conta; até 3 pedidos por
+  hora para o mesmo CPF ou e-mail e 10 por hora do mesmo IP.
+- Modelos dos e-mails: `supabase/templates/link_senha.html` e `confirmar_email.html`, aplicados na nuvem pelo
+  fluxo do banco (`supabase/auth-nuvem.json`, campo `modelos`). O link vale 1 hora e só uma vez.
+- Dono e gestor **não** trocam o próprio e-mail pelo app (o banco recusa; migration
+  `barrar_troca_email_gestor`): isso impede que alguém com a sessão roubada troque o e-mail e depois a senha.
 
-O envio que vem pronto no Supabase só entrega para **endereços da equipe do projeto** e no máximo
-**2 e-mails por hora**, sem garantia (feito só para testes). Para donos e gestores de verdade receberem
-e-mail, é preciso ligar um **SMTP próprio** (Supabase > Authentication > Emails > SMTP Settings ("Ajustes
-de SMTP") > Enable custom SMTP ("Ligar SMTP próprio")). Com SMTP próprio, o limite passa a 30 por hora
-(ajustável em Authentication > Rate Limits).
+## SMTP próprio (Brevo)
 
-## Opções (preços de 2026; conferir na página de cada um antes de assinar)
+O envio que vem pronto no Supabase só entrega para **endereços da equipe do projeto** e no máximo **2
+e-mails por hora**. Para motoristas e gestores receberem o link é preciso o **SMTP próprio**. Escolhido:
+**Brevo** (300 e-mails por dia grátis, painel em português).
 
-| Serviço | Grátis | Pago | Observação |
-|---|---|---|---|
-| **Brevo** | 300 e-mails/dia, sem prazo | planos mensais | Painel em português, guia oficial para Supabase. **Recomendado para o piloto.** |
-| Resend | 3.000/mês (100/dia) | a partir de ~US$ 20/mês | Muito simples; bom para desenvolvedor. |
-| Amazon SES | crédito inicial só para conta nova | US$ 0,10 por 1.000 | Mais barato em volume; configuração mais técnica. |
-| Zoho ZeptoMail | créditos iniciais | pago por pacote | Só e-mail transacional; boa entrega. |
-| Postmark | 100/mês | US$ 15/mês | Excelente entrega; caro para o tamanho atual. |
+O dono configura direto no painel do Supabase (a chave nunca passa pelo chat nem pelo repositório):
+Authentication ("Autenticação") > Emails ("E-mails") > SMTP Settings ("Configurações de SMTP") > Enable
+Custom SMTP ("Ativar SMTP personalizado"):
 
-A senha do SMTP é segredo: cola-se direto no Supabase, nunca no chat nem no repositório.
+| Campo | Valor |
+|---|---|
+| Sender email ("E-mail do remetente") | o remetente verificado no Brevo |
+| Sender name ("Nome do remetente") | Plataforma de Gestão de Frota |
+| Host ("Servidor") | smtp-relay.brevo.com |
+| Port number ("Porta") | 587 |
+| Username ("Usuário") | o **Login** da aba SMTP do Brevo (SMTP & API), parecido com `xxxx@smtp-brevo.com` |
+| Password ("Senha") | a chave SMTP do Brevo |
+
+O fluxo "Banco - backup diário e atualização na nuvem" confere a cada execução se o SMTP está ligado (sem
+mostrar senha nem usuário) e avisa no registro quando não está. Com SMTP próprio, o limite do Supabase
+passa a 30 e-mails por hora (Authentication > Rate Limits ("Limites")).
 
 ## Domínio e DNS (para não cair no spam)
 
@@ -39,5 +53,10 @@ registrado (Registro.br ou o provedor de DNS), crie os registros que o serviço 
 Passos do DMARC: comece com `p=none` (só observa) por 2 a 4 semanas, olhando os relatórios; depois
 `p=quarantine` (falso vai para o spam) e, quando estiver tudo certo, `p=reject`.
 
-Depois de ligar o SMTP, teste "Esqueci a senha" com um e-mail de gestor de teste e confira se chega na
-caixa de entrada (não no spam). Os modelos de e-mail ficam em `supabase/templates/`.
+Remetente com endereço do Gmail (ou outro e-mail gratuito) costuma cair no spam, porque o Gmail não autoriza
+o Brevo a mandar em nome dele. Para entregar bem, o próximo passo é autenticar o domínio no Brevo (Senders,
+Domains & Dedicated IPs ("Remetentes, domínios e IPs") > Domains ("Domínios")) e usar o remetente do
+subdomínio acima.
+
+Depois de ligar o SMTP, teste "Esqueci a senha" com um e-mail de teste e confira se chega na caixa de
+entrada (não no spam).
