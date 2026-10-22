@@ -282,6 +282,7 @@ jobs:
           conferir redefinir_acesso '{}' 401
           conferir criar_acesso_gestor '{}' 401
           conferir recuperar_acesso '{"identificador":"123","codigo":"x","senha_nova":"x"}' 400
+          conferir pedir_link_senha '{"identificador":"123"}' 400
           # Versão nova no ar: senha sem número é recusada antes de gravar qualquer coisa,
           # e pedido grande demais é recusado.
           conferir cadastrar_motorista '{"nome":"Teste","cpf":"52998224725","senha":"semnumero","aparelho":"esteira"}' 400

@@ -26,10 +26,16 @@ def chamar(metodo: str, corpo: dict | None = None) -> dict:
 
 def main(caminho: str) -> int:
     alvo = json.load(open(caminho, encoding="utf-8"))
+    raiz = os.path.dirname(os.path.dirname(os.path.abspath(caminho)))
+    for campo, arquivo in alvo.get("modelos", {}).items():
+        alvo["config"][campo] = open(os.path.join(raiz, arquivo), encoding="utf-8").read()
     atual = chamar("GET")
     mudar = {k: v for k, v in alvo["config"].items() if atual.get(k) != v}
     for k in alvo["config"]:
-        print(f"{k}: {atual.get(k)!r} -> {alvo['config'][k]!r}" if k in mudar else f"{k}: já está {atual.get(k)!r}")
+        if k in alvo.get("modelos", {}):
+            print(f"{k}: {'atualizado' if k in mudar else 'já está'} ({len(alvo['config'][k])} caracteres)")
+        else:
+            print(f"{k}: {atual.get(k)!r} -> {alvo['config'][k]!r}" if k in mudar else f"{k}: já está {atual.get(k)!r}")
     if mudar:
         chamar("PATCH", mudar)
         print(f"regras de login atualizadas: {len(mudar)}")
@@ -42,7 +48,24 @@ def main(caminho: str) -> int:
             print(f"{k}: aplicado {v!r}")
         except urllib.error.HTTPError as e:
             print(f"::notice::{k} não foi aplicado (HTTP {e.code}); costuma exigir o plano Pro do Supabase.")
+    conferir_smtp(atual)
     return 0
+
+
+def conferir_smtp(atual: dict) -> None:
+    """Só confere o e-mail próprio (SMTP), que o dono configura no painel do
+    Supabase. Nunca imprime a senha nem o usuário do SMTP; do remetente, só o
+    domínio."""
+    host = atual.get("smtp_host") or ""
+    if not host:
+        print("::warning::E-mail próprio (SMTP) desligado: os links de senha só chegam para a equipe do "
+              "projeto, no máximo 2 por hora (docs/EMAIL.md).")
+        return
+    remetente = (atual.get("smtp_admin_email") or "").split("@")[-1] or "(vazio)"
+    print(f"e-mail próprio (SMTP): ligado | servidor {host}:{atual.get('smtp_port')} | "
+          f"remetente @{remetente} | nome {atual.get('smtp_sender_name')!r} | "
+          f"usuário {'preenchido' if atual.get('smtp_user') else 'VAZIO'} | "
+          f"limite {atual.get('rate_limit_email_sent')} e-mails por hora")
 
 
 if __name__ == "__main__":

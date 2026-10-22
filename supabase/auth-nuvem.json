@@ -1,5 +1,5 @@
 {
-  "_leia": "Regras de login aplicadas no Supabase da nuvem pelo fluxo 'Banco - backup e atualização na nuvem' (Management API, PATCH /v1/projects/{ref}/config/auth). Só estes campos são enviados; nada de segredo aqui. Os campos em 'somente_pago' só funcionam no plano Pro e são tentados à parte (se o plano não deixar, o fluxo só avisa).",
+  "_leia": "Regras de login e e-mails aplicados no Supabase da nuvem pelo fluxo 'Banco - backup diário e atualização na nuvem' (Management API, PATCH /v1/projects/{ref}/config/auth). Só estes campos são enviados; nada de segredo aqui. 'modelos' aponta para arquivos HTML (o conteúdo vai no campo). Os campos de 'somente_pago' só funcionam no plano Pro e são tentados à parte.",
   "config": {
     "password_min_length": 8,
     "password_required_characters": "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ:0123456789",
@@ -7,11 +7,20 @@
     "security_refresh_token_reuse_interval": 10,
     "jwt_exp": 3600,
     "external_anonymous_users_enabled": false,
-    "mailer_otp_exp": 600
+    "mailer_otp_exp": 3600,
+    "site_url": "https://dasilvagonchoroskie-cpu.github.io/plataforma-gestao-frota/",
+    "uri_allow_list": "https://dasilvagonchoroskie-cpu.github.io/plataforma-gestao-frota/**",
+    "mailer_secure_email_change_enabled": false,
+    "mailer_subjects_recovery": "Criar uma senha nova - Plataforma de Gestão de Frota",
+    "mailer_subjects_email_change": "Confirme o seu e-mail - Plataforma de Gestão de Frota"
   },
   "somente_pago": {
     "password_hibp_enabled": true,
     "sessions_inactivity_timeout": 720,
     "sessions_timebox": 2160
+  },
+  "modelos": {
+    "mailer_templates_recovery_content": "supabase/templates/link_senha.html",
+    "mailer_templates_email_change_content": "supabase/templates/confirmar_email.html"
   }
 }
