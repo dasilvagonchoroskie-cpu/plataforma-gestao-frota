@@ -150,13 +150,23 @@ jobs:
         if: steps.segredos.outputs.acao == 'backup-e-aplicar' || steps.segredos.outputs.acao == 'conferir'
         run: |
           set -o pipefail
-          supabase db push --linked --include-all --dry-run 2>&1 | tee -a registros/banco-nuvem.log
+          # Até 3 tentativas: o login temporário do Supabase às vezes demora a valer.
+          for i in 1 2 3; do
+            supabase db push --linked --include-all --dry-run 2>&1 | tee -a registros/banco-nuvem.log && break
+            [ "$i" = 3 ] && exit 1
+            echo "tentativa $i falhou; de novo em 30 s" | tee -a registros/banco-nuvem.log; sleep 30
+          done
 
       - name: Aplicar as migrations pendentes
         if: steps.segredos.outputs.acao == 'backup-e-aplicar'
         run: |
           set -o pipefail
-          supabase db push --linked --include-all --yes 2>&1 | tee -a registros/banco-nuvem.log
+          # Cada migration entra na sua transação; repetir só aplica as que faltam.
+          for i in 1 2 3; do
+            supabase db push --linked --include-all --yes 2>&1 | tee -a registros/banco-nuvem.log && break
+            [ "$i" = 3 ] && exit 1
+            echo "tentativa $i falhou; de novo em 30 s" | tee -a registros/banco-nuvem.log; sleep 30
+          done
 
       - name: Regras de login (senha forte, sessões)
         if: steps.segredos.outputs.acao == 'backup-e-aplicar'
