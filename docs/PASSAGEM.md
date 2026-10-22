@@ -179,6 +179,12 @@ tudo), anotadas aqui:
   privado de vulnerabilidade): esta sessão não pode mudar configurações do repositório; ficam para o dono
   ligar em Settings > Code security (passo a passo no PROJETO).
 
+- **Tamanho mínimo da `CHAVE_MESTRA`:** a recomendação era 24 caracteres ou mais. O Evandro já tinha
+  criado a dele, menor, guardada em papel, e pediu para aceitar; o mínimo ficou em 12. Quanto mais curta,
+  mais fácil de adivinhar fora do ar (o certificado dos APKs e o backup cifrado são públicos enquanto o
+  repositório for público). Se um dia trocar por uma frase maior: APKs reinstalados uma vez e backups
+  antigos só abrem com a frase antiga.
+
 ### Pendências de segurança (dependem do usuário)
 
 1. **Criar os dois segredos no GitHub** (`SUPABASE_ACCESS_TOKEN` e `CHAVE_MESTRA`) — passo a passo em

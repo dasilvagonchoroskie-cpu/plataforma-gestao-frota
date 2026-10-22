@@ -31,7 +31,7 @@ import pathlib
 import sys
 
 SAL = b"plataforma-gestao-frota/chave-mestra/v1"
-MINIMO = 24
+MINIMO = 12  # decisão do dono (22/10/2026): frase dele, guardada em papel; 24 ou mais é o recomendado
 
 
 def raiz() -> bytes:

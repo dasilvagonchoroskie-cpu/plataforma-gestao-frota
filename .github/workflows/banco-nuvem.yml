@@ -71,8 +71,8 @@ jobs:
           FALTA=""
           [ -z "$SUPABASE_ACCESS_TOKEN" ] && FALTA="$FALTA SUPABASE_ACCESS_TOKEN"
           [ -z "$CHAVE_MESTRA" ] && FALTA="$FALTA CHAVE_MESTRA"
-          if [ -n "$CHAVE_MESTRA" ] && [ ${#CHAVE_MESTRA} -lt 24 ]; then
-            echo "::warning::A CHAVE_MESTRA tem menos de 24 caracteres: troque por uma frase maior (8 palavras ou mais)."
+          if [ -n "$CHAVE_MESTRA" ] && [ ${#CHAVE_MESTRA} -lt 12 ]; then
+            echo "::warning::A CHAVE_MESTRA tem menos de 12 caracteres: troque por uma frase maior."
             FALTA="$FALTA CHAVE_MESTRA(curta)"
           fi
           if [ -n "$FALTA" ]; then

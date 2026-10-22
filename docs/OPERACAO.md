@@ -85,7 +85,7 @@ New repository secret ("Novo segredo do repositório"). Criar dois:
    acesso total (fica limitado a este projeto). O token vence (ex.: 90 dias); quando vencer, o fluxo do
    banco falha e o GitHub manda e-mail: gere outro igual e troque o segredo (Update ("Atualizar")).
 2. `CHAVE_MESTRA` — uma frase longa inventada na hora: **8 palavras ou mais, sem sentido entre si, com um
-   número no meio** (pelo menos 24 caracteres; quanto mais longa, melhor). Escreva **à mão em papel** e
+   número no meio** (mínimo 12 caracteres; recomendado 24 ou mais: quanto mais longa, melhor). Escreva **à mão em papel** e
    guarde em casa, longe do celular. Sem ela nenhum backup abre e os APKs mudam de assinatura.
    Não troque depois: trocar muda a assinatura dos apps (todos reinstalam) e os backups antigos só abrem
    com a frase antiga.
