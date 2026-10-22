@@ -66,6 +66,35 @@ Só pelo SQL Editor (o dono da empresa não muda isso):
     update public.empresas set limite_caminhoes = 10, status = 'ativa' where id = '...';
     update public.empresas set status = 'suspensa' where id = '...';   -- motoristas não enviam; dados ficam
 
+## Aplicar mudança no banco da nuvem (sem computador)
+
+Pelo site do GitHub (no celular, use "Versão para computador" do navegador se não aparecer Settings):
+
+1. Uma vez só, criar 3 segredos em Settings ("Configurações") > Secrets and variables ("Segredos e
+   variáveis") > Actions > New repository secret ("Novo segredo do repositório"):
+   - `SUPABASE_ACCESS_TOKEN`: no Supabase, Account ("Conta") > Access Tokens ("Tokens de acesso") >
+     Generate new token ("Gerar novo token").
+   - `SUPABASE_DB_PASSWORD`: no projeto, Project Settings ("Configurações do projeto") > Database ("Banco
+     de dados") > Reset database password ("Redefinir senha do banco"). Os apps não usam esta senha.
+   - `BACKUP_SENHA`: uma frase longa (16 caracteres ou mais) inventada pelo dono e guardada em papel.
+     Sem ela nenhum backup abre. Nunca mandar no chat.
+2. Actions ("Ações") > "Banco - backup e atualização na nuvem" > Run workflow ("Executar fluxo de
+   trabalho"). `so-backup` só faz o backup; `backup-e-aplicar` (digitando APLICAR) faz o backup e, só se
+   ele der certo, aplica as migrations pendentes (`supabase db push`).
+3. O backup criptografado fica na página da execução, em Artifacts ("Artefatos"), por 90 dias.
+
+## Limpeza diária (pg_cron)
+
+Roda às 03:20 de Brasília (`frota-limpeza-diaria`). Começa em modo simulação: só anota o que apagaria.
+
+    -- o que a limpeza apagaria (últimas execuções):
+    select quando, modo, resultado from public.limpeza_execucoes order by quando desc limit 10;
+    -- registro de exclusões (empresa, tipo, quem pediu, data; sem dado pessoal):
+    select * from public.registro_exclusoes order by quando desc limit 50;
+    -- depois de conferir, ligar de verdade (ou voltar para simulação):
+    select public.definir_modo_limpeza('valendo');
+    select public.definir_modo_limpeza('simulacao');
+
 ## Mudança no banco
 
 Sempre por migration nova em `supabase/migrations/`, testada na esteira (job Banco) antes de aplicar.
