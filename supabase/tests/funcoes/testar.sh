@@ -212,6 +212,13 @@ R=$(funcao entrar_com_cpf "" '{"cpf":"24681357928","senha":"nova12345","aparelho
 igual "${R%% *}" "401" "a conta excluída não entra mais"
 R=$(funcao cadastrar_motorista "" '{"nome":"Motorista Volta","cpf":"24681357928","senha":"senha6543","aparelho":"conv-2"}')
 igual "${R%% *}" "200" "o CPF fica livre para um cadastro novo"
+# Motorista de empresa que exclui a própria conta (regra de 23/10/2026): o login sai na hora e o CPF fica livre
+igual "$(rpc "$TM" excluir_minha_conta '{}' | jq -r '(.apagada | tostring) + ":" + (.login_apagado | tostring)')" "false:true" "o motorista da empresa exclui a própria conta e o login sai na hora"
+igual "$(curl -s "$A/rest/v1/motoristas?select=perfil_id,exclusao_pedida_em&id=eq.$MOT" -H "apikey: $K" -H "Authorization: Bearer $TD" | jq -r '(.[0].perfil_id | tostring) + ":" + ((.[0].exclusao_pedida_em != null) | tostring)')" "null:true" "o painel vê que ele excluiu a conta e os lançamentos ficam com a empresa"
+R=$(funcao cadastrar_motorista "" '{"nome":"Motorista Volta Dois","cpf":"52998224725","senha":"senha6544","aparelho":"conv-3"}')
+igual "${R%% *}" "200" "o CPF dele fica livre na hora para uma conta nova"
+R=$(funcao redefinir_acesso "$TD" "{\"motorista_id\":\"$MOT\"}")
+igual "${R%% *} $(echo "${R#* }" | jq -r .mensagem)" "403 Este motorista excluiu a conta. Não tem acesso para redefinir; se ele voltar, cria uma conta nova." "o cadastro antigo não tem acesso para redefinir"
 psql "$DB" -tA -c "select public.bloquear_empresa(e.id, 'Teste encerrado.', 30) from public.empresas e where e.nome = 'Transportes W'" >/dev/null
 igual "$(rpc "$TW" situacao_acesso '{}' | jq -r .empresa.bloqueada)" "true" "a plataforma encerra o acesso de uma empresa"
 igual "$(curl -s "$A/rest/v1/caminhoes?select=id" -H "apikey: $K" -H "Authorization: Bearer $TW" | jq -r length)" "0" "e ela não vê mais nada"

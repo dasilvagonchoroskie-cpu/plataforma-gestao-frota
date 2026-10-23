@@ -51,7 +51,7 @@ servir(async (req) => {
 
   const emUso = () =>
     recusa(409, "cpf_em_uso",
-      "Não deu para criar a conta com este CPF. Se você já tem conta, entre com CPF e senha ou use o código de recuperação.");
+      'Já existe uma conta com este CPF. Entre com CPF e senha; se esqueceu a senha, toque em "Esqueci a senha".');
   const { data: existente } = await servidor.from("perfis").select("id").eq("cpf", cpf).maybeSingle();
   if (existente) return emUso();
 
