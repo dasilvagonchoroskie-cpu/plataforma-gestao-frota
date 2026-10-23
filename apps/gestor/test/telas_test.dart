@@ -236,8 +236,9 @@ void main() {
     expect(find.textContaining('Código K7M2QX'), findsOneWidget);
   });
 
-  testWidgets('excluir motorista e dados pede para digitar EXCLUIR', (tester) async {
+  testWidgets('excluir motorista: primeiro o PDF com tudo dele, depois digitar EXCLUIR', (tester) async {
     final s = servidorComAmostra();
+    final arquivos = guardarArquivos();
     await abrirApp(tester, s);
     await tester.tap(find.text('Motoristas').first);
     await tester.pumpAndSettle();
@@ -247,6 +248,11 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('Excluir motorista e dados'));
     await tester.pumpAndSettle();
+    expect(find.text('Primeiro, o PDF com todos os dados'), findsOneWidget);
+    await gerarPdfNaTela(tester);
+    expect(arquivos.single.nome, startsWith('Frota_arquivo_Carlos_'));
+    expect(String.fromCharCodes(arquivos.single.bytes.sublist(0, 5)), '%PDF-');
+    expect(s.chamadas.where((c) => c.startsWith('excluir motorista')), isEmpty, reason: 'ainda não excluiu');
     await tester.enterText(find.descendant(of: find.byType(AlertDialog), matching: find.byType(TextField)), 'EXCLUIR');
     await tester.pumpAndSettle();
     await tester.tap(find.widgetWithText(FilledButton, 'Excluir'));
@@ -289,15 +295,26 @@ void main() {
     expect(s.chamadas, contains('acesso gestor'), reason: 'o acesso fica registrado (Marco Civil)');
   });
 
-  testWidgets('empresa com o acesso encerrado: não abre o painel; o dono pode excluir tudo', (tester) async {
+  testWidgets('empresa com o acesso encerrado: o dono baixa o PDF com tudo e pode excluir', (tester) async {
     final s = servidorComAmostra()
       ..empresaExtra = {'bloqueada': true, 'motivo_bloqueio': 'O período de teste terminou.', 'excluir_em': '2026-12-01T12:00:00Z'};
+    final arquivos = guardarArquivos();
     await abrirApp(tester, s);
     expect(find.text('Acesso encerrado'), findsOneWidget);
     expect(find.text('Motivo: O período de teste terminou.'), findsOneWidget);
     expect(find.text('Faturamento'), findsNothing);
+    expect(find.textContaining('baixe aqui o PDF com todos os dados'), findsOneWidget);
+
+    await tester.tap(find.text('Baixar todos os dados (PDF)'));
+    await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 300)));
+    await tester.pumpAndSettle();
+    expect(s.chamadas, contains('exportar dados'), reason: 'com o acesso encerrado, os dados vêm da exportação do dono');
+    expect(arquivos.single.nome, startsWith('Frota_arquivo_Transportes_Goiatuba_'));
+
     await tester.tap(find.text('Excluir a conta da empresa e todos os dados'));
     await tester.pumpAndSettle();
+    await gerarPdfNaTela(tester);
+    expect(arquivos, hasLength(2), reason: 'excluir sempre gera o PDF antes');
     await tester.enterText(
       find.descendant(of: find.byType(AlertDialog), matching: find.byType(TextField)),
       'transportes goiatuba',

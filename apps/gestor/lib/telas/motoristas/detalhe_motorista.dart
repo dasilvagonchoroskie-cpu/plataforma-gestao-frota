@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:nucleo/nucleo.dart';
 import 'package:visual/visual.dart';
 
+import '../../componentes/arquivo_dados.dart';
 import '../../componentes/comuns.dart';
 import '../../componentes/itens.dart';
 import '../../dados/equipe.dart';
@@ -453,14 +454,21 @@ Future<void> ativarMotorista(BuildContext context, WidgetRef ref, Motorista m) a
   );
 }
 
-/// Exclui o motorista e todos os lançamentos dele (digitando EXCLUIR).
+/// Exclui o motorista e todos os lançamentos dele. Antes, sempre, o PDF com
+/// todos os dados dele (regra aprovada pelo dono); depois, digitar EXCLUIR.
 Future<void> excluirMotorista(BuildContext context, WidgetRef ref, Motorista m) async {
+  final pdf = await primeiroOPdf(
+    context,
+    quem: 'de ${m.primeiroNome}',
+    gerar: () => baixarDadosMotorista(context, ref, m.id),
+  );
+  if (!pdf || !context.mounted) return;
   final ok = await confirmarDigitando(
     context,
     titulo: 'Excluir ${m.primeiroNome} e os dados dele?',
     texto:
-        'Serão apagados de vez o cadastro dele e todos os fretes, viagens, acertos, abastecimentos, gastos e vales dele. '
-        'Antes, baixe o relatório dele (PDF ou planilha) se a empresa precisar guardar. Não dá para desfazer. '
+        'O PDF com todos os dados dele já foi gerado. Agora serão apagados de vez o cadastro dele e todos os fretes, '
+        'viagens, acertos, abastecimentos, gastos, vales e paradas dele. Não dá para desfazer. '
         'Para só tirar o acesso e guardar os dados, use "Desligar da empresa".',
     palavra: 'EXCLUIR',
     botao: 'Excluir',
@@ -584,6 +592,11 @@ class _Cadastro extends ConsumerWidget {
                 runSpacing: 8,
                 children: [
                   OutlinedButton.icon(
+                    onPressed: () => baixarDadosMotorista(context, ref, m.id),
+                    icon: const Icon(Icons.picture_as_pdf_outlined),
+                    label: const Text('Baixar tudo dele (PDF)'),
+                  ),
+                  OutlinedButton.icon(
                     onPressed: () => redefinirAcesso(context, ref, m),
                     icon: const Icon(Icons.key_outlined),
                     label: const Text('Redefinir o acesso'),
@@ -609,8 +622,8 @@ class _Cadastro extends ConsumerWidget {
                   titulo: 'Ele pediu para excluir a conta',
                   texto:
                       'Pedido feito em ${dataTexto(e.exclusaoPedida(m)!)}. O acesso dele já foi encerrado e os dados '
-                      'serão apagados sozinhos em ${dataTexto(e.exclusaoPedida(m)!.add(const Duration(days: 15)))}. '
-                      'Baixe antes o que a empresa precisar guardar.',
+                      'serão apagados sozinhos em ${dataTexto(e.exclusaoPedida(m)!.add(prazoExclusaoMotorista))}. '
+                      'Baixe antes o PDF com todos os dados dele (botão "Baixar tudo dele").',
                 ),
               ],
               const SizedBox(height: 8),

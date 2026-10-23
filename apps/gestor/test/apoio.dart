@@ -8,6 +8,7 @@ import 'package:gestor/app.dart';
 import 'package:gestor/dados/aparelho.dart';
 import 'package:gestor/dados/link_email.dart';
 import 'package:gestor/dados/provedores.dart';
+import 'package:gestor/relatorio/compartilhar.dart';
 import 'package:gestor/servidor/servidor.dart';
 import 'package:gestor/telas/casca.dart';
 import 'package:nucleo/nucleo.dart';
@@ -226,6 +227,17 @@ class ServidorFalso implements Servidor {
           'motoristas': t(Fontes.motoristas).where((x) => x['modalidade'] == m['codigo'] && x['ativo'] != false).length,
         },
     ];
+  }
+
+  /// Exportação completa (só o dono; funciona com o acesso encerrado).
+  @override
+  Future<Map<String, List<Map<String, Object?>>>> exportarDadosEmpresa() async {
+    _rede();
+    chamadas.add('exportar dados');
+    if (usuario != euDono) {
+      throw const ErroServidor('Só o dono da empresa baixa todos os dados.', codigo: 'sem_permissao');
+    }
+    return {for (final f in Fontes.todas) f: [for (final m in t(f)) Map<String, Object?>.from(m)]};
   }
 
   void ligarModalidade(String codigo) {
@@ -869,3 +881,19 @@ const camposViagemTeste = <Map<String, Object?>>[
   {'chave': 'entregas_cidades', 'rotulo': 'Cidades das entregas', 'tipo': 'cidades', 'obrigatorio': false, 'pode_ocultar': true, 'visivel': true, 'etapa': 'entregas'},
   {'chave': 'observacao', 'rotulo': 'Observação', 'tipo': 'texto', 'obrigatorio': false, 'pode_ocultar': true, 'visivel': true, 'etapa': 'desengate'},
 ];
+
+/// Troca o "compartilhar" do aparelho por uma lista (o teste confere os arquivos).
+List<Arquivo> guardarArquivos() {
+  final lista = <Arquivo>[];
+  final antes = compartilhador;
+  compartilhador = (arquivos, assunto) async => lista.addAll(arquivos);
+  addTearDown(() => compartilhador = antes);
+  return lista;
+}
+
+/// Toca em "Gerar o PDF" e espera o PDF ficar pronto (letras e páginas de verdade).
+Future<void> gerarPdfNaTela(WidgetTester tester) async {
+  await tester.tap(find.text('Gerar o PDF'));
+  await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 300)));
+  await tester.pumpAndSettle();
+}

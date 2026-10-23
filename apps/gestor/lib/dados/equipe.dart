@@ -25,7 +25,19 @@ class Lancamentos {
   final List<Viagem> viagens;
 }
 
-enum TipoAlerta { pedidos, caminhaoNaoConfirmado, doisMotoristas, semEnvio, suspensa }
+enum TipoAlerta {
+  pedidos,
+  caminhaoNaoConfirmado,
+  doisMotoristas,
+  semEnvio,
+  suspensa,
+
+  /// O motorista pediu para excluir a conta: baixar o PDF antes do prazo.
+  exclusaoPedida,
+
+  /// O acesso da empresa está acabando: baixar o PDF com todos os dados.
+  fimDoAcesso,
+}
 
 class Alerta {
   const Alerta(this.tipo, this.titulo, this.texto, {this.motoristaId, this.caminhaoId});
@@ -236,6 +248,46 @@ class Equipe {
 
   bool get souDono => eu.dono;
   Regras get regras => Regras.daEmpresa(empresa.configuracao);
+
+  // ------------------------------------------------------ arquivo de dados
+
+  /// Todos os dados de um motorista (ou da empresa toda, sem [motoristaId])
+  /// para o PDF de antes da exclusão: todo o histórico de cada um.
+  DadosArquivo arquivoDeDados({String? motoristaId, required DateTime agora}) {
+    final lista = motoristaId == null ? motoristas : [?motorista(motoristaId)];
+    return DadosArquivo(
+      empresa: empresa.nome,
+      daEmpresaToda: motoristaId == null,
+      caminhoes: motoristaId == null ? caminhoes : const [],
+      motoristas: [
+        for (final m in lista)
+          () {
+            final l = recorte(motoristaId: m.id);
+            final suas = paradasDe(m.id);
+            final acertosDele = acertosDe(m.id);
+            final periodo = periodoCompleto([
+              ...l.fretes.map((f) => f.dataCarga),
+              ...l.viagens.map((v) => v.engateEm),
+              ...l.abastecimentos.map((a) => a.data),
+              ...l.gastos.map((g) => g.data),
+              ...l.vales.map((v) => v.data),
+              ...suas.map((p) => p.inicioEm),
+              ...acertosDele.map((a) => a.periodoInicio),
+            ], agora);
+            return MotoristaNoArquivo(
+              nome: m.nome,
+              cpf: m.cpf.isEmpty ? '' : cpfTexto(m.cpf),
+              email: m.email,
+              modalidade: modalidadeDe(m).nome,
+              ativo: m.ativo,
+              relatorio: relatorio(periodo, motoristaId: m.id),
+              acertos: acertosDele,
+              paradas: suas.isEmpty ? null : dadosParadas(m.id, periodo, agora),
+            );
+          }(),
+      ],
+    );
+  }
 
   // -------------------------------------------------------------- paradas
 
@@ -539,6 +591,31 @@ class Equipe {
         );
       }
     }
+    // Exclusão automática chegando: o painel avisa para baixar o PDF antes.
+    final fim = empresa.acessoAte;
+    if (fim != null && fim.isAfter(agora) && fim.difference(agora).inDays < 7) {
+      r.add(
+        Alerta(
+          TipoAlerta.fimDoAcesso,
+          'O acesso da empresa termina em ${dataTexto(fim)}',
+          'Depois disso os dados ficam guardados${empresa.excluirEm == null ? ' por um tempo' : ' até ${dataTexto(empresa.excluirEm!)}'} '
+              'e são apagados de vez. Baixe antes o PDF com todos os dados da empresa.',
+        ),
+      );
+    }
+    for (final m in motoristas) {
+      final pedido = exclusaoPedida(m);
+      if (pedido == null) continue;
+      r.add(
+        Alerta(
+          TipoAlerta.exclusaoPedida,
+          '${m.primeiroNome} pediu para excluir a conta',
+          'Os dados dele serão apagados em ${dataTexto(pedido.add(prazoExclusaoMotorista))}. '
+              'Baixe antes o PDF com todos os dados dele.',
+          motoristaId: m.id,
+        ),
+      );
+    }
     for (final m in motoristas.where((m) => m.ativo)) {
       final ultimo = ultimoEnvio(m);
       if (ultimo == null) continue;
@@ -557,6 +634,10 @@ class Equipe {
     return r;
   }
 }
+
+/// O motorista que pede para excluir a conta tem os dados apagados depois
+/// deste prazo (regra do banco, limpeza diária).
+const prazoExclusaoMotorista = Duration(days: 15);
 
 /// "hoje às 14:20", "ontem às 08:05", "há 5 dias", "nunca".
 String quandoTexto(DateTime? d, DateTime agora) {

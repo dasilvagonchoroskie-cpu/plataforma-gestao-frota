@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:nucleo/nucleo.dart';
 import 'package:visual/visual.dart';
 
+import '../../componentes/arquivo_dados.dart';
 import '../../componentes/comuns.dart';
 import '../../config.dart';
 import '../../dados/equipe.dart';
@@ -179,6 +180,12 @@ class TelaConfiguracoes extends ConsumerWidget {
           ),
           if (e.souDono) ...[
             const Padding(padding: EdgeInsets.symmetric(horizontal: 16), child: TituloSecao('Encerrar')),
+            ListTile(
+              leading: const Icon(Icons.picture_as_pdf_outlined),
+              title: const Text('Baixar todos os dados da empresa (PDF)'),
+              subtitle: const Text('Caminhões e, de cada motorista, o cadastro e todo o histórico.'),
+              onTap: () => baixarDadosEmpresa(context, ref),
+            ),
             ListTile(
               leading: Icon(Icons.delete_forever_outlined, color: cores.negativo),
               title: Text('Excluir a conta da empresa e todos os dados', style: TextStyle(color: cores.negativo)),

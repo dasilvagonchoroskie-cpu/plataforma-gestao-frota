@@ -23,9 +23,17 @@ class Arquivo {
   final String tipo;
 }
 
+typedef Compartilhador = Future<void> Function(List<Arquivo> arquivos, String assunto);
+
+/// Quem entrega os arquivos. Nos testes é trocado por um que só guarda.
+Compartilhador compartilhador = _compartilharNoAparelho;
+
 /// No celular abre o "compartilhar" (WhatsApp, e-mail...). No computador o
 /// navegador baixa os arquivos.
-Future<void> compartilharArquivos(List<Arquivo> arquivos, {String assunto = ''}) async {
+Future<void> compartilharArquivos(List<Arquivo> arquivos, {String assunto = ''}) =>
+    compartilhador(arquivos, assunto);
+
+Future<void> _compartilharNoAparelho(List<Arquivo> arquivos, String assunto) async {
   await SharePlus.instance.share(
     ShareParams(
       files: [for (final a in arquivos) XFile.fromData(a.bytes, mimeType: a.tipo, name: a.nome)],
@@ -43,6 +51,15 @@ Future<void> compartilharPdf(DadosRelatorio d) async {
       ? 'Relatório de ${d.motorista}'
       : 'Relatório da frota';
   await compartilharArquivos([await arquivoPdf(d)], assunto: assunto);
+}
+
+/// PDF com todos os dados (da empresa ou de um motorista), antes da exclusão.
+Future<void> compartilharArquivoDeDados(DadosArquivo d, DateTime agora) async {
+  final bytes = await gerarPdfArquivo(d, await carregarFontes(), agora: agora);
+  await compartilharArquivos(
+    [Arquivo(nomeDoArquivoDeDados(d, agora), bytes, 'application/pdf')],
+    assunto: d.daEmpresaToda ? 'Todos os dados de ${d.empresa}' : 'Todos os dados de ${d.motoristas.first.nome}',
+  );
 }
 
 /// CSV (abre no Excel e no Google Planilhas) com BOM para os acentos.

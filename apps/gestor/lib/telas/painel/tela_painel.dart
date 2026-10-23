@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:nucleo/nucleo.dart';
 import 'package:visual/visual.dart';
 
+import '../../componentes/arquivo_dados.dart';
 import '../../componentes/comuns.dart';
 import '../../dados/equipe.dart';
 import '../../dados/provedores.dart';
@@ -181,6 +182,8 @@ class _CartaoAlerta extends ConsumerWidget {
       TipoAlerta.doisMotoristas => Icons.group_outlined,
       TipoAlerta.semEnvio => Icons.signal_wifi_statusbar_connected_no_internet_4_outlined,
       TipoAlerta.suspensa => Icons.pause_circle_outline,
+      TipoAlerta.exclusaoPedida => Icons.delete_outline,
+      TipoAlerta.fimDoAcesso => Icons.lock_clock_outlined,
     };
     VoidCallback? acao;
     if (a.tipo == TipoAlerta.pedidos) acao = () => ref.read(secaoProvider.notifier).ir(Secao.motoristas);
@@ -192,10 +195,24 @@ class _CartaoAlerta extends ConsumerWidget {
       acao = () =>
           Navigator.push(context, MaterialPageRoute(builder: (_) => TelaDetalheMotorista(motoristaId: a.motoristaId!)));
     }
-    return InkWell(
+    // Exclusão chegando: o botão do PDF fica no próprio aviso.
+    final pdf = switch (a.tipo) {
+      TipoAlerta.exclusaoPedida => () => baixarDadosMotorista(context, ref, a.motoristaId!),
+      TipoAlerta.fimDoAcesso => () => baixarDadosEmpresa(context, ref),
+      _ => null,
+    };
+    final cartao = InkWell(
       onTap: acao,
       borderRadius: BorderRadius.circular(12),
       child: Aviso(icone: icone, titulo: a.titulo, texto: a.texto),
+    );
+    if (pdf == null) return cartao;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: [
+        cartao,
+        TextButton.icon(onPressed: pdf, icon: const Icon(Icons.picture_as_pdf_outlined), label: const Text('Baixar PDF')),
+      ],
     );
   }
 }

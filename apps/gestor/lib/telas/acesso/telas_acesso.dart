@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:nucleo/nucleo.dart';
 import 'package:visual/visual.dart';
 
+import '../../componentes/arquivo_dados.dart';
 import '../../dados/link_email.dart';
 import '../../dados/provedores.dart';
 import '../../servidor/servidor.dart';
@@ -497,7 +498,15 @@ class TelaAcessoEncerrado extends ConsumerWidget {
           const SizedBox(height: 12),
           Nota(
             'Os dados ficam guardados até ${dataTexto(apagaEm)} e depois são apagados de vez. '
-            'Para pedir uma cópia antes disso, escreva para o e-mail acima.',
+            '${estado.dono ? 'Antes disso, baixe aqui o PDF com todos os dados da empresa.' : 'Antes disso, o dono baixa o PDF com todos os dados da empresa.'}',
+          ),
+        ],
+        if (estado.dono) ...[
+          const SizedBox(height: 12),
+          FilledButton.tonalIcon(
+            onPressed: () => baixarDadosEmpresa(context, ref, doServidor: true),
+            icon: const Icon(Icons.picture_as_pdf_outlined),
+            label: const Text('Baixar todos os dados (PDF)'),
           ),
         ],
       ],
@@ -509,7 +518,7 @@ class TelaAcessoEncerrado extends ConsumerWidget {
         if (estado.dono) ...[
           const SizedBox(height: 8),
           TextButton.icon(
-            onPressed: () => excluirEmpresa(context, ref, estado.empresaNome),
+            onPressed: () => excluirEmpresa(context, ref, estado.empresaNome, doServidor: true),
             style: TextButton.styleFrom(foregroundColor: context.cores.negativo),
             icon: const Icon(Icons.delete_forever_outlined),
             label: const Text('Excluir a conta da empresa e todos os dados'),
@@ -520,14 +529,22 @@ class TelaAcessoEncerrado extends ConsumerWidget {
   }
 }
 
-/// O dono exclui a empresa e todos os dados (digitando o nome da empresa).
-Future<void> excluirEmpresa(BuildContext context, WidgetRef ref, String nomeEmpresa) async {
+/// O dono exclui a empresa e todos os dados. Antes, sempre, o PDF com todos
+/// os dados (regra aprovada pelo dono); depois, digitar o nome da empresa.
+/// [doServidor]: acesso encerrado (os dados do PDF vêm da exportação do dono).
+Future<void> excluirEmpresa(BuildContext context, WidgetRef ref, String nomeEmpresa, {bool doServidor = false}) async {
+  final pdf = await primeiroOPdf(
+    context,
+    quem: 'da empresa',
+    gerar: () => baixarDadosEmpresa(context, ref, doServidor: doServidor),
+  );
+  if (!pdf || !context.mounted) return;
   final ok = await confirmarDigitando(
     context,
     titulo: 'Excluir a empresa e todos os dados?',
     texto:
-        'Serão apagados de vez: lançamentos, caminhões, motoristas, gestores e o acesso de todos, inclusive o seu. '
-        'Antes, baixe os relatórios (PDF ou planilha) que a empresa precisa guardar. Não dá para desfazer.',
+        'O PDF com todos os dados já foi gerado. Agora serão apagados de vez: lançamentos, caminhões, motoristas, '
+        'gestores e o acesso de todos, inclusive o seu. Não dá para desfazer.',
     palavra: nomeEmpresa,
     botao: 'Excluir tudo',
   );

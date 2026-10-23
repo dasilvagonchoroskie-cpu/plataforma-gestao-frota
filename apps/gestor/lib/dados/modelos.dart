@@ -14,6 +14,7 @@ class Empresa {
     this.acessoAte,
     this.paradasAtivas = false,
     this.limiteSemDescansoMinutos,
+    this.excluirEm,
   });
 
   final String id;
@@ -27,6 +28,9 @@ class Empresa {
 
   /// Fim do período de teste (nulo = sem prazo).
   final DateTime? acessoAte;
+
+  /// Quando os dados serão apagados (fim do acesso; vem da situação da conta).
+  final DateTime? excluirEm;
 
   /// Registro de paradas ligado (o dono liga em Configurações).
   final bool paradasAtivas;
@@ -48,6 +52,7 @@ class Empresa {
     configuracao: ConfiguracaoEmpresa.deMapa(m),
     acessoAte: lerDataOuNula(m['acesso_ate']),
     paradasAtivas: lerBool(m['paradas_ativas']),
+    excluirEm: lerDataOuNula(m['excluir_em']),
     limiteSemDescansoMinutos: m['limite_sem_descanso_minutos'] == null ? null : lerInt(m['limite_sem_descanso_minutos']),
   );
 }

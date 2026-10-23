@@ -62,6 +62,10 @@ class Fontes {
     paradas,
     motivosParada,
   ];
+
+  /// Fontes novas: se o banco da nuvem ainda não tem (o painel foi publicado
+  /// antes de a nuvem ser atualizada), o painel abre sem elas em vez de parar.
+  static const opcionais = {paradas, motivosParada};
 }
 
 /// Tudo que o painel conversa com a nuvem. Nos testes entra uma versão falsa.
@@ -103,6 +107,10 @@ abstract class Servidor {
   /// Modalidades do catálogo com a situação na empresa, os ajustes do dono e
   /// quantos motoristas usam cada uma.
   Future<List<Map<String, Object?>>> modalidadesDaEmpresa();
+
+  /// Todos os dados da empresa (só o dono; funciona com o acesso encerrado),
+  /// no mesmo formato de [carregar], para o PDF de antes da exclusão.
+  Future<Map<String, List<Map<String, Object?>>>> exportarDadosEmpresa();
 
   /// O dono liga ou desliga uma modalidade e ajusta os campos ([campos] nulo = não mexe).
   Future<void> salvarModalidadeEmpresa(String codigo, bool ativa, {Map<String, Object?>? campos});
@@ -347,7 +355,16 @@ class ServidorSupabase implements Servidor {
 
   @override
   Future<Map<String, List<Map<String, Object?>>>> carregar() => _tentar(() async {
-    final listas = await Future.wait(Fontes.todas.map(_tudo));
+    Future<List<Map<String, Object?>>> ler(String fonte) async {
+      if (!Fontes.opcionais.contains(fonte)) return _tudo(fonte);
+      try {
+        return await _tudo(fonte);
+      } on PostgrestException {
+        return const [];
+      }
+    }
+
+    final listas = await Future.wait(Fontes.todas.map(ler));
     return {for (var i = 0; i < Fontes.todas.length; i++) Fontes.todas[i]: listas[i]};
   });
 
@@ -396,6 +413,12 @@ class ServidorSupabase implements Servidor {
   );
 
   List<Map<String, Object?>> _lista(Object? r) => [for (final e in (r as List? ?? const [])) _mapa(e)];
+
+  @override
+  Future<Map<String, List<Map<String, Object?>>>> exportarDadosEmpresa() => _tentar(() async {
+    final r = _mapa(await cliente.rpc('exportar_dados_empresa'));
+    return {for (final e in r.entries) e.key: _lista(e.value)};
+  });
 
   @override
   Future<List<Map<String, Object?>>> modalidadesDaEmpresa() =>
