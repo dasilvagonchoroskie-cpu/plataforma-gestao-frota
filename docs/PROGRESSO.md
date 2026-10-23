@@ -260,7 +260,8 @@ inicial do motorista com botões grandes e ícones dos apps iguais aos do cartaz
 - **feito e testado** — Frota Gestor 0.7.0: menu do lado com a marca do app, mesmo tema. `flutter test
   --exclude-tags capturas` → 58 testes; 14 imagens.
 - **feito** — Ícones novos dos dois apps e do painel web (`ferramentas/icones/gerar.py`).
-- **em andamento** — Esteira e APKs.
+- **feito e testado** — Esteira do commit a7952f2 aprovada; APKs oficiais 0.7.0 (certificado 9c6ec010…22d2)
+  entregues ao Evandro; painel web publicado com o visual novo.
 
 ## Fase 7 — acabamento e piloto
 
