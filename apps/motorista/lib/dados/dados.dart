@@ -43,10 +43,14 @@ abstract final class Tabelas {
   /// Acertos fechados pelo gestor (só leitura no celular).
   static const acertos = 'acertos';
 
-  static const lancamentos = [fretes, viagens, abastecimentos, gastos, vales, ajustesKm, usos];
+  /// Paradas (só quando a empresa liga).
+  static const paradas = 'paradas';
+
+  static const lancamentos = [fretes, viagens, abastecimentos, gastos, vales, ajustesKm, usos, paradas];
   static const todas = [
     fretes,
     viagens,
+    paradas,
     abastecimentos,
     gastos,
     vales,
@@ -70,6 +74,7 @@ class InfoMotorista {
     this.configuracao = const ConfiguracaoEmpresa(),
     this.modalidadeCodigo,
     this.modalidades = const [],
+    this.paradas = const ConfiguracaoParadas(),
   });
 
   final String? motoristaId;
@@ -84,6 +89,9 @@ class InfoMotorista {
 
   /// Modalidades ligadas na empresa, com os campos ajustados pelo dono.
   final List<Modalidade> modalidades;
+
+  /// Registro de paradas: ligado ou não pela empresa, limite e motivos.
+  final ConfiguracaoParadas paradas;
 
   bool get suspensa => empresaStatus == 'suspensa';
 
@@ -113,6 +121,7 @@ class InfoMotorista {
       configuracao: ConfiguracaoEmpresa.deMapa(empresa),
       modalidadeCodigo: lerTextoOuNulo(motorista?['modalidade']),
       modalidades: modalidadesDaEmpresa(empresa),
+      paradas: ConfiguracaoParadas.deMapa(empresa),
     );
   }
 }
@@ -132,6 +141,7 @@ class EstadoDados {
     this.ajustes = const [],
     this.viagens = const [],
     this.acertos = const [],
+    this.paradas = const [],
     this.pendentes = const {},
     this.recusados = const [],
   });
@@ -157,6 +167,9 @@ class EstadoDados {
   /// Acertos fechados pelo gestor, mais novos primeiro.
   final List<Acerto> acertos;
 
+  /// Paradas registradas, mais novas primeiro.
+  final List<Parada> paradas;
+
   /// "tabela:id" de cada registro que ainda não chegou na nuvem.
   final Set<String> pendentes;
   final List<ItemFila> recusados;
@@ -171,6 +184,15 @@ class EstadoDados {
 
   /// Trabalha por viagem (Baú, Sider): aba Viagens no lugar de Fretes.
   bool get porViagem => modalidade.porViagem;
+
+  /// A empresa usa o registro de paradas (senão a aba nem aparece).
+  bool get paradasAtivas => info.paradas.ativas;
+
+  /// A parada que está acontecendo agora.
+  Parada? get paradaEmAndamento => paradaAberta(paradas);
+
+  /// Fim do último descanso (refeição, descanso ou pernoite).
+  DateTime? get fimDoUltimoDescanso => semDescansoDesde(paradas, info.paradas.motivos);
 
   /// A carreta engatada agora (viagem sem desengate).
   Viagem? get viagemEmAndamento {
@@ -382,6 +404,8 @@ class Dados extends AsyncNotifier<EstadoDados> {
         for (final m in brutos[Tabelas.acertos]!)
           if (m['apagado_em'] == null) Acerto.deMapa(m),
       ]..sort((x, y) => y.periodoFim.compareTo(x.periodoFim)),
+      paradas: [for (final m in vivos(Tabelas.paradas)) Parada.deMapa(m)]
+        ..sort((x, y) => y.inicioEm.compareTo(x.inicioEm)),
       pendentes: {
         for (final i in fila)
           if (i.situacao == 'pendente') i.chave,
@@ -426,6 +450,53 @@ class Dados extends AsyncNotifier<EstadoDados> {
   Future<void> apagarVale(Vale v) => _apagar(Tabelas.vales, v.paraMapa());
   Future<void> salvarViagem(Viagem v) => _gravar(Tabelas.viagens, v.paraMapa());
   Future<void> apagarViagem(Viagem v) => _apagar(Tabelas.viagens, v.paraMapa());
+  Future<void> apagarParada(Parada p) => _apagar(Tabelas.paradas, p.paraMapa());
+
+  /// Corrigiu o motivo ou os horários de uma parada: fica marcada como
+  /// ajustada (o horário não foi o do toque).
+  Future<void> corrigirParada(Parada p, {required bool mudouHorario}) =>
+      _gravar(Tabelas.paradas, (mudouHorario ? p.copyWith(ajustado: true) : p).paraMapa());
+
+  /// "Registrar parada": grava o motivo e o horário do toque (ou o que o
+  /// motorista informar, quando esqueceu; aí fica ajustada). Se ainda havia
+  /// uma parada aberta, ela termina onde a nova começa.
+  Future<Parada> registrarParada(String motivo, {String? descricao, DateTime? inicio}) async {
+    final agora = _agora();
+    var comeco = inicio ?? agora;
+    if (comeco.isAfter(agora)) comeco = agora;
+    final aberta = _atual.paradaEmAndamento;
+    if (aberta != null) {
+      final fim = comeco.isBefore(aberta.inicioEm) ? aberta.inicioEm : comeco;
+      final fechada = aberta.copyWith(fimEm: fim, ajustado: aberta.ajustado || inicio != null);
+      await _a.gravarRegistros(Tabelas.paradas, [fechada.paraMapa()]);
+      await _a.enfileirar(Tabelas.paradas, fechada.id, fechada.paraMapa());
+      if (comeco.isBefore(aberta.inicioEm)) comeco = aberta.inicioEm;
+    }
+    final p = Parada(
+      id: novoId(),
+      motoristaId: _motoristaId,
+      caminhaoId: _atual.caminhaoAtualId,
+      motivo: motivo,
+      descricao: descricao,
+      inicioEm: comeco,
+      ajustado: inicio != null,
+      criadoNoAparelhoEm: agora,
+    );
+    await _gravar(Tabelas.paradas, p.paraMapa());
+    return p;
+  }
+
+  /// "Retomar viagem": fecha a parada aberta na hora do toque. Se o motorista
+  /// esqueceu de retomar e informa o horário, a parada fica ajustada.
+  Future<void> retomarViagem({DateTime? fim}) async {
+    final aberta = _atual.paradaEmAndamento;
+    if (aberta == null) return;
+    final agora = _agora();
+    var quando = fim ?? agora;
+    if (quando.isAfter(agora)) quando = agora;
+    if (quando.isBefore(aberta.inicioEm)) quando = aberta.inicioEm;
+    await _gravar(Tabelas.paradas, aberta.copyWith(fimEm: quando, ajustado: aberta.ajustado || fim != null).paraMapa());
+  }
 
   /// Carreta nova engatada agora, no cavalo do motorista.
   Viagem novaViagem() => Viagem(

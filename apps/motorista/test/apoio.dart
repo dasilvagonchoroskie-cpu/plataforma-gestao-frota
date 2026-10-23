@@ -58,13 +58,26 @@ class ServidorFalso implements Servidor {
 
   Map<String, Object?> situacaoAtual() {
     final s = situacaoFixa ?? situacaoDe(motoristaId);
-    if (modalidades.isEmpty || situacaoFixa != null) return s;
+    if (situacaoFixa != null) return s;
     return {
       ...s,
-      'empresa': {...(s['empresa'] as Map).cast<String, Object?>(), 'modalidades': modalidades},
-      'motorista': {...(s['motorista'] as Map).cast<String, Object?>(), 'modalidade': modalidadeDoMotorista},
+      'empresa': {
+        ...(s['empresa'] as Map).cast<String, Object?>(),
+        if (modalidades.isNotEmpty) 'modalidades': modalidades,
+        'paradas_ativas': paradasAtivas,
+        'limite_sem_descanso_minutos': limiteSemDescanso,
+        'motivos_parada': paradasAtivas ? motivosParadaTeste : const [],
+      },
+      'motorista': {
+        ...(s['motorista'] as Map).cast<String, Object?>(),
+        if (modalidades.isNotEmpty) 'modalidade': modalidadeDoMotorista,
+      },
     };
   }
+
+  /// Registro de paradas (a empresa liga; desligado por padrão).
+  bool paradasAtivas = false;
+  int limiteSemDescanso = 330;
 
   void _rede() {
     if (!online) throw const ErroServidor('Sem internet agora.', semInternet: true);
@@ -196,6 +209,7 @@ class ServidorFalso implements Servidor {
       'uso_caminhao': de('uso_caminhao'),
       'viagens': de('viagens'),
       'acertos': de('acertos'),
+      'paradas': de('paradas'),
       'ajustes': [...ajustes],
     };
   }
@@ -332,3 +346,17 @@ ServidorFalso servidorBau({List<Map<String, Object?>> campos = const []}) {
   s.modalidadeDoMotorista = 'bau';
   return s;
 }
+
+/// Como o servidor manda os motivos (tabela motivos_parada).
+const motivosParadaTeste = <Map<String, Object?>>[
+  {'codigo': 'cafe', 'nome': 'Café ou pausa curta', 'conta_como_descanso': false, 'ativo': true},
+  {'codigo': 'refeicao', 'nome': 'Refeição', 'conta_como_descanso': true, 'ativo': true},
+  {'codigo': 'descanso', 'nome': 'Descanso', 'conta_como_descanso': true, 'ativo': true},
+  {'codigo': 'pernoite', 'nome': 'Pernoite', 'conta_como_descanso': true, 'ativo': true},
+  {'codigo': 'manutencao', 'nome': 'Manutenção mecânica', 'conta_como_descanso': false, 'ativo': true},
+  {'codigo': 'abastecimento', 'nome': 'Abastecimento', 'conta_como_descanso': false, 'ativo': true},
+  {'codigo': 'carga', 'nome': 'Carga', 'conta_como_descanso': false, 'ativo': true},
+  {'codigo': 'descarga', 'nome': 'Descarga', 'conta_como_descanso': false, 'ativo': true},
+  {'codigo': 'fiscalizacao', 'nome': 'Fiscalização', 'conta_como_descanso': false, 'ativo': true},
+  {'codigo': 'outro', 'nome': 'Outro', 'conta_como_descanso': false, 'ativo': true},
+];

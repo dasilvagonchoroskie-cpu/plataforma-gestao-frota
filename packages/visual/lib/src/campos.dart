@@ -250,6 +250,36 @@ class CampoData extends StatelessWidget {
 }
 
 /// Campo de data e hora: toca, escolhe o dia e depois a hora.
+/// Pergunta o dia e depois a hora (24 horas). Nulo se a pessoa cancelar.
+Future<DateTime?> escolherDataHora(BuildContext context, {required String rotulo, DateTime? inicial}) async {
+  final agora = DateTime.now();
+  final base = (inicial ?? agora).toLocal();
+  final d = await showDatePicker(
+    context: context,
+    initialDate: base,
+    firstDate: DateTime(2015),
+    lastDate: DateTime(agora.year + 1, 12, 31),
+    locale: const Locale('pt', 'BR'),
+    helpText: rotulo,
+    cancelText: 'Cancelar',
+    confirmText: 'Pronto',
+  );
+  if (d == null || !context.mounted) return null;
+  final h = await showTimePicker(
+    context: context,
+    initialTime: TimeOfDay.fromDateTime(base),
+    helpText: 'Que horas?',
+    cancelText: 'Cancelar',
+    confirmText: 'Pronto',
+    builder: (ctx, filho) => MediaQuery(
+      data: MediaQuery.of(ctx).copyWith(alwaysUse24HourFormat: true),
+      child: filho ?? const SizedBox.shrink(),
+    ),
+  );
+  if (h == null) return null;
+  return DateTime(d.year, d.month, d.day, h.hour, h.minute);
+}
+
 class CampoDataHora extends StatelessWidget {
   const CampoDataHora({
     super.key,
@@ -267,32 +297,8 @@ class CampoDataHora extends StatelessWidget {
   final String textoVazio;
 
   Future<void> _escolher(BuildContext context) async {
-    final agora = DateTime.now();
-    final base = (valor ?? agora).toLocal();
-    final d = await showDatePicker(
-      context: context,
-      initialDate: base,
-      firstDate: DateTime(2015),
-      lastDate: DateTime(agora.year + 1, 12, 31),
-      locale: const Locale('pt', 'BR'),
-      helpText: rotulo,
-      cancelText: 'Cancelar',
-      confirmText: 'Pronto',
-    );
-    if (d == null || !context.mounted) return;
-    final h = await showTimePicker(
-      context: context,
-      initialTime: TimeOfDay.fromDateTime(base),
-      helpText: 'Que horas?',
-      cancelText: 'Cancelar',
-      confirmText: 'Pronto',
-      builder: (ctx, filho) => MediaQuery(
-        data: MediaQuery.of(ctx).copyWith(alwaysUse24HourFormat: true),
-        child: filho ?? const SizedBox.shrink(),
-      ),
-    );
-    if (h == null) return;
-    aoMudar(DateTime(d.year, d.month, d.day, h.hour, h.minute));
+    final r = await escolherDataHora(context, rotulo: rotulo, inicial: valor);
+    if (r != null) aoMudar(r);
   }
 
   @override

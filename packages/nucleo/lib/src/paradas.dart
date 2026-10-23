@@ -303,6 +303,10 @@ Parada? paradaAberta(List<Parada> paradas) {
 String textoDoIntervalo(IntervaloSemDescanso i) =>
     'de ${diaMes(i.inicio)} ${horaTexto(i.inicio)} a ${i.ateAgora ? 'agora' : '${diaMes(i.fim)} ${horaTexto(i.fim)}'}';
 
+/// Sem os segundos (o relógio de escolher hora só vai até o minuto).
+DateTime ateOMinuto(DateTime d) =>
+    d.subtract(Duration(seconds: d.second, milliseconds: d.millisecond, microseconds: d.microsecond));
+
 /// "08:05" no horário do celular.
 String horaTexto(DateTime d) {
   final l = d.toLocal();

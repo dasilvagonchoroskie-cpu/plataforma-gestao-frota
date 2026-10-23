@@ -8,6 +8,7 @@ export 'src/campos_extras.dart';
 export 'src/contas.dart';
 export 'src/entrada.dart';
 export 'src/listas.dart';
+export 'src/paradas.dart';
 export 'src/placa_estrada.dart';
 export 'src/placa_veiculo.dart';
 export 'src/resumo.dart';

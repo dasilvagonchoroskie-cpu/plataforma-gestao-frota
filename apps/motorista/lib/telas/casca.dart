@@ -11,13 +11,14 @@ import 'diesel/tela_diesel.dart';
 import 'fretes/tela_fretes.dart';
 import 'gastos/tela_gastos.dart';
 import 'inicio/tela_resumo.dart';
+import 'paradas/tela_paradas.dart';
 import 'vales/tela_vales.dart';
 import 'viagens/tela_viagens.dart';
 
 /// Desligado nos testes de tela (sem internet nem sensor de rede).
 final sincronizarSozinhoProvider = Provider<bool>((ref) => true);
 
-/// As cinco abas de baixo. Também cuida de mandar a fila para a nuvem: ao
+/// As abas de baixo (cinco; seis quando a empresa usa o registro de paradas). Também cuida de mandar a fila para a nuvem: ao
 /// abrir, quando a internet volta, de tempos em tempos e ao voltar para o app.
 class Casca extends ConsumerStatefulWidget {
   const Casca({super.key, this.abaInicial = 0});
@@ -63,23 +64,29 @@ class _CascaState extends ConsumerState<Casca> with WidgetsBindingObserver {
   @override
   Widget build(BuildContext context) {
     // Baú e Sider: a segunda aba é Viagens (por carreta) no lugar de Fretes.
-    final porViagem = assistirDados(ref).porViagem;
+    final dados = assistirDados(ref);
+    final porViagem = dados.porViagem;
+    // Paradas: só quando a empresa liga (quem não usa nem vê a aba).
+    final comParadas = dados.paradasAtivas;
     final telas = [
       const TelaResumo(),
       if (porViagem) const TelaViagens() else const TelaFretes(),
       const TelaDiesel(),
       const TelaGastos(),
       const TelaVales(),
+      if (comParadas) const TelaParadas(),
     ];
+    // A empresa desligou as paradas com a aba aberta: volta para o Resumo.
+    final aba = _aba < telas.length ? _aba : 0;
     return PopScope(
-      canPop: _aba == 0,
+      canPop: aba == 0,
       onPopInvokedWithResult: (saiu, _) {
-        if (!saiu && _aba != 0) setState(() => _aba = 0);
+        if (!saiu && aba != 0) setState(() => _aba = 0);
       },
       child: Scaffold(
-        body: IndexedStack(index: _aba, children: telas),
+        body: IndexedStack(index: aba, children: telas),
         bottomNavigationBar: NavigationBar(
-          selectedIndex: _aba,
+          selectedIndex: aba,
           onDestinationSelected: (i) => setState(() => _aba = i),
           destinations: [
             const NavigationDestination(
@@ -114,6 +121,12 @@ class _CascaState extends ConsumerState<Casca> with WidgetsBindingObserver {
               selectedIcon: Icon(Icons.payments),
               label: 'Vales',
             ),
+            if (comParadas)
+              const NavigationDestination(
+                icon: Icon(Icons.pause_circle_outline),
+                selectedIcon: Icon(Icons.pause_circle),
+                label: 'Paradas',
+              ),
           ],
         ),
       ),

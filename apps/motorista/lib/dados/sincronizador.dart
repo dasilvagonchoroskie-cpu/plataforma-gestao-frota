@@ -207,6 +207,7 @@ class Sincronizador extends Notifier<EstadoEnvio> {
       Tabelas.ajustesKm,
       Tabelas.usos,
       Tabelas.acertos,
+      Tabelas.paradas,
     ]) {
       final chaveResposta = t == Tabelas.categorias ? 'categorias' : t;
       final lista = [for (final e in (r[chaveResposta] as List? ?? const [])) (e as Map).cast<String, Object?>()];

@@ -10,6 +10,7 @@ import '../configuracoes/tela_configuracoes.dart';
 import '../diesel/form_abastecimento.dart';
 import '../fretes/form_frete.dart';
 import '../gastos/tela_gastos.dart';
+import '../paradas/tela_paradas.dart';
 import '../relatorio/tela_relatorio.dart';
 import '../vales/tela_vales.dart';
 import '../viagens/form_viagem.dart';
@@ -128,6 +129,12 @@ class _TelaResumoState extends ConsumerState<TelaResumo> {
               ),
             ),
           const SizedBox(height: 4),
+          // Parado agora: o botão de retomar fica à mão também aqui.
+          if (dados.paradasAtivas && dados.paradaEmAndamento != null)
+            const Padding(
+              padding: EdgeInsets.fromLTRB(16, 4, 16, 8),
+              child: CartaoSituacaoParada(soQuandoParado: true),
+            ),
           if (dados.porViagem && dados.viagemEmAndamento != null)
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
