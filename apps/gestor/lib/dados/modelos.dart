@@ -84,10 +84,14 @@ class Convite {
     required this.expiraEm,
     this.usadoEm,
     this.canceladoEm,
+    this.modalidade,
   });
 
   final String id;
   final String codigo;
+
+  /// Modalidade com que o motorista entra (nula = a empresa tem uma só, ou ele escolhe).
+  final String? modalidade;
   final String nome;
   final String cpf;
   final DateTime expiraEm;
@@ -105,6 +109,7 @@ class Convite {
     expiraEm: lerDataOuNula(m['expira_em']) ?? DateTime.fromMillisecondsSinceEpoch(0, isUtc: true),
     usadoEm: lerDataOuNula(m['usado_em']),
     canceladoEm: lerDataOuNula(m['cancelado_em']),
+    modalidade: lerTextoOuNulo(m['modalidade']),
   );
 }
 
@@ -117,10 +122,14 @@ class Motorista {
     this.email = '',
     this.telefone,
     this.ativo = true,
+    this.modalidade,
   });
 
   final String id;
   final String perfilId;
+
+  /// Graneleiro, Baú... (nula = ainda não escolheu; a empresa tem mais de uma).
+  final String? modalidade;
   final String nome;
   final String cpf;
   final String email;
@@ -137,6 +146,7 @@ class Motorista {
     email: lerTexto(m['email']),
     telefone: lerTextoOuNulo(m['telefone']),
     ativo: lerBool(m['ativo'], true),
+    modalidade: lerTextoOuNulo(m['modalidade']),
   );
 }
 
@@ -263,6 +273,7 @@ const camposAjustaveis = <String, Map<String, TipoAjuste>>{
 
 /// Nome de cada tipo de lançamento, para títulos.
 const nomesDasTabelas = <String, String>{
+  'viagens': 'Viagem',
   'fretes': 'Frete',
   'abastecimentos': 'Abastecida',
   'gastos_viagem': 'Gasto',

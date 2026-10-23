@@ -12,6 +12,7 @@ class Lancamentos {
     this.gastos = const [],
     this.vales = const [],
     this.ajustesKm = const [],
+    this.viagens = const [],
   });
 
   final List<Frete> fretes;
@@ -19,6 +20,9 @@ class Lancamentos {
   final List<Gasto> gastos;
   final List<Vale> vales;
   final List<AjusteKm> ajustesKm;
+
+  /// Viagens do Baú e do Sider.
+  final List<Viagem> viagens;
 }
 
 enum TipoAlerta { pedidos, caminhaoNaoConfirmado, doisMotoristas, semEnvio, suspensa }
@@ -34,12 +38,27 @@ class Alerta {
 
 /// Uma linha da lista de motoristas do painel.
 class LinhaMotorista {
-  const LinhaMotorista({required this.motorista, required this.resultado, this.caminhao, this.ultimoEnvio});
+  const LinhaMotorista({
+    required this.motorista,
+    required this.resultado,
+    this.caminhao,
+    this.ultimoEnvio,
+    this.porViagem = false,
+    this.viagens = 0,
+    this.entregas = 0,
+    this.ultimoAcerto,
+  });
 
   final Motorista motorista;
   final ResultadoResumo resultado;
   final Caminhao? caminhao;
   final DateTime? ultimoEnvio;
+
+  /// Baú e Sider: viagens e entregas do período e o último acerto fechado.
+  final bool porViagem;
+  final int viagens;
+  final int entregas;
+  final Acerto? ultimoAcerto;
 }
 
 /// Tudo da empresa que o painel mostra, carregado de uma vez. As contas
@@ -63,6 +82,9 @@ class Equipe {
     required this.dispositivos,
     required this.acessos,
     this.convites = const [],
+    this.viagens = const [],
+    this.acertos = const [],
+    this.modalidades = const [],
     required this.brutos,
     required this.carregadoEm,
   });
@@ -87,6 +109,16 @@ class Equipe {
   /// Códigos individuais gerados para motoristas (mais novos primeiro).
   final List<Convite> convites;
 
+  /// Viagens do Baú e do Sider (mais novas primeiro).
+  final List<Viagem> viagens;
+
+  /// Acertos fechados (mais novos primeiro).
+  final List<Acerto> acertos;
+
+  /// Todas as modalidades do catálogo, com a situação na empresa (ativa),
+  /// os campos já ajustados e os ajustes do dono.
+  final List<Modalidade> modalidades;
+
   /// Linha como veio do banco (valores efetivos), por tabela e id. A tela de
   /// correção lê daqui o valor atual de cada campo.
   final Map<String, Map<String, Map<String, Object?>>> brutos;
@@ -105,6 +137,7 @@ class Equipe {
     required Map<String, List<Map<String, Object?>>> tabelas,
     required List<Map<String, Object?>> pedidos,
     required DateTime agora,
+    List<Map<String, Object?>>? modalidades,
   }) {
     List<Map<String, Object?>> t(String nome) => tabelas[nome] ?? const [];
     bool vivo(Map<String, Object?> m) => m['apagado_em'] == null;
@@ -166,6 +199,18 @@ class Equipe {
         for (final m in t(Fontes.convites))
           if (vivo(m)) Convite.deMapa(m),
       ]..sort((a, b) => b.expiraEm.compareTo(a.expiraEm)),
+      viagens: [
+        for (final m in t(Fontes.viagens))
+          if (vivo(m)) Viagem.deMapa(m),
+      ]..sort((a, b) => b.engateEm.compareTo(a.engateEm)),
+      acertos: [
+        for (final m in t(Fontes.acertos))
+          if (vivo(m)) Acerto.deMapa(m),
+      ]..sort((a, b) => b.periodoFim.compareTo(a.periodoFim)),
+      // Sem a lista completa (só o dono e o gestor leem), as ligadas que vêm na situação.
+      modalidades: modalidades != null
+          ? [for (final m in modalidades) Modalidade.deMapa(m)]
+          : modalidadesDaEmpresa(empresaSituacao),
       brutos: {
         'fretes': porId(t(Fontes.fretes)),
         'abastecimentos': porId(t(Fontes.abastecimentos)),
@@ -180,6 +225,42 @@ class Equipe {
 
   bool get souDono => eu.dono;
   Regras get regras => Regras.daEmpresa(empresa.configuracao);
+
+  // ---------------------------------------------------------- modalidades
+
+  /// As modalidades ligadas na empresa.
+  List<Modalidade> get modalidadesAtivas => modalidades.where((m) => m.ativa).toList();
+
+  /// A empresa trabalha com mais de uma modalidade (aí o painel pergunta e mostra).
+  bool get variasModalidades => modalidadesAtivas.length > 1;
+
+  /// Alguma modalidade por viagem ligada (Baú, Sider...).
+  bool get temViagens => modalidadesAtivas.any((m) => m.porViagem) || viagens.isNotEmpty;
+
+  Modalidade? modalidade(String? codigo) => modalidadePorCodigo(modalidades, codigo);
+
+  /// Como o motorista trabalha. Sem modalidade (ainda não escolheu) e com uma
+  /// só ligada, é ela; sem informação nenhuma, Graneleiro.
+  Modalidade modalidadeDe(Motorista m) {
+    final x = modalidade(m.modalidade);
+    if (x != null) return x;
+    final ativas = modalidadesAtivas;
+    if (m.modalidade == null && ativas.length == 1) return ativas.first;
+    return Modalidade.graneleiro;
+  }
+
+  /// O motorista trabalha por viagem (Baú, Sider).
+  bool porViagem(String? motoristaId) {
+    final m = motorista(motoristaId);
+    return m != null && modalidadeDe(m).porViagem;
+  }
+
+  /// Acertos de um motorista (mais novos primeiro).
+  List<Acerto> acertosDe(String motoristaId) => acertos.where((a) => a.motoristaId == motoristaId).toList();
+
+  Acerto? acerto(String id) => acertos.where((a) => a.id == id).firstOrNull;
+
+  Viagem? viagem(String id) => viagens.where((v) => v.id == id).firstOrNull;
 
   late final Map<String, Caminhao> _caminhaoPorId = {for (final c in caminhoes) c.id: c};
   late final Map<String, Motorista> _motoristaPorId = {for (final m in motoristas) m.id: m};
@@ -279,6 +360,9 @@ class Equipe {
       ajustesKm: emb != null
           ? const []
           : ajustesKm.where((a) => doMotorista(a.motoristaId) && doCaminhao(a.caminhaoId)).toList(),
+      viagens: emb != null
+          ? const []
+          : viagens.where((v) => doMotorista(v.motoristaId) && doCaminhao(v.caminhaoId)).toList(),
     );
   }
 
@@ -306,6 +390,28 @@ class Equipe {
       empresa: empresa.nome,
       embarcador: embarcador ?? '',
       placasPorCaminhao: placas,
+      viagens: l.viagens,
+      porViagem: motoristaId != null && porViagem(motoristaId),
+      modalidade: motoristaId == null ? null : modalidadeDe(motorista(motoristaId)!),
+    );
+  }
+
+  /// Relatório do acerto fechado (as viagens, o diesel, os vales e os gastos do período dele).
+  DadosRelatorio relatorioDoAcerto(Acerto a) {
+    final l = recorte(motoristaId: a.motoristaId);
+    final m = motorista(a.motoristaId);
+    return montarDadosDoAcerto(
+      acerto: a,
+      viagens: l.viagens,
+      abastecimentos: l.abastecimentos,
+      vales: l.vales,
+      gastos: l.gastos,
+      regras: regras,
+      motorista: m?.nome ?? '',
+      placa: caminhaoAtual(a.motoristaId)?.placa ?? '',
+      empresa: empresa.nome,
+      placasPorCaminhao: placas,
+      modalidade: m == null ? null : modalidadeDe(m),
     );
   }
 
@@ -327,12 +433,19 @@ class Equipe {
   /// Uma linha por motorista: caminhão atual, último envio e a conta do período.
   List<LinhaMotorista> linhasMotoristas(Periodo periodo) => [
     for (final m in motoristas)
-      LinhaMotorista(
-        motorista: m,
-        resultado: relatorio(periodo, motoristaId: m.id).resultado,
-        caminhao: caminhaoAtual(m.id),
-        ultimoEnvio: ultimoEnvio(m),
-      ),
+      () {
+        final d = relatorio(periodo, motoristaId: m.id);
+        return LinhaMotorista(
+          motorista: m,
+          resultado: d.resultado,
+          caminhao: caminhaoAtual(m.id),
+          ultimoEnvio: ultimoEnvio(m),
+          porViagem: d.porViagem,
+          viagens: d.viagens.length,
+          entregas: d.viagens.fold(0, (s, v) => s + v.entregasQuantidade),
+          ultimoAcerto: acertosDe(m.id).firstOrNull,
+        );
+      }(),
   ];
 
   // --------------------------------------------------------------- alertas

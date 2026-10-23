@@ -163,6 +163,8 @@ Future<Uint8List> gerarPdf(DadosRelatorio d, FontesPdf fontes, {DateTime? agora}
       } else {
         conteudo.addAll(_resumo(p, d));
         conteudo.addAll(_fretes(p, d.fretes, d.modalidade));
+        // Frota com Graneleiro e Baú juntos: as viagens entram também.
+        if (d.viagens.isNotEmpty) conteudo.addAll(_viagens(p, d));
       }
       conteudo.addAll(_abastecimentos(p, d.abastecimentos, d.abastecimentosCompletos));
       conteudo.addAll(_vales(p, d.vales, d.resultado.totalVale));
@@ -176,6 +178,7 @@ Future<Uint8List> gerarPdf(DadosRelatorio d, FontesPdf fontes, {DateTime? agora}
       } else {
         conteudo.addAll(_fretes(p, d.fretes, d.modalidade));
         conteudo.addAll(_fechoFretes(p, d.resultado));
+        if (d.viagens.isNotEmpty) conteudo.addAll(_viagens(p, d));
       }
     case ConteudoRelatorio.vales:
       conteudo.addAll(_vales(p, d.vales, d.resultado.totalVale));

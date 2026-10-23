@@ -10,6 +10,7 @@ import '../../dados/equipe.dart';
 import '../../dados/modelos.dart';
 import '../../dados/provedores.dart';
 import '../../relatorio/compartilhar.dart';
+import 'tela_acerto.dart';
 
 /// Um motorista: o resumo como ele vê no app, os lançamentos e o cadastro.
 class TelaDetalheMotorista extends ConsumerWidget {
@@ -36,9 +37,11 @@ class TelaDetalheMotorista extends ConsumerWidget {
     final periodo = escolha.periodoOuMes;
     final dados = e.relatorio(periodo, motoristaId: m.id);
     final tudo = e.recorte(motoristaId: m.id);
+    // Baú e Sider: Viagens no lugar de Fretes e a aba dos acertos.
+    final porViagem = e.porViagem(m.id);
 
     return DefaultTabController(
-      length: 6,
+      length: porViagem ? 7 : 6,
       initialIndex: abaInicial,
       child: Scaffold(
         appBar: AppBar(
@@ -48,16 +51,17 @@ class TelaDetalheMotorista extends ConsumerWidget {
             _MenuMotorista(motorista: m),
             const SizedBox(width: 4),
           ],
-          bottom: const TabBar(
+          bottom: TabBar(
             isScrollable: true,
             tabAlignment: TabAlignment.start,
             tabs: [
-              Tab(text: 'Como ele vê'),
-              Tab(text: 'Fretes'),
-              Tab(text: 'Diesel'),
-              Tab(text: 'Gastos'),
-              Tab(text: 'Vales'),
-              Tab(text: 'Cadastro'),
+              const Tab(text: 'Como ele vê'),
+              Tab(text: porViagem ? 'Viagens' : 'Fretes'),
+              const Tab(text: 'Diesel'),
+              const Tab(text: 'Gastos'),
+              const Tab(text: 'Vales'),
+              if (porViagem) const Tab(text: 'Acertos'),
+              const Tab(text: 'Cadastro'),
             ],
           ),
         ),
@@ -72,6 +76,18 @@ class TelaDetalheMotorista extends ConsumerWidget {
                   icone: Icons.block,
                   titulo: 'Motorista desligado',
                   texto: 'Ele não consegue mais enviar lançamentos. O que já mandou continua aqui.',
+                ),
+              ),
+            if (m.ativo && m.modalidade == null && e.variasModalidades)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+                child: InkWell(
+                  onTap: () => escolherModalidade(context, ref, m),
+                  child: Aviso(
+                    icone: Icons.alt_route,
+                    titulo: 'Falta a modalidade',
+                    texto: '${m.primeiroNome} ainda não escolheu no app. Toque aqui para definir agora.',
+                  ),
                 ),
               ),
             Expanded(
@@ -98,29 +114,55 @@ class TelaDetalheMotorista extends ConsumerWidget {
                       ),
                       Padding(
                         padding: const EdgeInsets.fromLTRB(20, 14, 20, 0),
-                        child: CorpoResumo(
-                          dados: dados,
-                          todasAbastecidas: tudo.abastecimentos,
-                          descricao: escolha.descricao,
-                          empresaNome: e.empresa.nome,
-                          percentualPadrao: e.empresa.configuracao.percentualComissaoPadrao,
-                          textoVazio:
-                              '${m.primeiroNome} não lançou nada neste período. Quando ele lançar no app, '
-                              'aparece aqui na próxima vez que o celular dele tiver internet.',
-                        ),
+                        child: porViagem
+                            ? CorpoResumoViagens(
+                                dados: dados,
+                                todasAbastecidas: tudo.abastecimentos,
+                                descricao: escolha.descricao,
+                                empresaNome: e.empresa.nome,
+                                acertos: e.acertosDe(m.id),
+                                aoAbrirAcerto: (a) => Navigator.push(
+                                  context,
+                                  MaterialPageRoute(builder: (_) => TelaAcertoFechado(acertoId: a.id)),
+                                ),
+                                textoVazio:
+                                    '${m.primeiroNome} não lançou nada neste período. Quando ele lançar no app, '
+                                    'aparece aqui na próxima vez que o celular dele tiver internet.',
+                              )
+                            : CorpoResumo(
+                                dados: dados,
+                                todasAbastecidas: tudo.abastecimentos,
+                                descricao: escolha.descricao,
+                                empresaNome: e.empresa.nome,
+                                percentualPadrao: e.empresa.configuracao.percentualComissaoPadrao,
+                                textoVazio:
+                                    '${m.primeiroNome} não lançou nada neste período. Quando ele lançar no app, '
+                                    'aparece aqui na próxima vez que o celular dele tiver internet.',
+                              ),
                       ),
                     ],
                   ),
                   ListaCentral(
                     largura: 900,
                     children: [
-                      ListaPorMes<Frete>(
-                        itens: dados.fretes,
-                        data: (f) => f.dataCarga,
-                        valor: (f) => f.freteRealCentavos,
-                        item: (f) => ItemFrete(frete: f, equipe: e),
-                        vazio: 'Nenhum frete neste período.',
-                      ),
+                      if (porViagem)
+                        ListaPorMes<Viagem>(
+                          itens: dados.viagens,
+                          data: (v) => v.engateEm,
+                          valor: (v) => v.entregasQuantidade,
+                          resumo: (l) =>
+                              plural(l.fold<int>(0, (s, v) => s + v.entregasQuantidade), 'entrega', 'entregas'),
+                          item: (v) => ItemViagem(viagem: v, equipe: e),
+                          vazio: 'Nenhuma viagem neste período.',
+                        )
+                      else
+                        ListaPorMes<Frete>(
+                          itens: dados.fretes,
+                          data: (f) => f.dataCarga,
+                          valor: (f) => f.freteRealCentavos,
+                          item: (f) => ItemFrete(frete: f, equipe: e),
+                          vazio: 'Nenhum frete neste período.',
+                        ),
                     ],
                   ),
                   ListaCentral(
@@ -159,6 +201,7 @@ class TelaDetalheMotorista extends ConsumerWidget {
                       ),
                     ],
                   ),
+                  if (porViagem) ListaAcertos(motoristaId: m.id),
                   _Cadastro(motorista: m),
                 ],
               ),
@@ -170,7 +213,7 @@ class TelaDetalheMotorista extends ConsumerWidget {
   }
 }
 
-enum _Acao { caminhao, redefinir, ativar, excluir }
+enum _Acao { caminhao, modalidade, redefinir, ativar, excluir }
 
 class _MenuMotorista extends ConsumerWidget {
   const _MenuMotorista({required this.motorista});
@@ -185,6 +228,8 @@ class _MenuMotorista extends ConsumerWidget {
         switch (a) {
           case _Acao.caminhao:
             escolherCaminhao(context, ref, m);
+          case _Acao.modalidade:
+            escolherModalidade(context, ref, m);
           case _Acao.redefinir:
             redefinirAcesso(context, ref, m);
           case _Acao.ativar:
@@ -197,6 +242,10 @@ class _MenuMotorista extends ConsumerWidget {
         const PopupMenuItem(
           value: _Acao.caminhao,
           child: ListTile(leading: Icon(Icons.local_shipping_outlined), title: Text('Trocar o caminhão dele')),
+        ),
+        const PopupMenuItem(
+          value: _Acao.modalidade,
+          child: ListTile(leading: Icon(Icons.alt_route), title: Text('Trocar a modalidade dele')),
         ),
         const PopupMenuItem(
           value: _Acao.redefinir,
@@ -279,6 +328,58 @@ Future<void> escolherCaminhao(BuildContext context, WidgetRef ref, Motorista m) 
   );
 }
 
+/// O gestor escolhe a modalidade do motorista (entre as ligadas na empresa).
+Future<void> escolherModalidade(BuildContext context, WidgetRef ref, Motorista m) async {
+  final e = ref.read(equipeProvider).requireValue;
+  final atual = m.modalidade == null ? null : e.modalidadeDe(m);
+  final escolhida = await showModalBottomSheet<Modalidade>(
+    context: context,
+    isScrollControlled: true,
+    builder: (ctx) => SafeArea(
+      child: ListView(
+        shrinkWrap: true,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 4, 20, 8),
+            child: Text(
+              'Modalidade de ${m.primeiroNome}',
+              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w600),
+            ),
+          ),
+          for (final x in e.modalidadesAtivas)
+            ListTile(
+              leading: Icon(x.porViagem ? Icons.route_outlined : Icons.local_shipping_outlined),
+              title: Text(x.nome),
+              subtitle: Text(x.porViagem ? 'Por viagem (carreta, entregas, acerto)' : 'Por frete'),
+              trailing: x.codigo == atual?.codigo ? const Icon(Icons.check) : null,
+              onTap: () => Navigator.pop(ctx, x),
+            ),
+          if (e.modalidadesAtivas.length < 2)
+            const Padding(
+              padding: EdgeInsets.fromLTRB(20, 8, 20, 16),
+              child: Nota('Para ter outras opções, o dono liga mais modalidades em Configurações.'),
+            ),
+        ],
+      ),
+    ),
+  );
+  if (escolhida == null || escolhida.codigo == atual?.codigo || !context.mounted) return;
+  final mudaJeito = atual != null && atual.porViagem != escolhida.porViagem;
+  final ok = await confirmar(
+    context,
+    titulo: 'Passar ${m.primeiroNome} para ${escolhida.nome}?',
+    texto:
+        'O app dele muda na próxima conexão.${mudaJeito ? ' O jeito de lançar muda (${escolhida.porViagem ? 'viagens no lugar de fretes' : 'fretes no lugar de viagens'}). O que ele já lançou continua guardado.' : ''}',
+    botao: 'Trocar',
+  );
+  if (!ok || !context.mounted) return;
+  await executar(
+    context,
+    () => ref.read(equipeProvider.notifier).definirModalidade(m.id, escolhida.codigo),
+    sucesso: 'Modalidade trocada.',
+  );
+}
+
 /// Cria uma senha provisória para o motorista que perdeu o acesso.
 Future<void> redefinirAcesso(BuildContext context, WidgetRef ref, Motorista m) async {
   final ok = await confirmar(
@@ -353,7 +454,7 @@ Future<void> excluirMotorista(BuildContext context, WidgetRef ref, Motorista m) 
     context,
     titulo: 'Excluir ${m.primeiroNome} e os dados dele?',
     texto:
-        'Serão apagados de vez o cadastro dele e todos os fretes, abastecimentos, gastos e vales que ele lançou. '
+        'Serão apagados de vez o cadastro dele e todos os fretes, viagens, acertos, abastecimentos, gastos e vales dele. '
         'Antes, baixe o relatório dele (PDF ou planilha) se a empresa precisar guardar. Não dá para desfazer. '
         'Para só tirar o acesso e guardar os dados, use "Desligar da empresa".',
     palavra: 'EXCLUIR',
@@ -382,6 +483,7 @@ class _Cadastro extends ConsumerWidget {
     final caminhao = e.caminhaoAtual(m.id);
     final usos = e.usosDoMotorista(m.id);
     final aparelhos = e.aparelhosDe(m);
+    final porViagem = e.porViagem(m.id);
     return ListaCentral(
       largura: 760,
       children: [
@@ -394,7 +496,26 @@ class _Cadastro extends ConsumerWidget {
               LinhaValor(rotulo: 'E-mail', valor: m.email),
               if ((m.telefone ?? '').isNotEmpty) LinhaValor(rotulo: 'Telefone', valor: m.telefone!),
               LinhaValor(rotulo: 'Último envio', valor: quandoTexto(e.ultimoEnvio(m), agora)),
-              const TituloSecao('Caminhão'),
+              const TituloSecao('Modalidade'),
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      m.modalidade == null && e.variasModalidades
+                          ? 'Ainda não escolhida'
+                          : '${e.modalidadeDe(m).nome} (${porViagem ? 'por viagem' : 'por frete'})',
+                      style: const TextStyle(fontSize: 16.5),
+                    ),
+                  ),
+                  if (e.variasModalidades || m.modalidade == null)
+                    OutlinedButton.icon(
+                      onPressed: () => escolherModalidade(context, ref, m),
+                      icon: const Icon(Icons.alt_route),
+                      label: const Text('Trocar'),
+                    ),
+                ],
+              ),
+              TituloSecao(porViagem ? 'Cavalo' : 'Caminhão'),
               Row(
                 children: [
                   if (caminhao != null) PlacaVeiculo(caminhao.placa, tamanho: 16) else const Text('Sem caminhão'),

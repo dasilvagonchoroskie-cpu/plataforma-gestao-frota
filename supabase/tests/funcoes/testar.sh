@@ -165,6 +165,13 @@ TC=$(echo "${R#* }" | jq -r .access_token)
 igual "$(rpc "$TC" situacao_acesso '{}' | jq -r .termos.aceito)" "true" "o aceite dos termos do cadastro fica guardado"
 igual "$(rpc "$TC" pedir_entrada "{\"p_codigo\":\"$CONV\"}" | jq -r .status)" "aprovado" "com o código individual entra na empresa na hora"
 
+# Modalidades: com uma só ligada o motorista fica nela; o dono liga o Baú e passa o motorista
+igual "$(rpc "$TC" situacao_acesso '{}' | jq -r .motorista.modalidade)" "graneleiro" "motorista novo fica na única modalidade ligada (Graneleiro)"
+igual "$(rpc "$TD" salvar_modalidade_empresa '{"p_modalidade":"bau","p_ativa":true}' | jq -r .ativa)" "true" "o dono liga o Baú pelo painel"
+MOTC=$(rpc "$TC" situacao_acesso '{}' | jq -r .motorista.id)
+igual "$(rpc "$TD" definir_modalidade_motorista "{\"p_motorista_id\":\"$MOTC\",\"p_modalidade\":\"bau\"}" | jq -r .modalidade)" "bau" "o dono passa o motorista para o Baú"
+igual "$(rpc "$TC" situacao_acesso '{}' | jq -r '.motorista.modalidade + ":" + (.empresa.modalidades | length | tostring)')" "bau:2" "o app do motorista recebe a modalidade e as duas ligadas"
+
 # Recuperar o acesso com o código de recuperação
 REC=$(rpc "$TC" gerar_codigo_recuperacao '{}' | jq -r .)
 [ ${#REC} -eq 14 ] && ok "o motorista gera o código de recuperação" || falha "gerar_codigo_recuperacao" "$REC"

@@ -51,8 +51,14 @@ class _TelaRelatoriosState extends ConsumerState<TelaRelatorios> {
     final nomes = e.nomesMotoristas;
     final placas = e.placas;
     final arquivos = <Arquivo>[
-      if (_conteudo == ConteudoRelatorio.tudo || _conteudo == ConteudoRelatorio.fretes)
+      if ((_conteudo == ConteudoRelatorio.tudo || _conteudo == ConteudoRelatorio.fretes) &&
+          (d.fretes.isNotEmpty || d.viagens.isEmpty))
         arquivoCsv('${base}_fretes.csv', csvFretes(d.fretes, motoristas: nomes, placas: placas)),
+      if ((_conteudo == ConteudoRelatorio.tudo || _conteudo == ConteudoRelatorio.fretes) && d.viagens.isNotEmpty)
+        arquivoCsv(
+          '${base}_viagens.csv',
+          csvViagens(d.viagens, motoristas: nomes, placas: placas, modalidade: d.modalidade),
+        ),
       if (_conteudo == ConteudoRelatorio.tudo || _conteudo == ConteudoRelatorio.diesel)
         arquivoCsv(
           '${base}_diesel.csv',

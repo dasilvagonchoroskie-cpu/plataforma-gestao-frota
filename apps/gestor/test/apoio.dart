@@ -173,9 +173,9 @@ class ServidorFalso implements Servidor {
   bool saiuDeTodos = false;
 
   @override
-  Future<Map<String, Object?>> gerarConvite(String nome, String cpf) async {
+  Future<Map<String, Object?>> gerarConvite(String nome, String cpf, {String? modalidade}) async {
     _rede();
-    chamadas.add('convite $nome $cpf');
+    chamadas.add('convite $nome $cpf${modalidade == null ? '' : ' $modalidade'}');
     final c = {
       'id': 'conv-${t(Fontes.convites).length + 1}',
       'empresa_id': empresaId,
@@ -183,9 +183,196 @@ class ServidorFalso implements Servidor {
       'nome': nome,
       'cpf': cpf,
       'expira_em': iso(DateTime.now().add(const Duration(days: 7))),
+      'modalidade': modalidade,
     };
     t(Fontes.convites).add(c);
     return {...c};
+  }
+
+  /// Modalidades como o banco devolve (modalidades_da_empresa): só Graneleiro ligado.
+  final modalidadesEmpresa = <Map<String, Object?>>[
+    for (final (codigo, nome, tipo) in [
+      ('graneleiro', 'Graneleiro', 'frete'),
+      ('grade_baixa', 'Grade baixa', 'frete'),
+      ('cacamba', 'Caçamba', 'frete'),
+      ('bau', 'Baú', 'viagem'),
+      ('sider', 'Sider', 'viagem'),
+    ])
+      {
+        'codigo': codigo,
+        'nome': nome,
+        'tipo': tipo,
+        'ativa': codigo == 'graneleiro',
+        'campos': tipo == 'frete' ? camposFreteTeste : camposViagemTeste,
+        'ajustes': <String, Object?>{},
+        'motoristas': 0,
+      },
+  ];
+
+  @override
+  Future<List<Map<String, Object?>>> modalidadesDaEmpresa() async {
+    _rede();
+    return [
+      for (final m in modalidadesEmpresa)
+        {
+          ...m,
+          'campos': [
+            for (final c in (m['campos'] as List).cast<Map<String, Object?>>())
+              {
+                ...c,
+                ...?((m['ajustes'] as Map)[c['chave']] as Map?)?.cast<String, Object?>(),
+              },
+          ],
+          'motoristas': t(Fontes.motoristas).where((x) => x['modalidade'] == m['codigo'] && x['ativo'] != false).length,
+        },
+    ];
+  }
+
+  void ligarModalidade(String codigo) {
+    for (final m in modalidadesEmpresa) {
+      if (m['codigo'] == codigo) m['ativa'] = true;
+    }
+  }
+
+  @override
+  Future<void> salvarModalidadeEmpresa(String codigo, bool ativa, {Map<String, Object?>? campos}) async {
+    _rede();
+    chamadas.add('modalidade $codigo $ativa${campos == null ? '' : ' ${jsonEncode(campos)}'}');
+    if (usuario != euDono) {
+      throw const ErroServidor('Só o dono muda as modalidades da empresa.', codigo: 'sem_permissao');
+    }
+    if (!ativa && t(Fontes.motoristas).any((x) => x['modalidade'] == codigo && x['ativo'] != false)) {
+      throw const ErroServidor('Há motoristas nesta modalidade. Troque a modalidade deles antes de desligar.');
+    }
+    for (final m in modalidadesEmpresa) {
+      if (m['codigo'] != codigo) continue;
+      m['ativa'] = ativa;
+      if (campos != null) m['ajustes'] = campos;
+    }
+  }
+
+  @override
+  Future<void> definirModalidadeMotorista(String motoristaId, String codigo) async {
+    _rede();
+    chamadas.add('modalidade do motorista $motoristaId $codigo');
+    for (final m in t(Fontes.motoristas)) {
+      if (m['id'] == motoristaId) m['modalidade'] = codigo;
+    }
+  }
+
+  @override
+  Future<Map<String, Object?>> fecharAcerto({
+    required String id,
+    required String motoristaId,
+    required DateTime inicio,
+    required DateTime fim,
+    required int comissaoCentavos,
+    required List<Map<String, Object?>> descontos,
+    String? observacao,
+  }) async {
+    _rede();
+    chamadas.add('acerto $motoristaId ${diaIso(inicio)} ${diaIso(fim)} $comissaoCentavos');
+    bool noPeriodo(Object? d) {
+      final l = DateTime.parse('$d').toLocal();
+      final x = DateTime(l.year, l.month, l.day);
+      return !x.isBefore(inicio) && !x.isAfter(fim);
+    }
+
+    int soma(String fonte, {bool semPartida = false}) => [
+      for (final m in t(fonte))
+        if (m['motorista_id'] == motoristaId && noPeriodo(m['data']) && !(semPartida && m['ponto_de_partida'] == true))
+          lerInt(m['valor_centavos']),
+    ].fold(0, (s, v) => s + v);
+    final vales = soma(Fontes.vales);
+    final diesel = soma(Fontes.abastecimentos, semPartida: true);
+    final gastos = soma(Fontes.gastos);
+    final regras = Regras.daEmpresa(ConfiguracaoEmpresa.deMapa(empresa));
+    final lista = [for (final d in descontos) DescontoAcerto.deMapa(d)];
+    final a = {
+      'id': id,
+      'empresa_id': empresaId,
+      'motorista_id': motoristaId,
+      'periodo_inicio': diaIso(inicio),
+      'periodo_fim': diaIso(fim),
+      'comissao_centavos': comissaoCentavos,
+      'descontos': descontos,
+      'total_descontos_centavos': lista.fold<int>(0, (s, d) => s + d.valorCentavos),
+      'vales_centavos': vales,
+      'diesel_centavos': diesel,
+      'gastos_centavos': gastos,
+      'desconta_vales': regras.valeDescontaDoLiquido,
+      'desconta_gastos': regras.gastosDescontamDoLiquido,
+      'para_receber_centavos': calcularParaReceber(
+        comissaoCentavos: comissaoCentavos,
+        descontos: lista,
+        valesCentavos: vales,
+        dieselCentavos: diesel,
+        gastosCentavos: gastos,
+        regras: regras,
+      ),
+      'quantidade_viagens': t(Fontes.viagens)
+          .where((v) => v['motorista_id'] == motoristaId && noPeriodo(v['engate_em']))
+          .length,
+      'observacao': observacao,
+      'autor_id': usuario,
+      'fechado_em': iso(DateTime.now()),
+    };
+    t(Fontes.acertos)
+      ..removeWhere((x) => x['id'] == id)
+      ..add(a);
+    return {...a};
+  }
+
+  /// Catálogo da Plataforma (o super administrador mexe).
+  List<Map<String, Object?>> get catalogo => modalidadesEmpresa;
+
+  @override
+  Future<List<Map<String, Object?>>> plataformaModalidades() async {
+    _rede();
+    _admin();
+    return [for (final m in catalogo) {...m, 'empresas': m['ativa'] == true ? 1 : 0}];
+  }
+
+  @override
+  Future<void> plataformaSalvarModalidade({
+    required String codigo,
+    required String nome,
+    required String tipo,
+    bool ativa = true,
+  }) async {
+    _rede();
+    _admin();
+    acoesPlataforma.add('modalidade $codigo $nome $tipo $ativa');
+    final atual = catalogo.where((m) => m['codigo'] == codigo).firstOrNull;
+    if (atual != null) {
+      atual['nome'] = nome;
+      return;
+    }
+    catalogo.add({
+      'codigo': codigo,
+      'nome': nome,
+      'tipo': tipo,
+      'ativa': false,
+      'campos': tipo == 'frete' ? [...camposFreteTeste] : [...camposViagemTeste],
+      'ajustes': <String, Object?>{},
+    });
+  }
+
+  @override
+  Future<void> plataformaSalvarCampo(String modalidade, Map<String, Object?> campo) async {
+    _rede();
+    _admin();
+    acoesPlataforma.add('campo $modalidade ${jsonEncode(campo)}');
+    final m = catalogo.firstWhere((x) => x['codigo'] == modalidade);
+    final campos = [...(m['campos'] as List).cast<Map<String, Object?>>()];
+    final i = campos.indexWhere((c) => c['chave'] == campo['chave']);
+    final novo = {...campo, 'extra': true, 'pode_ocultar': true, 'visivel': campo['desativado'] != true};
+    if (i < 0) {
+      campos.add(novo);
+    } else {
+      campos[i] = novo;
+    }
+    m['campos'] = campos;
   }
 
   @override
@@ -666,3 +853,19 @@ Future<void> abrirApp(
 
 /// Tamanho de um celular comum (em pontos).
 const celular = Size(392, 850);
+
+/// Campos de fábrica (como o banco manda, já com visivel e obrigatorio).
+const camposFreteTeste = <Map<String, Object?>>[
+  {'chave': 'data_carga', 'rotulo': 'Data da carga', 'tipo': 'data', 'obrigatorio': true, 'pode_ocultar': false, 'visivel': true},
+  {'chave': 'origem', 'rotulo': 'Origem (de onde saiu)', 'tipo': 'cidade', 'obrigatorio': true, 'pode_ocultar': false, 'visivel': true},
+  {'chave': 'destino', 'rotulo': 'Destino (para onde vai)', 'tipo': 'cidade', 'obrigatorio': true, 'pode_ocultar': false, 'visivel': true},
+  {'chave': 'embarcador', 'rotulo': 'Embarcador ou cliente', 'tipo': 'texto', 'obrigatorio': false, 'pode_ocultar': true, 'visivel': true},
+  {'chave': 'saldo_centavos', 'rotulo': 'Saldo', 'tipo': 'dinheiro', 'obrigatorio': false, 'pode_ocultar': true, 'visivel': true},
+];
+
+const camposViagemTeste = <Map<String, Object?>>[
+  {'chave': 'placa_carreta', 'rotulo': 'Placa da carreta', 'tipo': 'placa', 'obrigatorio': true, 'pode_ocultar': false, 'visivel': true, 'etapa': 'engate'},
+  {'chave': 'engate_local', 'rotulo': 'Onde engatou', 'tipo': 'cidade', 'obrigatorio': true, 'pode_ocultar': false, 'visivel': true, 'etapa': 'engate'},
+  {'chave': 'entregas_cidades', 'rotulo': 'Cidades das entregas', 'tipo': 'cidades', 'obrigatorio': false, 'pode_ocultar': true, 'visivel': true, 'etapa': 'entregas'},
+  {'chave': 'observacao', 'rotulo': 'Observação', 'tipo': 'texto', 'obrigatorio': false, 'pode_ocultar': true, 'visivel': true, 'etapa': 'desengate'},
+];

@@ -57,6 +57,9 @@ class TelaLancamentos extends ConsumerWidget {
     final abast = l.abastecimentos.where((x) => !x.pontoDePartida && ok(x.data, x.ajustado)).toList();
     final gastos = l.gastos.where((x) => ok(x.data, x.ajustado)).toList();
     final vales = l.vales.where((x) => ok(x.data, x.ajustado)).toList();
+    // Viagens (Baú, Sider) não têm correção do gestor: com "só corrigidos", saem.
+    final viagens = f.soCorrigidos ? <Viagem>[] : l.viagens.where((x) => periodo.contem(x.engateEm)).toList();
+    final comViagens = e.temViagens;
     final mudar = ref.read(filtrosProvider.notifier).mudar;
 
     String total<T>(List<T> itens, num Function(T) v) => reais(itens.fold<num>(0, (s, x) => s + v(x)));
@@ -108,7 +111,7 @@ class TelaLancamentos extends ConsumerWidget {
     Widget aba(Widget lista) => ListaCentral(largura: 900, children: [lista]);
 
     return DefaultTabController(
-      length: 4,
+      length: comViagens ? 5 : 4,
       child: Scaffold(
         appBar: AppBar(
           title: const Text('Lançamentos'),
@@ -118,6 +121,7 @@ class TelaLancamentos extends ConsumerWidget {
             tabAlignment: telaLarga(context) ? TabAlignment.fill : TabAlignment.start,
             tabs: [
               Tab(text: 'Fretes (${fretes.length})'),
+              if (comViagens) Tab(text: 'Viagens (${viagens.length})'),
               Tab(text: 'Diesel (${abast.length})'),
               Tab(text: 'Gastos (${gastos.length})'),
               Tab(text: 'Vales (${vales.length})'),
@@ -157,6 +161,29 @@ class TelaLancamentos extends ConsumerWidget {
                       ],
                     ),
                   ),
+                  if (comViagens)
+                    aba(
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          _Total(
+                            'Entregas',
+                            '${viagens.fold<int>(0, (s, x) => s + x.entregasQuantidade)}',
+                            detalhe: plural(viagens.length, 'viagem', 'viagens'),
+                          ),
+                          ListaPorMes(
+                            itens: viagens,
+                            data: (x) => x.engateEm,
+                            valor: (x) => x.entregasQuantidade,
+                            resumo: (l) => plural(l.fold<int>(0, (s, x) => s + x.entregasQuantidade), 'entrega', 'entregas'),
+                            item: (x) => ItemViagem(viagem: x, equipe: e),
+                            vazio: f.embarcador != null
+                                ? 'Viagem não tem embarcador. Tire esse filtro para ver as viagens.'
+                                : 'Nenhuma viagem com estes filtros.',
+                          ),
+                        ],
+                      ),
+                    ),
                   aba(
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,

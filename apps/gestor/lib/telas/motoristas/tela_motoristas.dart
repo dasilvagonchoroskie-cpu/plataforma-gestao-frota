@@ -128,11 +128,15 @@ class CartaoCadastrarMotorista extends ConsumerWidget {
 
 /// Formulário (nome e CPF) e depois o código gerado, pronto para mandar.
 Future<void> cadastrarMotorista(BuildContext context, WidgetRef ref) async {
-  final dados = await showDialog<(String, String)>(context: context, builder: (_) => const _DialogoNovoMotorista());
+  final ativas = ref.read(equipeProvider).requireValue.modalidadesAtivas;
+  final dados = await showDialog<(String, String, String?)>(
+    context: context,
+    builder: (_) => _DialogoNovoMotorista(modalidades: ativas.length > 1 ? ativas : const []),
+  );
   if (dados == null || !context.mounted) return;
   Map<String, Object?>? r;
   final ok = await executar(context, () async {
-    r = await ref.read(equipeProvider.notifier).gerarConvite(dados.$1, dados.$2);
+    r = await ref.read(equipeProvider.notifier).gerarConvite(dados.$1, dados.$2, modalidade: dados.$3);
   });
   if (!ok || r == null || !context.mounted) return;
   final convite = Convite.deMapa(r!);
@@ -181,7 +185,10 @@ Future<void> mostrarConvite(BuildContext context, Convite c, String empresa) {
 }
 
 class _DialogoNovoMotorista extends StatefulWidget {
-  const _DialogoNovoMotorista();
+  const _DialogoNovoMotorista({this.modalidades = const []});
+
+  /// Com mais de uma modalidade ligada, o gestor escolhe a do motorista.
+  final List<Modalidade> modalidades;
 
   @override
   State<_DialogoNovoMotorista> createState() => _DialogoNovoMotoristaState();
@@ -192,6 +199,8 @@ class _DialogoNovoMotoristaState extends State<_DialogoNovoMotorista> {
   final _cpf = TextEditingController();
   String? _erroNome;
   String? _erroCpf;
+  String? _erroModalidade;
+  String? _modalidade;
 
   @override
   void dispose() {
@@ -204,8 +213,11 @@ class _DialogoNovoMotoristaState extends State<_DialogoNovoMotorista> {
     setState(() {
       _erroNome = _nome.text.trim().length < 2 ? 'Escreva o nome do motorista.' : null;
       _erroCpf = cpfValido(_cpf.text) ? null : 'Confira o CPF: tem 11 números.';
+      _erroModalidade = widget.modalidades.isNotEmpty && _modalidade == null ? 'Escolha a modalidade.' : null;
     });
-    if (_erroNome == null && _erroCpf == null) Navigator.pop(context, (_nome.text.trim(), soDigitos(_cpf.text)));
+    if (_erroNome == null && _erroCpf == null && _erroModalidade == null) {
+      Navigator.pop(context, (_nome.text.trim(), soDigitos(_cpf.text), _modalidade));
+    }
   }
 
   @override
@@ -232,6 +244,25 @@ class _DialogoNovoMotoristaState extends State<_DialogoNovoMotorista> {
             erro: _erroCpf,
             acaoTeclado: TextInputAction.done,
           ),
+          if (widget.modalidades.isNotEmpty) ...[
+            const SizedBox(height: 14),
+            DropdownButtonFormField<String>(
+              initialValue: _modalidade,
+              isExpanded: true,
+              decoration: InputDecoration(labelText: 'Modalidade', errorText: _erroModalidade),
+              items: [
+                for (final m in widget.modalidades)
+                  DropdownMenuItem(
+                    value: m.codigo,
+                    child: Text('${m.nome}  (${m.porViagem ? 'por viagem' : 'por frete'})'),
+                  ),
+              ],
+              onChanged: (v) => setState(() {
+                _modalidade = v;
+                _erroModalidade = null;
+              }),
+            ),
+          ],
         ],
       ),
     ),
@@ -270,7 +301,10 @@ class _LinhaConvite extends ConsumerWidget {
       contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 2),
       leading: const CircleAvatar(child: Icon(Icons.hourglass_top)),
       title: Text(c.nome, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w600)),
-      subtitle: Text('Código ${c.codigo}  ·  CPF ${cpfTexto(c.cpf)}  ·  vale até ${dataTexto(c.expiraEm)}'),
+      subtitle: Text(
+        'Código ${c.codigo}  ·  CPF ${cpfTexto(c.cpf)}  ·  vale até ${dataTexto(c.expiraEm)}'
+        '${c.modalidade == null ? '' : '  ·  ${ref.read(equipeProvider).requireValue.modalidade(c.modalidade)?.nome ?? c.modalidade}'}',
+      ),
       trailing: PopupMenuButton<String>(
         tooltip: 'Opções',
         onSelected: (v) {
@@ -369,6 +403,10 @@ class LinhaMotorista extends StatelessWidget {
     final cores = context.cores;
     final caminhao = equipe.caminhaoAtual(m.id);
     final envio = equipe.ultimoEnvio(m);
+    final semModalidade = m.modalidade == null && equipe.variasModalidades;
+    final modalidade = equipe.variasModalidades || equipe.porViagem(m.id)
+        ? (semModalidade ? 'falta a modalidade' : equipe.modalidadeDe(m).nome)
+        : '';
     return ListTile(
       contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 2),
       leading: CircleAvatar(
@@ -380,8 +418,11 @@ class LinhaMotorista extends StatelessWidget {
       subtitle: Text(
         equipe.exclusaoPedida(m) != null
             ? 'Pediu para excluir a conta em ${dataTexto(equipe.exclusaoPedida(m)!)}'
-            : '${caminhao == null ? 'sem caminhão' : placaTexto(caminhao.placa)}  ·  último envio ${quandoTexto(envio, agora)}',
-        style: equipe.exclusaoPedida(m) != null ? TextStyle(color: cores.negativo) : null,
+            : '${modalidade.isEmpty ? '' : '$modalidade  ·  '}'
+                  '${caminhao == null ? 'sem caminhão' : placaTexto(caminhao.placa)}  ·  último envio ${quandoTexto(envio, agora)}',
+        style: equipe.exclusaoPedida(m) != null
+            ? TextStyle(color: cores.negativo)
+            : (semModalidade ? TextStyle(color: cores.atencao) : null),
       ),
       trailing: const Icon(Icons.chevron_right),
       onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => TelaDetalheMotorista(motoristaId: m.id))),

@@ -4,6 +4,7 @@ import 'package:visual/visual.dart';
 
 import '../dados/equipe.dart';
 import '../telas/lancamentos/detalhe_lancamento.dart';
+import '../telas/lancamentos/detalhe_viagem.dart';
 
 void abrirLancamento(BuildContext context, String tabela, String id) => Navigator.push(
   context,
@@ -140,6 +141,34 @@ class ItemFrete extends StatelessWidget {
   }
 }
 
+/// Viagem do Baú ou do Sider: de onde até onde, a carreta e as entregas.
+class ItemViagem extends StatelessWidget {
+  const ItemViagem({super.key, required this.viagem, required this.equipe});
+  final Viagem viagem;
+  final Equipe equipe;
+
+  @override
+  Widget build(BuildContext context) {
+    final v = viagem;
+    final cores = context.cores;
+    return _Linha(
+      data: v.engateEm,
+      inicioExtra: const Padding(padding: EdgeInsets.only(top: 5, right: 10), child: MarcadorTrajeto(altura: 12)),
+      titulo: '${v.engateLocal.isEmpty ? 'Engate' : v.engateLocal}  –  '
+          '${v.emAndamento ? 'em andamento' : (v.desengateLocal.isEmpty ? 'Desengate' : v.desengateLocal)}',
+      subtitulo: v.entregasCidades.join(', '),
+      quem: '${_quem(equipe, v.motoristaId, v.caminhaoId)}  ·  carreta ${placaTexto(v.placaCarreta)}',
+      marcas: [if (v.emAndamento) const Etiqueta('Em andamento', atencao: false)],
+      valor: '${v.entregasQuantidade}',
+      abaixoDoValor: Text(
+        v.entregasQuantidade == 1 ? 'entrega' : 'entregas',
+        style: TextStyle(fontSize: 13, color: cores.textoFraco),
+      ),
+      aoTocar: () => Navigator.push(context, MaterialPageRoute(builder: (_) => TelaDetalheViagem(id: v.id))),
+    );
+  }
+}
+
 class ItemAbastecimento extends StatelessWidget {
   const ItemAbastecimento({super.key, required this.abastecimento, required this.equipe});
   final Abastecimento abastecimento;
@@ -219,6 +248,7 @@ class ListaPorMes<T> extends StatelessWidget {
     required this.valor,
     required this.item,
     required this.vazio,
+    this.resumo,
   });
 
   final List<T> itens;
@@ -226,6 +256,9 @@ class ListaPorMes<T> extends StatelessWidget {
   final num Function(T) valor;
   final Widget Function(T) item;
   final String vazio;
+
+  /// Texto do cabeçalho de cada mês (padrão: a soma em reais).
+  final String Function(List<T>)? resumo;
 
   @override
   Widget build(BuildContext context) {
@@ -240,7 +273,10 @@ class ListaPorMes<T> extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         for (final g in grupos) ...[
-          CabecalhoMes(titulo: g.titulo, resumo: reais(g.itens.fold<num>(0, (s, e) => s + valor(e)))),
+          CabecalhoMes(
+            titulo: g.titulo,
+            resumo: resumo?.call(g.itens) ?? reais(g.itens.fold<num>(0, (s, e) => s + valor(e))),
+          ),
           for (var i = 0; i < g.itens.length; i++) ...[
             if (i > 0) const Divider(indent: 16, endIndent: 16, height: 1),
             item(g.itens[i]),

@@ -182,11 +182,17 @@ class EquipeNotifier extends AsyncNotifier<Equipe> {
   Future<Equipe> build() => _carregar();
 
   Future<Equipe> _carregar() async {
-    final resultados = await Future.wait([_s.situacao(), _s.carregar(), _s.pedidosEntrada()]);
+    final resultados = await Future.wait([
+      _s.situacao(),
+      _s.carregar(),
+      _s.pedidosEntrada(),
+      _s.modalidadesDaEmpresa(),
+    ]);
     return Equipe.montar(
       situacao: resultados[0] as Map<String, Object?>,
       tabelas: resultados[1] as Map<String, List<Map<String, Object?>>>,
       pedidos: resultados[2] as List<Map<String, Object?>>,
+      modalidades: resultados[3] as List<Map<String, Object?>>,
       agora: ref.read(relogioProvider)(),
     );
   }
@@ -223,10 +229,40 @@ class EquipeNotifier extends AsyncNotifier<Equipe> {
   Future<Map<String, Object?>> redefinirAcesso(String motoristaId) => _s.redefinirAcesso(motoristaId);
 
   /// Cadastra o motorista (nome e CPF) e devolve o código individual dele.
-  Future<Map<String, Object?>> gerarConvite(String nome, String cpf) async {
-    final r = await _s.gerarConvite(nome, cpf);
+  Future<Map<String, Object?>> gerarConvite(String nome, String cpf, {String? modalidade}) async {
+    final r = await _s.gerarConvite(nome, cpf, modalidade: modalidade);
     await recarregar();
     return r;
+  }
+
+  /// O dono liga ou desliga uma modalidade e ajusta os campos dela.
+  Future<void> salvarModalidade(String codigo, bool ativa, {Map<String, Object?>? campos}) =>
+      _eRecarregar(() => _s.salvarModalidadeEmpresa(codigo, ativa, campos: campos));
+
+  Future<void> definirModalidade(String motoristaId, String codigo) =>
+      _eRecarregar(() => _s.definirModalidadeMotorista(motoristaId, codigo));
+
+  /// Fecha (ou corrige) o acerto. O servidor soma vales, diesel e gastos.
+  Future<Acerto> fecharAcerto({
+    String? id,
+    required String motoristaId,
+    required DateTime inicio,
+    required DateTime fim,
+    required int comissaoCentavos,
+    required List<DescontoAcerto> descontos,
+    String? observacao,
+  }) async {
+    final r = await _s.fecharAcerto(
+      id: id ?? novoId(),
+      motoristaId: motoristaId,
+      inicio: inicio,
+      fim: fim,
+      comissaoCentavos: comissaoCentavos,
+      descontos: [for (final d in descontos) d.paraMapa()],
+      observacao: (observacao ?? '').trim().isEmpty ? null : observacao!.trim(),
+    );
+    await recarregar();
+    return Acerto.deMapa(r);
   }
 
   Future<void> cancelarConvite(String id) => _eRecarregar(() => _s.cancelarConvite(id));

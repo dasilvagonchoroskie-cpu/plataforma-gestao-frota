@@ -224,7 +224,37 @@ class _LinhaMotoristaPainel extends ConsumerWidget {
       onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => TelaDetalheMotorista(motoristaId: m.id))),
       child: Padding(
         padding: const EdgeInsets.fromLTRB(20, 12, 20, 12),
-        child: largo
+        child: linha.porViagem
+            ? Row(
+                children: [
+                  Expanded(flex: 4, child: info),
+                  if (largo) ...[
+                    Expanded(flex: 2, child: _Coluna('Viagens', '${linha.viagens}')),
+                    Expanded(flex: 3, child: _Coluna('Entregas', '${linha.entregas}')),
+                    Expanded(
+                      flex: 6,
+                      child: _Coluna(
+                        'Último acerto',
+                        linha.ultimoAcerto == null ? '—' : reais(linha.ultimoAcerto!.paraReceberCentavos),
+                      ),
+                    ),
+                    const Icon(Icons.chevron_right),
+                  ] else ...[
+                    const SizedBox(width: 8),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Text('${linha.viagens}', style: estiloNumero(18)),
+                        Text(
+                          linha.viagens == 1 ? 'viagem' : 'viagens',
+                          style: TextStyle(fontSize: 13, color: cores.textoFraco),
+                        ),
+                      ],
+                    ),
+                  ],
+                ],
+              )
+            : largo
             ? Row(
                 children: [
                   Expanded(flex: 4, child: info),

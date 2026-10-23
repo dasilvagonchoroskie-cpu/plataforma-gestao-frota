@@ -9,6 +9,7 @@ import '../../componentes/comuns.dart';
 import '../../config.dart';
 import '../../dados/provedores.dart';
 import '../../servidor/servidor.dart';
+import 'tela_plataforma_modalidades.dart';
 
 /// Uma empresa na lista da Plataforma.
 class EmpresaPlataforma {
@@ -104,6 +105,12 @@ class TelaPlataforma extends ConsumerWidget {
         automaticallyImplyLeading: !sozinha,
         title: const Text('Plataforma'),
         actions: [
+          IconButton(
+            tooltip: 'Modalidades e campos',
+            icon: const Icon(Icons.alt_route),
+            onPressed: () =>
+                Navigator.push(context, MaterialPageRoute(builder: (_) => const TelaPlataformaModalidades())),
+          ),
           IconButton(
             tooltip: 'Atualizar',
             icon: const Icon(Icons.refresh),

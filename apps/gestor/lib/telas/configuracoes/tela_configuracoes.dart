@@ -12,6 +12,7 @@ import '../../dados/provedores.dart';
 import '../acesso/telas_acesso.dart';
 import '../casca.dart';
 import '../plataforma/tela_plataforma.dart';
+import 'tela_modalidades.dart';
 
 /// Configurações: dados e regras da empresa, categorias de gasto, gestores,
 /// celulares dos motoristas e a conta de quem está usando.
@@ -75,10 +76,21 @@ class TelaConfiguracoes extends ConsumerWidget {
             trailing: e.souDono ? const Icon(Icons.edit_outlined) : null,
             onTap: e.souDono ? () => abrir(const TelaRegras()) : null,
           ),
+          ListTile(
+            leading: const Icon(Icons.alt_route),
+            title: const Text('Modalidades de operação'),
+            subtitle: Text(
+              e.modalidadesAtivas.isEmpty
+                  ? 'Graneleiro'
+                  : '${e.modalidadesAtivas.map((m) => m.nome).join(', ')}. Campos de cada uma.',
+            ),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => abrir(const TelaModalidades()),
+          ),
           if (!e.souDono)
             const Padding(
               padding: EdgeInsets.fromLTRB(20, 0, 20, 4),
-              child: Nota('Só o dono muda os dados e as regras da empresa.'),
+              child: Nota('Só o dono muda os dados, as regras e as modalidades da empresa.'),
             ),
           const Padding(padding: EdgeInsets.symmetric(horizontal: 16), child: TituloSecao('Cadastros')),
           ListTile(

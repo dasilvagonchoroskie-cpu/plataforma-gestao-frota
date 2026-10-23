@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:nucleo/nucleo.dart' show diaIso;
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 /// Erro já com a mensagem em português simples para mostrar na tela.
@@ -33,6 +34,8 @@ class Fontes {
   static const dispositivos = 'dispositivos';
   static const acessos = 'acessos_autorizados';
   static const convites = 'convites_motorista';
+  static const viagens = 'viagens';
+  static const acertos = 'acertos';
 
   static const todas = [
     empresa,
@@ -50,6 +53,8 @@ class Fontes {
     dispositivos,
     acessos,
     convites,
+    viagens,
+    acertos,
   ];
 }
 
@@ -86,7 +91,29 @@ abstract class Servidor {
   Future<Map<String, Object?>> criarAcessoGestor(String email, String nome);
 
   /// Cadastra o motorista (nome e CPF) e devolve o código individual dele.
-  Future<Map<String, Object?>> gerarConvite(String nome, String cpf);
+  /// [modalidade]: a do motorista (quando a empresa tem mais de uma).
+  Future<Map<String, Object?>> gerarConvite(String nome, String cpf, {String? modalidade});
+
+  /// Modalidades do catálogo com a situação na empresa, os ajustes do dono e
+  /// quantos motoristas usam cada uma.
+  Future<List<Map<String, Object?>>> modalidadesDaEmpresa();
+
+  /// O dono liga ou desliga uma modalidade e ajusta os campos ([campos] nulo = não mexe).
+  Future<void> salvarModalidadeEmpresa(String codigo, bool ativa, {Map<String, Object?>? campos});
+
+  /// O gestor define a modalidade de um motorista.
+  Future<void> definirModalidadeMotorista(String motoristaId, String codigo);
+
+  /// Fecha (ou corrige) o acerto de um motorista. Devolve o acerto gravado.
+  Future<Map<String, Object?>> fecharAcerto({
+    required String id,
+    required String motoristaId,
+    required DateTime inicio,
+    required DateTime fim,
+    required int comissaoCentavos,
+    required List<Map<String, Object?>> descontos,
+    String? observacao,
+  });
   Future<void> cancelarConvite(String conviteId);
 
   /// Exclui o motorista e todos os lançamentos dele.
@@ -127,6 +154,20 @@ abstract class Servidor {
 
   /// Senha provisória nova para o dono (perdeu o acesso ao e-mail).
   Future<Map<String, Object?>> plataformaNovaSenhaDono(String empresaId);
+
+  /// Catálogo de modalidades (todas, com os campos de fábrica e os novos).
+  Future<List<Map<String, Object?>>> plataformaModalidades();
+
+  /// Cria uma modalidade nova ou muda nome e situação de uma que existe.
+  Future<void> plataformaSalvarModalidade({
+    required String codigo,
+    required String nome,
+    required String tipo,
+    bool ativa = true,
+  });
+
+  /// Cria ou muda um campo novo de uma modalidade.
+  Future<void> plataformaSalvarCampo(String modalidade, Map<String, Object?> campo);
 
   /// Sai da conta. Com [todosOsAparelhos], encerra também as outras sessões
   /// (depois de criar a senha nova pelo link).
@@ -337,8 +378,58 @@ class ServidorSupabase implements Servidor {
   });
 
   @override
-  Future<Map<String, Object?>> gerarConvite(String nome, String cpf) => _tentar(
-    () async => _mapa(await cliente.rpc('gerar_convite_motorista', params: {'p_nome': nome.trim(), 'p_cpf': cpf})),
+  Future<Map<String, Object?>> gerarConvite(String nome, String cpf, {String? modalidade}) => _tentar(
+    () async => _mapa(
+      await cliente.rpc(
+        'gerar_convite_motorista',
+        params: {'p_nome': nome.trim(), 'p_cpf': cpf, 'p_modalidade': ?modalidade},
+      ),
+    ),
+  );
+
+  List<Map<String, Object?>> _lista(Object? r) => [for (final e in (r as List? ?? const [])) _mapa(e)];
+
+  @override
+  Future<List<Map<String, Object?>>> modalidadesDaEmpresa() =>
+      _tentar(() async => _lista(await cliente.rpc('modalidades_da_empresa')));
+
+  @override
+  Future<void> salvarModalidadeEmpresa(String codigo, bool ativa, {Map<String, Object?>? campos}) => _tentar(
+    () => cliente.rpc(
+      'salvar_modalidade_empresa',
+      params: {'p_modalidade': codigo, 'p_ativa': ativa, 'p_campos': campos},
+    ),
+  );
+
+  @override
+  Future<void> definirModalidadeMotorista(String motoristaId, String codigo) => _tentar(
+    () => cliente.rpc('definir_modalidade_motorista', params: {'p_motorista_id': motoristaId, 'p_modalidade': codigo}),
+  );
+
+  @override
+  Future<Map<String, Object?>> fecharAcerto({
+    required String id,
+    required String motoristaId,
+    required DateTime inicio,
+    required DateTime fim,
+    required int comissaoCentavos,
+    required List<Map<String, Object?>> descontos,
+    String? observacao,
+  }) => _tentar(
+    () async => _mapa(
+      await cliente.rpc(
+        'fechar_acerto',
+        params: {
+          'p_id': id,
+          'p_motorista_id': motoristaId,
+          'p_inicio': diaIso(inicio),
+          'p_fim': diaIso(fim),
+          'p_comissao_centavos': comissaoCentavos,
+          'p_descontos': descontos,
+          'p_observacao': observacao,
+        },
+      ),
+    ),
   );
 
   @override
@@ -421,6 +512,27 @@ class ServidorSupabase implements Servidor {
   Future<Map<String, Object?>> plataformaNovaSenhaDono(String empresaId) => _tentar(
     () async => _mapa(await cliente.rpc('plataforma_nova_senha_dono', params: {'p_empresa': empresaId})),
   );
+
+  @override
+  Future<List<Map<String, Object?>>> plataformaModalidades() =>
+      _tentar(() async => _lista(await cliente.rpc('plataforma_modalidades')));
+
+  @override
+  Future<void> plataformaSalvarModalidade({
+    required String codigo,
+    required String nome,
+    required String tipo,
+    bool ativa = true,
+  }) => _tentar(
+    () => cliente.rpc(
+      'plataforma_salvar_modalidade',
+      params: {'p_codigo': codigo, 'p_nome': nome, 'p_tipo': tipo, 'p_ativa': ativa},
+    ),
+  );
+
+  @override
+  Future<void> plataformaSalvarCampo(String modalidade, Map<String, Object?> campo) =>
+      _tentar(() => cliente.rpc('plataforma_salvar_campo', params: {'p_modalidade': modalidade, 'p_campo': campo}));
 
   @override
   Future<void> sair({bool todosOsAparelhos = false}) async {
