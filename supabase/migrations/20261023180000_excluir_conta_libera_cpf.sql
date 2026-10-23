@@ -16,6 +16,9 @@ alter table public.motoristas alter column perfil_id drop not null;
 alter table public.motoristas add column exclusao_pedida_em timestamptz;
 alter table public.motoristas add constraint motoristas_ativo_tem_login_ck
   check (not ativo or perfil_id is not null);
+-- Quem registrou o uso do caminhão: fica vazio quando o login dessa pessoa é
+-- apagado (o uso continua ligado ao motorista e ao caminhão).
+alter table public.uso_caminhao alter column registrado_por drop not null;
 
 -- ------------------------------------------------- excluir a própria conta
 
@@ -49,6 +52,7 @@ begin
   update public.motoristas
      set ativo = false, exclusao_pedida_em = pg_catalog.now(), perfil_id = null
    where id = v_motorista;
+  update public.uso_caminhao set registrado_por = null where registrado_por = v_uid;
   perform public.expurgar_perfil(v_uid);
   return pg_catalog.jsonb_build_object('ok', true, 'apagada', false, 'login_apagado', true,
     'apagar_em', pg_catalog.now() + interval '15 days');
@@ -150,6 +154,7 @@ begin
     update public.motoristas
        set ativo = false, exclusao_pedida_em = r.exclusao_pedida_em, perfil_id = null
      where id = r.motorista_id;
+    update public.uso_caminhao set registrado_por = null where registrado_por = r.perfil_id;
     perform public.expurgar_perfil(r.perfil_id);
   end loop;
 end;

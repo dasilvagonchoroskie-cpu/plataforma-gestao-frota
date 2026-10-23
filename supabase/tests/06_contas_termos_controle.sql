@@ -3,7 +3,7 @@
 begin;
 \ir apoio/fixtures.psql
 
-select plan(91);
+select plan(92);
 
 -- Dois motoristas novos, ainda sem empresa.
 insert into fx values
@@ -179,6 +179,9 @@ select is((select count(*)::int from public.registro_exclusoes
 
 -- Motorista de empresa que exclui a conta (regra de 23/10/2026): o login sai
 -- na hora e o CPF fica livre; os lançamentos ficam 15 dias com a empresa.
+-- Ele mesmo registrou o caminhão que usa (como o celular faz).
+select public.registrar_uso_caminhao(gen_random_uuid(), pg_temp.fx('empresa_x'), pg_temp.fx('mot_a'),
+  pg_temp.fx('cam_x1'), now() - interval '2 days', pg_temp.fx('u_a'));
 select is(pg_temp.como(pg_temp.fx('u_a'), $q$select public.excluir_minha_conta()$q$) ->> 'login_apagado', 'true',
   'ligado a uma empresa, a exclusão da conta é aceita');
 select is((select count(*)::int from public.perfis where id = pg_temp.fx('u_a'))
@@ -187,6 +190,8 @@ select is((select count(*)::int from public.perfis where id = pg_temp.fx('u_a'))
 select is((select count(*)::int from public.fretes where id = pg_temp.fx('frete_a'))::text
   || ':' || (select coalesce(perfil_id::text, 'sem login') || ':' || ativo from public.motoristas where id = pg_temp.fx('mot_a')),
   '1:sem login:false', 'os lançamentos ficam com a empresa, sem login');
+select is((select count(*)::int from public.uso_caminhao where motorista_id = pg_temp.fx('mot_a') and registrado_por is null), 1,
+  'o uso do caminhão fica, sem o login de quem registrou');
 select is(pg_temp.como(pg_temp.fx('u_gestor_x'), format(
   'select to_jsonb(exclusao_pedida_em is not null) from public.motoristas where id = %L', pg_temp.fx('mot_a')))::text, 'true',
   'o gestor vê que ele excluiu a conta');
