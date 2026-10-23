@@ -167,6 +167,7 @@ void main() {
     await abrirApp(tester, s);
     await tester.tap(find.text('Configurações').first);
     await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(find.text('Área da Plataforma'), 300, scrollable: find.byType(Scrollable).first);
     await tocar(tester, find.text('Área da Plataforma'));
     await tocar(tester, find.byTooltip('Modalidades e campos'));
     await tocar(tester, find.text('Nova modalidade'));

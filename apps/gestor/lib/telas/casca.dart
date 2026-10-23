@@ -129,15 +129,11 @@ class _CascaState extends ConsumerState<Casca> with WidgetsBindingObserver {
                 padding: const EdgeInsets.fromLTRB(8, 12, 8, 16),
                 child: Column(
                   children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                      decoration: BoxDecoration(color: cores.placa, borderRadius: BorderRadius.circular(8)),
-                      child: Text(
-                        'FROTA',
-                        style: estiloNumero(18, peso: FontWeight.w700, cor: cores.placaTexto),
-                      ),
-                    ),
+                    // A marca do app, como no cartaz: o quadrado com o gráfico e o nome.
+                    const MarcaApp(icone: Icons.bar_chart_rounded, tamanho: 46),
                     const SizedBox(height: 8),
+                    const Text('Frota Gestor', style: TextStyle(fontSize: 16.5, fontWeight: FontWeight.w700)),
+                    const SizedBox(height: 2),
                     SizedBox(
                       width: 180,
                       child: Text(
