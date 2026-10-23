@@ -64,6 +64,13 @@ limitado), **Baixa** (defesa em profundidade).
   `motoristas_ativo_tem_login_ck`, teste 06) e não tem acesso para redefinir. Mensagens de erro claras para
   código, aprovação e redefinição (teste 06 e teste das funções).
 
+### Motorista que sai fica com o login livre (23/10/2026)
+
+- Entrou com a linha `aprovado-por` do dono (apaga o e-mail do registro e do histórico na saída). O gatilho
+  `motoristas_soltar_login` roda no banco para qualquer desligamento, até pelo app antigo; a função de limpeza
+  (`motoristas_soltar_login_depois`) não pode ser chamada pelos apps. Teste 12 (24 verificações): login livre,
+  registro sem e-mail, outra empresa, volta com cadastro novo.
+
 ### Paradas (23/10/2026)
 
 - A tabela `paradas` nasce com RLS (motorista vê as próprias; dono e gestor, as da empresa) e entra na

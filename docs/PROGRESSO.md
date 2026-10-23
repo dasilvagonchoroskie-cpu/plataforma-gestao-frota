@@ -284,6 +284,25 @@ Escolha dele: "Liberar o CPF na hora" (vale como aprovação; linha `aprovado-po
   nuvem: migration `20261023180000` aplicada, nenhum login preso, CPF do Evandro livre, cadastro antigo sem
   login até 07/11/2026. APKs oficiais 0.7.1 (certificado 9c6ec010…22d2) entregues.
 
+## Motorista que sai da empresa fica com o login livre — 23/10/2026
+
+Pedido do Evandro: motorista que sai (e volta dias depois, ou vai para outra empresa) não pode ficar com o
+login preso à empresa antiga. Escolhas dele: login livre na hora ao desligar; quem volta começa do zero;
+apagar o e-mail do registro (aprovação na migration); prazo de 15 dias mantido para quem excluiu a conta.
+
+- **feito e testado** — Banco (migration `20261023200000_motorista_sai_login_livre`, com `aprovado-por`):
+  gatilho que solta o login ao desligar, registro com nome, CPF, lançamentos e data de saída, sem e-mail (nem
+  no histórico); CPF repetido só em registros sem login; código e aprovação para quem voltou criam cadastro
+  novo. `rodar.sh` → `total de verificações que passaram: 447` (teste 12 novo: 24). `conferir_aprovacao.py` →
+  `sem aprovação para apagar dados: 0`. Teste à parte com dados como os da nuvem: login solto, e-mail fora do
+  registro e do histórico.
+- **feito e testado** — Frota Gestor 0.7.2: desligar avisa que o login fica livre; "Saíram da empresa" com o
+  registro e o botão "Gerar código para voltar" (no lugar de Religar) → `flutter test --exclude-tags capturas`
+  61 testes. Frota Motorista 0.7.2: recado ao sair da empresa → 51 testes. `flutter analyze` sem problemas.
+- **feito e testado** — Esteira abb6652 e banco da nuvem aprovados (`success`). Conferido na nuvem: migration
+  `20261023200000` aplicada, gatilhos e índice criados, nenhum desligado com login, nenhum registro (nem
+  histórico) com e-mail. APKs oficiais 0.7.2 (certificado 9c6ec010…22d2) entregues.
+
 ## Fase 7 — acabamento e piloto
 
 - **em andamento** — SMTP próprio (Brevo, configuração no painel do Supabase pelo dono).

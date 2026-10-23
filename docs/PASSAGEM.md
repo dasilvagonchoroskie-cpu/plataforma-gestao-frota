@@ -113,7 +113,7 @@ configurar SMTP e modelos no painel do Supabase, então o acesso do piloto passo
   acesso encerrado; a gestão exclui um motorista e os lançamentos dele (digitando EXCLUIR) — a conta dele
   fica sem empresa; o motorista exclui a própria conta (sem empresa: tudo na hora; com empresa: o login e o
   CPF saem na hora e os lançamentos ficam 15 dias com a empresa, prazo para guardar o que a lei exige — regra
-  de 23/10/2026). A auditoria não
+  de 23/10/2026). Desligar também solta o login na hora (seção "Motorista que sai da empresa"). A auditoria não
   guarda cópia do que foi excluído. Da empresa excluída fica só uma linha "Empresa excluída", sem dados.
 - **Controle da plataforma:** `bloquear_empresa`, `liberar_empresa` (com prazo de teste),
   `excluir_empresa_plataforma`, `empresas_da_plataforma` e `limpeza_diaria` — só pelo SQL Editor
@@ -315,11 +315,30 @@ Decisões tomadas na construção (confirmar no piloto):
   exclusão antes desta mudança teve o login apagado na atualização (o prazo continua contando do pedido).
   O uso do caminhão registrado pela própria pessoa fica sem "quem registrou" (`uso_caminhao.registrado_por`
   agora pode ficar vazio); o uso continua ligado ao motorista e ao caminhão.
-- **Decisão provisória (perguntar ao Evandro se quiser diferente):** se a pessoa volta com conta nova para a
-  MESMA empresa dentro dos 15 dias, o painel avisa para usar antes "Excluir motorista e dados" (com o PDF) no
-  cadastro antigo. Alternativa não feita: ligar o cadastro antigo (com o histórico) à conta nova.
+- **Volta para a mesma empresa:** decidido depois (ver a seção seguinte) — começa um cadastro novo, sem apagar
+  nada antes.
 - **Mesmo e-mail do dono numa conta de motorista: não dá.** O login (Supabase Auth) é um por e-mail. O dono que
   também dirige usa outro e-mail na conta de motorista (escolha do Evandro em 23/10/2026).
 - **Pendência de texto:** os Termos de Uso ainda falam em "código de recuperação", que saiu dos apps em
   22/10/2026. Mudar o texto pede versão nova dos termos (todos aceitam de novo) — decidir com o Evandro.
+
+## Motorista que sai da empresa fica com o login livre (23/10/2026, aprovado pelo usuário)
+
+- **Pedido do Evandro:** motorista sai hoje e volta em 3 dias, ou vai para outra empresa que usa a plataforma.
+  O login (CPF, senha e e-mail) não pode ficar preso à empresa de onde ele saiu. A empresa precisa saber quem
+  trabalhou em cada período com cada caminhão.
+- **Escolhas dele:** login livre na hora ao desligar; quem volta "começa do zero" (cadastro novo, o registro
+  antigo fica separado); "Apagar o e-mail" do registro (vale como aprovação; linha `aprovado-por` na migration
+  `20261023200000_motorista_sai_login_livre`); prazo de 15 dias de quem excluiu a conta mantido.
+- **Como ficou:** desligar (`motoristas.ativo = false`, inclusive pelo app antigo) solta o login na hora por
+  gatilho no banco: o perfil fica sem empresa, os celulares saem, o uso do caminhão fica sem "quem registrou",
+  o e-mail sai do registro e do histórico (`auditoria`). O registro fica com nome, CPF, lançamentos e a data de
+  saída (`motoristas.desligado_em`). Cadastro com login é sempre ativo, e vice-versa (`motoristas_ativo_e_login_ck`).
+- **CPF repetido na empresa:** permitido só em registros sem login (índice `motoristas_cpf_empresa_com_login_uk`).
+  O painel mostra o registro antigo em "Saíram da empresa" e o cadastro novo em "Na empresa".
+- **Religar acabou:** no lugar, "Gerar código para voltar" (código individual com nome e CPF do registro).
+- **Registros de quem foi desligado** ficam até a empresa usar "Excluir motorista e dados" (como antes); só quem
+  excluiu a conta tem a limpeza de 15 dias.
+- **Ideia para depois (não feita):** botão "Sair da empresa" no app do motorista; hoje ele sai sendo desligado
+  ou excluindo a conta.
 

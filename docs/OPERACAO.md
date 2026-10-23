@@ -77,8 +77,9 @@ depois, se ninguém liberar. A limpeza roda todo dia às 03:20 (horário de Bras
 O dono também pode excluir a conta da empresa e todos os dados pelo app (Configurações > Excluir a conta
 da empresa), mesmo com o acesso encerrado. O motorista exclui a própria conta em Configurações: o login e
 o CPF saem na hora (ele pode criar conta nova com o mesmo CPF) e os lançamentos ficam 15 dias com a empresa.
-Se ele voltar para a mesma empresa antes disso, o gestor usa "Excluir motorista e dados" no cadastro antigo
-(o PDF vem antes) e depois aprova a conta nova.
+Motorista desligado também fica com o login livre na hora e pode entrar em outra empresa. A empresa fica com o
+registro (nome, CPF e lançamentos, sem o e-mail) em Motoristas > "Saíram da empresa". Se ele voltar, o gestor
+abre o registro e usa "Gerar código para voltar": ele entra num cadastro novo.
 
 ## Modalidades e campos (Plataforma)
 
