@@ -10,9 +10,12 @@ from playwright.sync_api import sync_playwright
 AQUI = pathlib.Path(__file__).resolve().parent
 RAIZ = AQUI.parent.parent
 
+# Iguais ao cartaz da plataforma (23/10/2026): quadrado verde com o caminhão
+# (motorista) e quadrado quase preto com o gráfico e o caminhão (gestor), sem
+# borda, com um degradê leve de cima para baixo.
 APPS = {
-    'motorista': {'fundo': '#0B5D3B', 'borda': '#FFFFFF'},
-    'gestor': {'fundo': '#1E2427', 'borda': '#F2B300'},
+    'motorista': {'fundo': '#028A36', 'topo': '#1FB04F', 'base': '#01632A'},
+    'gestor': {'fundo': '#11181C', 'topo': '#1D262C', 'base': '#0A0F12'},
 }
 DENSIDADES = {'mdpi': 1, 'hdpi': 1.5, 'xhdpi': 2, 'xxhdpi': 3, 'xxxhdpi': 4}
 
@@ -25,14 +28,16 @@ def arte(app):
 def svg(app, tipo):
     c = APPS[app]
     g = arte(app)
-    if tipo == 'completo':  # placa de estrada com borda (ícone antigo e web)
-        return f'''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
-<rect x="16" y="16" width="992" height="992" rx="220" fill="{c['fundo']}"/>
-<rect x="66" y="66" width="892" height="892" rx="176" fill="none" stroke="{c['borda']}" stroke-width="24"/>
-<g transform="translate(512 512) scale(0.82) translate(-506 -508)">{g}</g></svg>'''
+    degrade = (f'<defs><linearGradient id="f" x1="0" y1="0" x2="0" y2="1">'
+               f'<stop offset="0" stop-color="{c['topo']}"/><stop offset="1" stop-color="{c['base']}"/>'
+               f'</linearGradient></defs>')
+    if tipo == 'completo':  # quadrado arredondado, como no cartaz (ícone antigo e web)
+        return f'''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">{degrade}
+<rect x="16" y="16" width="992" height="992" rx="220" fill="url(#f)"/>
+<g transform="translate(512 512) scale(0.86) translate(-506 -508)">{g}</g></svg>'''
     if tipo == 'mascaravel':  # fundo cheio, arte no círculo seguro (web)
-        return f'''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
-<rect width="1024" height="1024" fill="{c['fundo']}"/>
+        return f'''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">{degrade}
+<rect width="1024" height="1024" fill="url(#f)"/>
 <g transform="translate(512 512) scale(0.70) translate(-506 -508)">{g}</g></svg>'''
     # frente do ícone adaptativo (Android 8+): só a arte, fundo transparente
     return f'''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">

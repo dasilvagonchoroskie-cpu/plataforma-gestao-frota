@@ -12,7 +12,7 @@
     <rect x="236" y="676" width="372" height="96" rx="14" fill="#FFFFFF"/>
     <path d="M622 704 h96 c12 0 22 6 27 17 l34 51 v0 H622 z" fill="#FFFFFF"/>
     <rect x="236" y="786" width="552" height="18" rx="9" fill="#FFFFFF"/>
-    <g fill="#1E2427" stroke="#FFFFFF" stroke-width="12">
+    <g fill="#11181C" stroke="#FFFFFF" stroke-width="12">
       <circle cx="318" cy="812" r="36"/>
       <circle cx="420" cy="812" r="36"/>
       <circle cx="700" cy="812" r="36"/>
