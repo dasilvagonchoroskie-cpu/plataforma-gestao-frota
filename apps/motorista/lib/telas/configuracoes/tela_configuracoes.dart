@@ -8,6 +8,7 @@ import '../../componentes/comuns.dart';
 import '../../config.dart';
 import '../../dados/sincronizador.dart';
 import '../../dados/dados.dart';
+import '../acertos/tela_acertos.dart';
 import '../acesso/telas_acesso.dart';
 import '../caminhao/tela_caminhao.dart';
 
@@ -24,7 +25,7 @@ class TelaConfiguracoes extends ConsumerWidget {
         content: Text(
           pendentes > 0
               ? 'ATENÇÃO: ${plural(pendentes, 'lançamento ainda não foi enviado', 'lançamentos ainda não foram enviados')} '
-                  'e vai se perder. Envie antes com internet. Quer sair mesmo assim?'
+                    'e vai se perder. Envie antes com internet. Quer sair mesmo assim?'
               : 'Os seus dados estão guardados na nuvem. Para voltar, é só entrar com o CPF e a senha.',
           style: const TextStyle(fontSize: 16.5, height: 1.4),
         ),
@@ -57,25 +58,55 @@ class TelaConfiguracoes extends ConsumerWidget {
         children: [
           ListTile(
             leading: const Icon(Icons.person_outline),
-            title: Text(d.info.nome.isEmpty ? 'Motorista' : d.info.nome, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w600)),
+            title: Text(
+              d.info.nome.isEmpty ? 'Motorista' : d.info.nome,
+              style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w600),
+            ),
             subtitle: Text(d.info.empresaNome.isEmpty ? 'Empresa' : d.info.empresaNome),
           ),
           const Divider(),
-          ListTile(
-            leading: c == null ? const Icon(Icons.local_shipping_outlined) : PlacaVeiculo(c.placa, tamanho: 14),
-            title: const Text('Trocar de caminhão', style: TextStyle(fontSize: 17)),
-            subtitle: Text(c == null ? 'Nenhum escolhido' : 'Agora: ${placaTexto(c.placa)}'),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const TelaTrocarCaminhao())),
-          ),
+          if (d.porViagem && c != null)
+            ListTile(
+              leading: PlacaVeiculo(c.placa, tamanho: 14),
+              title: const Text('Cavalo', style: TextStyle(fontSize: 17)),
+              subtitle: const Text('Definido pelo seu patrão. Para trocar, fale com ele.'),
+            )
+          else
+            ListTile(
+              leading: c == null ? const Icon(Icons.local_shipping_outlined) : PlacaVeiculo(c.placa, tamanho: 14),
+              title: const Text('Trocar de caminhão', style: TextStyle(fontSize: 17)),
+              subtitle: Text(c == null ? 'Nenhum escolhido' : 'Agora: ${placaTexto(c.placa)}'),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const TelaTrocarCaminhao())),
+            ),
+          if (d.info.modalidades.isNotEmpty)
+            ListTile(
+              leading: const Icon(Icons.category_outlined),
+              title: const Text('Modalidade', style: TextStyle(fontSize: 17)),
+              subtitle: Text('${d.modalidade.nome}. Quem troca é o seu patrão.'),
+            ),
+          if (d.porViagem)
+            ListTile(
+              leading: const Icon(Icons.request_quote_outlined),
+              title: const Text('Meus acertos', style: TextStyle(fontSize: 17)),
+              subtitle: Text(
+                d.acertos.isEmpty
+                    ? 'Nenhum fechado ainda'
+                    : plural(d.acertos.length, 'acerto fechado', 'acertos fechados'),
+              ),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const TelaAcertos())),
+            ),
           ListTile(
             leading: const Icon(Icons.sync),
             title: const Text('Sincronizar agora', style: TextStyle(fontSize: 17)),
-            subtitle: Text(envio.ocupado
-                ? 'Enviando...'
-                : (d.quantidadePendente == 0
-                    ? 'Tudo enviado'
-                    : plural(d.quantidadePendente, 'item aguardando internet', 'itens aguardando internet'))),
+            subtitle: Text(
+              envio.ocupado
+                  ? 'Enviando...'
+                  : (d.quantidadePendente == 0
+                        ? 'Tudo enviado'
+                        : plural(d.quantidadePendente, 'item aguardando internet', 'itens aguardando internet')),
+            ),
             onTap: envio.ocupado ? null : () => ref.read(sincronizadorProvider.notifier).sincronizar(),
           ),
           ListTile(
@@ -110,7 +141,10 @@ class TelaConfiguracoes extends ConsumerWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                LinhaValor(rotulo: 'Comissão padrão', valor: '${percentualTexto(config.percentualComissaoPadrao)}%'),
+                if (d.porViagem)
+                  const LinhaValor(rotulo: 'Comissão', valor: 'no acerto')
+                else
+                  LinhaValor(rotulo: 'Comissão padrão', valor: '${percentualTexto(config.percentualComissaoPadrao)}%'),
                 LinhaValor(
                   rotulo: 'Diesel e gastos',
                   valor: config.gastosDescontamDoLiquido ? 'por sua conta' : 'a empresa paga',
@@ -133,7 +167,9 @@ class TelaConfiguracoes extends ConsumerWidget {
             onTap: () => excluirMinhaConta(context, ref),
           ),
           const SizedBox(height: 12),
-          Center(child: Text('Versão $versaoApp', style: TextStyle(color: cores.textoFraco))),
+          Center(
+            child: Text('Versão $versaoApp', style: TextStyle(color: cores.textoFraco)),
+          ),
         ],
       ),
     );

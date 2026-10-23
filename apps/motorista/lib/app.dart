@@ -10,6 +10,7 @@ import 'dados/dados.dart';
 import 'telas/acesso/telas_acesso.dart';
 import 'telas/caminhao/tela_caminhao.dart';
 import 'telas/casca.dart';
+import 'telas/inicio/tela_escolher_modalidade.dart';
 
 class AplicativoMotorista extends StatelessWidget {
   const AplicativoMotorista({super.key, this.inicio});
@@ -88,6 +89,7 @@ class Raiz extends ConsumerWidget {
           case Etapa.pronto:
             if (!dados.hasValue) return const _Carregando();
             final d = assistirDados(ref);
+            if (d.info.precisaEscolherModalidade) return const TelaEscolherModalidade();
             if (d.caminhaoAtual == null && d.usos.isEmpty) return const _PrimeiroCaminhao();
             return const Casca();
         }

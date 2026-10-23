@@ -21,34 +21,52 @@ class TopoCaminhao extends ConsumerWidget {
     final d = assistirDados(ref);
     final cores = context.cores;
     final c = d.caminhaoAtual;
+    // Baú e Sider: o cavalo é fixo; quem troca é o patrão (no painel).
+    final fixo = d.porViagem && c != null;
     return Material(
       color: Theme.of(context).colorScheme.surfaceContainer,
       child: InkWell(
-        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const TelaTrocarCaminhao())),
+        onTap: fixo
+            ? () => mostrarMensagem(context, 'O cavalo é definido pelo seu patrão. Para trocar, fale com ele.')
+            : () => Navigator.push(context, MaterialPageRoute(builder: (_) => const TelaTrocarCaminhao())),
         child: Padding(
           padding: const EdgeInsets.fromLTRB(20, 10, 16, 10),
           child: Row(
             children: [
-              if (c != null) PlacaVeiculo(c.placa, tamanho: 17) else Icon(Icons.local_shipping_outlined, color: cores.atencao),
+              if (c != null)
+                PlacaVeiculo(c.placa, tamanho: 17)
+              else
+                Icon(Icons.local_shipping_outlined, color: cores.atencao),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      c == null ? 'Escolha o seu caminhão' : 'Lançando neste caminhão',
-                      style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: c == null ? cores.atencao : null),
+                      c == null
+                          ? (d.porViagem ? 'Escolha o seu cavalo' : 'Escolha o seu caminhão')
+                          : (d.porViagem ? 'Seu cavalo' : 'Lançando neste caminhão'),
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                        color: c == null ? cores.atencao : null,
+                      ),
                     ),
                     if (c != null && (c.numeroFrota ?? '').isNotEmpty)
                       Text('Frota ${c.numeroFrota}', style: TextStyle(fontSize: 13.5, color: cores.textoFraco)),
                     if (c != null && !c.confirmado)
-                      Text('O gestor ainda vai conferir esta placa', style: TextStyle(fontSize: 13.5, color: cores.atencao)),
+                      Text(
+                        'O gestor ainda vai conferir esta placa',
+                        style: TextStyle(fontSize: 13.5, color: cores.atencao),
+                      ),
                   ],
                 ),
               ),
-              const Icon(Icons.swap_horiz),
-              const SizedBox(width: 4),
-              const Text('Trocar', style: TextStyle(fontWeight: FontWeight.w600)),
+              if (!fixo) ...[
+                const Icon(Icons.swap_horiz),
+                const SizedBox(width: 4),
+                const Text('Trocar', style: TextStyle(fontWeight: FontWeight.w600)),
+              ],
             ],
           ),
         ),
@@ -73,7 +91,8 @@ class LinhaEnvio extends ConsumerWidget {
         child: Aviso(
           icone: Icons.block,
           titulo: 'Acesso desligado',
-          texto: 'A empresa desligou o seu acesso ou este celular. Seus lançamentos continuam guardados aqui. '
+          texto:
+              'A empresa desligou o seu acesso ou este celular. Seus lançamentos continuam guardados aqui. '
               'Fale com o seu patrão.',
         ),
       );
@@ -86,11 +105,14 @@ class LinhaEnvio extends ConsumerWidget {
           titulo: 'Entre de novo para enviar',
           texto: 'Seus lançamentos estão guardados no celular. Toque aqui para entrar com CPF e senha.',
         ),
-      ).comToque(() => Navigator.push(
-            context,
-            MaterialPageRoute(
-                builder: (_) => TelaEntrar(depois: () => ref.read(sincronizadorProvider.notifier).sincronizar())),
-          ));
+      ).comToque(
+        () => Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => TelaEntrar(depois: () => ref.read(sincronizadorProvider.notifier).sincronizar()),
+          ),
+        ),
+      );
     }
 
     final String texto;
@@ -121,8 +143,21 @@ class LinhaEnvio extends ConsumerWidget {
               children: [
                 Icon(icone, size: 20, color: cor),
                 const SizedBox(width: 8),
-                Expanded(child: Text(texto, style: TextStyle(fontSize: 14.5, color: cor, fontWeight: FontWeight.w500))),
-                if (!envio.ocupado) Text('Enviar agora', style: TextStyle(fontSize: 14, color: Theme.of(context).colorScheme.primary, fontWeight: FontWeight.w600)),
+                Expanded(
+                  child: Text(
+                    texto,
+                    style: TextStyle(fontSize: 14.5, color: cor, fontWeight: FontWeight.w500),
+                  ),
+                ),
+                if (!envio.ocupado)
+                  Text(
+                    'Enviar agora',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Theme.of(context).colorScheme.primary,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
               ],
             ),
           ),
@@ -147,7 +182,8 @@ class LinhaEnvio extends ConsumerWidget {
 }
 
 extension ComToque on Widget {
-  Widget comToque(VoidCallback aoTocar) => GestureDetector(onTap: aoTocar, behavior: HitTestBehavior.opaque, child: this);
+  Widget comToque(VoidCallback aoTocar) =>
+      GestureDetector(onTap: aoTocar, behavior: HitTestBehavior.opaque, child: this);
 }
 
 /// Etiqueta dos lançamentos que ainda não chegaram na nuvem ou que o gestor corrigiu.

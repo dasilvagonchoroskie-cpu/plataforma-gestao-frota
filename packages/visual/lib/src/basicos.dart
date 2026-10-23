@@ -175,7 +175,8 @@ class CabecalhoMes extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
           Expanded(child: Text(titulo, style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: cores.textoFraco))),
-          Text(resumo, style: estiloNumero(16, cor: cores.textoFraco)),
+          const SizedBox(width: 8),
+          Flexible(child: Text(resumo, textAlign: TextAlign.end, style: estiloNumero(16, cor: cores.textoFraco))),
         ],
       ),
     );

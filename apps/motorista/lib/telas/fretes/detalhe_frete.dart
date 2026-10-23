@@ -114,7 +114,8 @@ class _DetalheFreteState extends ConsumerState<DetalheFrete> {
           Placa(
             rotulo: 'Sua parte neste frete',
             valor: reais(f.minhaParteCentavos),
-            detalhe: '${percentualTexto(f.percentualComissao)}% sobre ${reais(f.baseComissaoCentavos)}'
+            detalhe:
+                '${percentualTexto(f.percentualComissao)}% sobre ${reais(f.baseComissaoCentavos)}'
                 '${f.comissaoSobreBruto ? ' (frete + pedágio)' : ''}',
             tamanhoValor: 40,
           ),
@@ -150,9 +151,9 @@ class _DetalheFreteState extends ConsumerState<DetalheFrete> {
                 dif.abs() < 1
                     ? 'Bateu certinho com o combinado.'
                     : (dif > 0
-                        ? 'Entrou ${reais(dif)} a mais que o combinado. Confira.'
-                        : 'A transportadora descontou ${reais(dif.abs())} do contratado '
-                            '(INSS, SEST/SENAT, seguro, pedágio, quebra).'),
+                          ? 'Entrou ${reais(dif)} a mais que o combinado. Confira.'
+                          : 'A transportadora descontou ${reais(dif.abs())} do contratado '
+                                '(INSS, SEST/SENAT, seguro, pedágio, quebra).'),
                 cor: dif.abs() < 1 ? cores.positivo : (dif > 0 ? cores.atencao : null),
               ),
             ),
@@ -173,9 +174,15 @@ class _DetalheFreteState extends ConsumerState<DetalheFrete> {
               ),
             ],
           ],
+          if (f.extras.values.any((v) => !extraVazio(v))) ...[
+            const TituloSecao('Mais informações'),
+            LinhasExtras(extras: f.extras, modalidade: dados.modalidade),
+          ],
           const TituloSecao('Conta desta viagem'),
-          Nota('Diesel, gastos e vales lançados de ${dataTexto(viagem.periodo.inicio)} a '
-              '${dataTexto(viagem.periodo.fim)}, até a carga seguinte.'),
+          Nota(
+            'Diesel, gastos e vales lançados de ${dataTexto(viagem.periodo.inicio)} a '
+            '${dataTexto(viagem.periodo.fim)}, até a carga seguinte.',
+          ),
           const SizedBox(height: 6),
           LinhaValor(rotulo: 'Frete que caiu na conta', valor: reais(r.totalFretes)),
           LinhaValor(

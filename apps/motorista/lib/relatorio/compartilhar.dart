@@ -23,9 +23,14 @@ Future<void> gerarEEnviarPdf(DadosRelatorio d) async {
   final nome = nomeDoArquivoPdf(d);
   final arquivo = File('${pasta.path}/$nome');
   await arquivo.writeAsBytes(bytes, flush: true);
-  await SharePlus.instance.share(ShareParams(
-    files: [XFile(arquivo.path, mimeType: 'application/pdf', name: nome)],
-    subject: (d.ehViagem ? 'Acerto da viagem: ${d.viagem}' : 'Relatório do motorista') +
-        (d.motorista.isEmpty ? '' : ' - ${d.motorista}'),
-  ));
+  await SharePlus.instance.share(
+    ShareParams(
+      files: [XFile(arquivo.path, mimeType: 'application/pdf', name: nome)],
+      subject:
+          (d.acerto != null
+              ? 'Acerto de ${d.acerto!.periodoTexto}'
+              : (d.ehViagem ? 'Acerto da viagem: ${d.viagem}' : 'Relatório do motorista')) +
+          (d.motorista.isEmpty ? '' : ' - ${d.motorista}'),
+    ),
+  );
 }

@@ -4,6 +4,7 @@ library;
 export 'src/abertura.dart';
 export 'src/basicos.dart';
 export 'src/campos.dart';
+export 'src/campos_extras.dart';
 export 'src/contas.dart';
 export 'src/entrada.dart';
 export 'src/listas.dart';

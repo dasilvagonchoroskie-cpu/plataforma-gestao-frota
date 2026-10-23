@@ -11,21 +11,26 @@ const caminhao1 = 'cam-1';
 const caminhao2 = 'cam-2';
 const categoria = 'cat-borracharia';
 
-Map<String, Object?> situacaoDe(String motoristaId, {String nome = 'João da Silva', bool ativo = true, String status = 'ativa'}) => {
-      'logado': true,
-      'perfil': {'id': 'u-$motoristaId', 'nome': nome, 'papel': 'motorista', 'ativo': true},
-      'empresa': {
-        'id': 'emp-x',
-        'nome': 'Transportes Goiatuba',
-        'status': status,
-        'percentual_comissao_padrao': 13,
-        'comissao_sobre_bruto_padrao': false,
-        'gastos_descontam_do_liquido': false,
-        'vale_desconta_do_liquido': true,
-      },
-      'motorista': {'id': motoristaId, 'nome': nome, 'ativo': ativo},
-      'pedido': null,
-    };
+Map<String, Object?> situacaoDe(
+  String motoristaId, {
+  String nome = 'João da Silva',
+  bool ativo = true,
+  String status = 'ativa',
+}) => {
+  'logado': true,
+  'perfil': {'id': 'u-$motoristaId', 'nome': nome, 'papel': 'motorista', 'ativo': true},
+  'empresa': {
+    'id': 'emp-x',
+    'nome': 'Transportes Goiatuba',
+    'status': status,
+    'percentual_comissao_padrao': 13,
+    'comissao_sobre_bruto_padrao': false,
+    'gastos_descontam_do_liquido': false,
+    'vale_desconta_do_liquido': true,
+  },
+  'motorista': {'id': motoristaId, 'nome': nome, 'ativo': ativo},
+  'pedido': null,
+};
 
 /// Servidor de mentira que se comporta como sincronizar_lote/baixar_alteracoes
 /// do banco: upsert pelo id, sem duplicar, cada motorista só vê o que é dele.
@@ -51,14 +56,25 @@ class ServidorFalso implements Servidor {
   Map<String, Object?>? situacaoFixa;
   final cadastros = <String>[];
 
-  Map<String, Object?> situacaoAtual() => situacaoFixa ?? situacaoDe(motoristaId);
+  Map<String, Object?> situacaoAtual() {
+    final s = situacaoFixa ?? situacaoDe(motoristaId);
+    if (modalidades.isEmpty || situacaoFixa != null) return s;
+    return {
+      ...s,
+      'empresa': {...(s['empresa'] as Map).cast<String, Object?>(), 'modalidades': modalidades},
+      'motorista': {...(s['motorista'] as Map).cast<String, Object?>(), 'modalidade': modalidadeDoMotorista},
+    };
+  }
 
   void _rede() {
     if (!online) throw const ErroServidor('Sem internet agora.', semInternet: true);
   }
 
   void colocar(String tabela, Map<String, Object?> dados) =>
-      nuvem.putIfAbsent(tabela, () => {})[dados['id'].toString()] = {...dados, 'atualizado_em': relogio.toIso8601String()};
+      nuvem.putIfAbsent(tabela, () => {})[dados['id'].toString()] = {
+        ...dados,
+        'atualizado_em': relogio.toIso8601String(),
+      };
 
   @override
   bool get temSessao => sessao;
@@ -116,8 +132,12 @@ class ServidorFalso implements Servidor {
         final doGestor = placasDoGestor[dados['placa']];
         if (doGestor != null) {
           mapa[id] = doGestor;
-          aceitos.add({'tabela': tabela, 'id': id, 'substituido_por': doGestor,
-            'atual': {'id': doGestor, 'placa': dados['placa'], 'ativo': true, 'confirmado': true}});
+          aceitos.add({
+            'tabela': tabela,
+            'id': id,
+            'substituido_por': doGestor,
+            'atual': {'id': doGestor, 'placa': dados['placa'], 'ativo': true, 'confirmado': true},
+          });
           continue;
         }
         colocar(tabela, dados);
@@ -133,7 +153,9 @@ class ServidorFalso implements Servidor {
         final igual = dados.entries.every((e) => e.key == 'apagado_em' || existente[e.key] == e.value);
         if (!igual) {
           rejeitados.add({
-            'tabela': tabela, 'id': id, 'motivo': 'ajustado',
+            'tabela': tabela,
+            'id': id,
+            'motivo': 'ajustado',
             'mensagem': 'O seu patrão já corrigiu este lançamento. Para mudar de novo, fale com ele.',
             'atual': existente,
           });
@@ -155,11 +177,12 @@ class ServidorFalso implements Servidor {
   Future<Map<String, Object?>> baixarAlteracoes(DateTime? desde) async {
     _rede();
     bool novo(Map<String, Object?> m) =>
-        desde == null || DateTime.parse(m['atualizado_em'] as String).isAfter(desde.subtract(const Duration(minutes: 2)));
+        desde == null ||
+        DateTime.parse(m['atualizado_em'] as String).isAfter(desde.subtract(const Duration(minutes: 2)));
     List<Map<String, Object?>> de(String t, {bool soMeus = true}) => [
-          for (final m in (nuvem[t] ?? const {}).values)
-            if ((!soMeus || m['motorista_id'] == motoristaId) && novo(m)) m,
-        ];
+      for (final m in (nuvem[t] ?? const {}).values)
+        if ((!soMeus || m['motorista_id'] == motoristaId) && novo(m)) m,
+    ];
     return {
       'servidor_em': relogio.toIso8601String(),
       'situacao': situacaoAtual(),
@@ -171,6 +194,8 @@ class ServidorFalso implements Servidor {
       'vales': de('vales'),
       'ajustes_km': de('ajustes_km'),
       'uso_caminhao': de('uso_caminhao'),
+      'viagens': de('viagens'),
+      'acertos': de('acertos'),
       'ajustes': [...ajustes],
     };
   }
@@ -214,7 +239,12 @@ class ServidorFalso implements Servidor {
     _rede();
     termosAceitos = versao;
     final s = situacaoFixa;
-    if (s != null) situacaoFixa = {...s, 'termos': {'versao': versao, 'aceito': true}};
+    if (s != null) {
+      situacaoFixa = {
+        ...s,
+        'termos': {'versao': versao, 'aceito': true},
+      };
+    }
     return situacaoAtual();
   }
 
@@ -230,6 +260,19 @@ class ServidorFalso implements Servidor {
 
   @override
   Future<Map<String, Object?>> pedirEntrada(String codigo) async => {'ok': true, 'status': 'pendente'};
+
+  /// Modalidades ligadas na empresa e a do motorista (null = ainda não escolheu).
+  List<Map<String, Object?>> modalidades = const [];
+  String? modalidadeDoMotorista;
+  final modalidadesEscolhidas = <String>[];
+
+  @override
+  Future<void> escolherModalidade(String codigo) async {
+    _rede();
+    modalidadesEscolhidas.add(codigo);
+    modalidadeDoMotorista = codigo;
+  }
+
   @override
   Future<void> sair() async => sessao = false;
 }
@@ -237,8 +280,20 @@ class ServidorFalso implements Servidor {
 /// Nuvem com dois caminhões e as categorias da empresa.
 ServidorFalso servidorComCadastros({String motoristaId = motoristaA}) {
   final s = ServidorFalso(motoristaId: motoristaId);
-  s.colocar('caminhoes', {'id': caminhao1, 'placa': 'ABC1D23', 'numero_frota': '01', 'ativo': true, 'confirmado': true});
-  s.colocar('caminhoes', {'id': caminhao2, 'placa': 'DEF4567', 'numero_frota': '02', 'ativo': true, 'confirmado': true});
+  s.colocar('caminhoes', {
+    'id': caminhao1,
+    'placa': 'ABC1D23',
+    'numero_frota': '01',
+    'ativo': true,
+    'confirmado': true,
+  });
+  s.colocar('caminhoes', {
+    'id': caminhao2,
+    'placa': 'DEF4567',
+    'numero_frota': '02',
+    'ativo': true,
+    'confirmado': true,
+  });
   s.colocar('categorias_gasto', {'id': categoria, 'nome': 'Borracharia', 'ativa': true});
   return s;
 }
@@ -248,11 +303,32 @@ Future<ProviderContainer> celular(ServidorFalso servidor, {Armazenamento? armaze
   final a = armazenamento ?? ArmazenamentoMemoria();
   await a.gravarEstado('situacao', jsonEncode(servidor.situacaoAtual()));
   await a.gravarEstado('pronto', '1');
-  final c = ProviderContainer(overrides: [
-    armazenamentoProvider.overrideWithValue(a),
-    servidorProvider.overrideWithValue(servidor),
-    if (agora != null) relogioProvider.overrideWithValue(() => agora),
-  ]);
+  final c = ProviderContainer(
+    overrides: [
+      armazenamentoProvider.overrideWithValue(a),
+      servidorProvider.overrideWithValue(servidor),
+      if (agora != null) relogioProvider.overrideWithValue(() => agora),
+    ],
+  );
   await c.read(dadosProvider.future);
   return c;
+}
+
+/// Como o servidor manda as modalidades (campos de fábrica, sem ajustes).
+Map<String, Object?> modalidadeTeste(
+  String codigo,
+  String nome,
+  String tipo, {
+  List<Map<String, Object?>> campos = const [],
+}) => {'codigo': codigo, 'nome': nome, 'tipo': tipo, 'ativa': true, 'campos': campos};
+
+final graneleiroTeste = modalidadeTeste('graneleiro', 'Graneleiro', 'frete');
+final bauTeste = modalidadeTeste('bau', 'Baú', 'viagem');
+
+/// Nuvem de um motorista do Baú (com o cavalo já escolhido no celular).
+ServidorFalso servidorBau({List<Map<String, Object?>> campos = const []}) {
+  final s = servidorComCadastros();
+  s.modalidades = [graneleiroTeste, modalidadeTeste('bau', 'Baú', 'viagem', campos: campos)];
+  s.modalidadeDoMotorista = 'bau';
+  return s;
 }

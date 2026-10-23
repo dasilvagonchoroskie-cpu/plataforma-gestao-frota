@@ -29,14 +29,20 @@ class EstadoEnvio {
   /// A empresa desativou este motorista ou este celular.
   final bool desligado;
 
-  EstadoEnvio copyWith({bool? ocupado, DateTime? ultimaVez, String? erro, bool limparErro = false, bool? precisaEntrar, bool? desligado}) =>
-      EstadoEnvio(
-        ocupado: ocupado ?? this.ocupado,
-        ultimaVez: ultimaVez ?? this.ultimaVez,
-        erro: limparErro ? null : (erro ?? this.erro),
-        precisaEntrar: precisaEntrar ?? this.precisaEntrar,
-        desligado: desligado ?? this.desligado,
-      );
+  EstadoEnvio copyWith({
+    bool? ocupado,
+    DateTime? ultimaVez,
+    String? erro,
+    bool limparErro = false,
+    bool? precisaEntrar,
+    bool? desligado,
+  }) => EstadoEnvio(
+    ocupado: ocupado ?? this.ocupado,
+    ultimaVez: ultimaVez ?? this.ultimaVez,
+    erro: limparErro ? null : (erro ?? this.erro),
+    precisaEntrar: precisaEntrar ?? this.precisaEntrar,
+    desligado: desligado ?? this.desligado,
+  );
 }
 
 /// Leva a fila do celular para a nuvem e traz o que mudou (cadastros,
@@ -109,7 +115,9 @@ class Sincronizador extends Notifier<EstadoEnvio> {
       final resposta = await _s.sincronizarLote({
         'dispositivo_id': dispositivo,
         'apelido': 'Celular do motorista',
-        'itens': [for (final i in itens) {'tabela': i.tabela, 'dados': i.dados}],
+        'itens': [
+          for (final i in itens) {'tabela': i.tabela, 'dados': i.dados},
+        ],
       });
       final porChave = {for (final i in itens) i.chave: i};
       var andou = false;
@@ -131,8 +139,10 @@ class Sincronizador extends Notifier<EstadoEnvio> {
 
       if (resposta['suspensa'] == true) {
         // Fica tudo na fila, guardado, até a empresa voltar.
-        throw const ErroServidor('A empresa está suspensa. Seus lançamentos estão guardados no celular.',
-            codigo: 'suspensa');
+        throw const ErroServidor(
+          'A empresa está suspensa. Seus lançamentos estão guardados no celular.',
+          codigo: 'suspensa',
+        );
       }
 
       for (final r in (resposta['rejeitados'] as List? ?? const [])) {
@@ -157,13 +167,13 @@ class Sincronizador extends Notifier<EstadoEnvio> {
   }
 
   Map<String, Object?> _caminhao(Map<String, Object?> c) => {
-        'id': c['id'],
-        'placa': c['placa'],
-        'numero_frota': c['numero_frota'],
-        'modelo': c['modelo'] ?? '',
-        'ativo': c['ativo'] ?? true,
-        'confirmado': c['confirmado'] ?? true,
-      };
+    'id': c['id'],
+    'placa': c['placa'],
+    'numero_frota': c['numero_frota'],
+    'modelo': c['modelo'] ?? '',
+    'ativo': c['ativo'] ?? true,
+    'confirmado': c['confirmado'] ?? true,
+  };
 
   /// Traz o que mudou desde a última vez (ou tudo, na primeira).
   Future<void> baixar({bool tudo = false}) async {
@@ -187,16 +197,24 @@ class Sincronizador extends Notifier<EstadoEnvio> {
     final fila = await _a.fila();
     final naFila = {for (final i in fila) i.chave};
     for (final t in [
-      Tabelas.caminhoes, Tabelas.categorias, Tabelas.fretes, Tabelas.abastecimentos, Tabelas.gastos,
-      Tabelas.vales, Tabelas.ajustesKm, Tabelas.usos,
+      Tabelas.caminhoes,
+      Tabelas.categorias,
+      Tabelas.fretes,
+      Tabelas.viagens,
+      Tabelas.abastecimentos,
+      Tabelas.gastos,
+      Tabelas.vales,
+      Tabelas.ajustesKm,
+      Tabelas.usos,
+      Tabelas.acertos,
     ]) {
       final chaveResposta = t == Tabelas.categorias ? 'categorias' : t;
-      final lista = [
-        for (final e in (r[chaveResposta] as List? ?? const []))
-          (e as Map).cast<String, Object?>(),
-      ];
+      final lista = [for (final e in (r[chaveResposta] as List? ?? const [])) (e as Map).cast<String, Object?>()];
       // O que o motorista mudou e ainda não enviou vale mais que a cópia da nuvem.
-      final gravar = [for (final m in lista) if (!naFila.contains('$t:${m['id']}')) m];
+      final gravar = [
+        for (final m in lista)
+          if (!naFila.contains('$t:${m['id']}')) m,
+      ];
       if (gravar.isNotEmpty) await _a.gravarRegistros(t, gravar);
     }
     final ajustes = [for (final e in (r['ajustes'] as List? ?? const [])) (e as Map).cast<String, Object?>()];

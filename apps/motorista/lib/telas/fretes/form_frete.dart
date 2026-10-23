@@ -40,12 +40,28 @@ class _FormFreteState extends ConsumerState<FormFrete> {
   String? _erroDestino;
   String? _erroCaminhao;
 
+  /// Campos novos da Plataforma e os erros dos campos obrigatórios.
+  Map<String, Object?> _extras = const {};
+  final _erros = <String, String>{};
+
+  /// Muda quando o rascunho chega (os campos novos se refazem com os valores dele).
+  var _versaoExtras = 0;
+
   bool get _novo => widget.editando == null;
 
   List<TextEditingController> get _todos => [
-        _origem, _destino, _embarcador, _peso, _tonelada, _adiantamento,
-        _saldo, _percentual, _pedagio, _pesoDescarga, _descontoQuebra,
-      ];
+    _origem,
+    _destino,
+    _embarcador,
+    _peso,
+    _tonelada,
+    _adiantamento,
+    _saldo,
+    _percentual,
+    _pedagio,
+    _pesoDescarga,
+    _descontoQuebra,
+  ];
 
   @override
   void initState() {
@@ -66,6 +82,7 @@ class _FormFreteState extends ConsumerState<FormFrete> {
     _pedagio.text = textoDinheiro(f.pedagioCentavos);
     _pesoDescarga.text = textoInteiro(f.pesoDescargaKg);
     _descontoQuebra.text = textoDinheiro(f.descontoQuebraCentavos);
+    _extras = {...f.extras};
     if (_novo) _carregarRascunho();
   }
 
@@ -91,6 +108,11 @@ class _FormFreteState extends ConsumerState<FormFrete> {
       if (d != null) _dataCarga = d;
       final b = m['sobreBruto'];
       if (b is bool) _sobreBruto = b;
+      final x = m['extras'];
+      if (x is Map) {
+        _extras = x.cast<String, Object?>();
+        _versaoExtras++;
+      }
     });
   }
 
@@ -114,6 +136,7 @@ class _FormFreteState extends ConsumerState<FormFrete> {
         'descontoQuebra': _descontoQuebra.text,
         'dataCarga': _dataCarga.toIso8601String(),
         'sobreBruto': _sobreBruto,
+        'extras': _extras,
       });
     }
   }
@@ -127,30 +150,52 @@ class _FormFreteState extends ConsumerState<FormFrete> {
   }
 
   Frete _montar() => _base.copyWith(
-        caminhaoId: _caminhaoId ?? '',
-        origem: _origem.text.trim(),
-        destino: _destino.text.trim(),
-        embarcador: _embarcador.text.trim(),
-        dataCarga: _dataCarga,
-        pesoCargaKg: lerNumero(_peso.text),
-        valorToneladaCentavos: lerCentavos(_tonelada.text),
-        adiantamentoCentavos: lerCentavos(_adiantamento.text),
-        saldoCentavos: lerCentavos(_saldo.text),
-        percentualComissao: lerNumero(_percentual.text),
-        pedagioCentavos: lerCentavos(_pedagio.text),
-        comissaoSobreBruto: _sobreBruto,
-        pesoDescargaKg: lerNumero(_pesoDescarga.text),
-        descontoQuebraCentavos: lerCentavos(_descontoQuebra.text),
-      );
+    caminhaoId: _caminhaoId ?? '',
+    origem: _origem.text.trim(),
+    destino: _destino.text.trim(),
+    embarcador: _embarcador.text.trim(),
+    dataCarga: _dataCarga,
+    pesoCargaKg: lerNumero(_peso.text),
+    valorToneladaCentavos: lerCentavos(_tonelada.text),
+    adiantamentoCentavos: lerCentavos(_adiantamento.text),
+    saldoCentavos: lerCentavos(_saldo.text),
+    percentualComissao: lerNumero(_percentual.text),
+    pedagioCentavos: lerCentavos(_pedagio.text),
+    comissaoSobreBruto: _sobreBruto,
+    pesoDescargaKg: lerNumero(_pesoDescarga.text),
+    descontoQuebraCentavos: lerCentavos(_descontoQuebra.text),
+    extras: _extras,
+  );
 
   Future<void> _salvar() async {
     final f = _montar();
+    final m = ref.read(dadosProvider).requireValue.modalidade;
+    // O que o dono marcou como obrigatório (campos de fábrica que podem sumir).
+    final preenchido = <String, bool>{
+      'embarcador': f.embarcador.isNotEmpty,
+      'peso_carga_kg': f.pesoCargaKg > 0,
+      'valor_tonelada_centavos': f.valorToneladaCentavos > 0,
+      'adiantamento_centavos': f.adiantamentoCentavos > 0,
+      'saldo_centavos': f.saldoCentavos > 0,
+      'pedagio_centavos': f.pedagioCentavos > 0,
+      'percentual_comissao': _percentual.text.trim().isNotEmpty,
+      'peso_descarga_kg': f.pesoDescargaKg > 0,
+      'desconto_quebra_centavos': f.descontoQuebraCentavos > 0,
+    };
     setState(() {
-      _erroOrigem = f.origem.isEmpty ? 'Falta de onde saiu a carga.' : null;
-      _erroDestino = f.destino.isEmpty ? 'Falta para onde vai a carga.' : null;
+      _erroOrigem = f.origem.isEmpty ? 'Falta ${m.rotulo('origem', 'de onde saiu a carga').toLowerCase()}.' : null;
+      _erroDestino = f.destino.isEmpty ? 'Falta ${m.rotulo('destino', 'para onde vai a carga').toLowerCase()}.' : null;
       _erroCaminhao = f.caminhaoId.isEmpty ? 'Escolha o caminhão.' : null;
+      _erros
+        ..clear()
+        ..addAll({
+          for (final e in preenchido.entries)
+            if (m.visivel(e.key) && m.obrigatorio(e.key) && !e.value)
+              e.key: 'Preencha ${m.rotulo(e.key, '').toLowerCase()}.',
+        })
+        ..addAll(errosDosExtras(m.extras(), _extras));
     });
-    if (_erroOrigem != null || _erroDestino != null || _erroCaminhao != null) {
+    if (_erroOrigem != null || _erroDestino != null || _erroCaminhao != null || _erros.isNotEmpty) {
       mostrarMensagem(context, 'Preencha o que está marcado para salvar.');
       return;
     }
@@ -163,17 +208,34 @@ class _FormFreteState extends ConsumerState<FormFrete> {
     if (!mounted) return;
     final mensageiro = ScaffoldMessenger.of(context);
     Navigator.pop(context, true);
-    mensageiro.showSnackBar(SnackBar(content: Text(_novo ? 'Frete salvo.' : 'Alteração salva.')));
+    mensageiro
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text(_novo ? 'Frete salvo.' : 'Alteração salva.')));
   }
 
   Widget _dupla(Widget a, Widget b) => Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [Expanded(child: a), const SizedBox(width: 12), Expanded(child: b)],
-      );
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Expanded(child: a),
+      const SizedBox(width: 12),
+      Expanded(child: b),
+    ],
+  );
+
+  /// Um ou dois campos lado a lado (o dono pode esconder um deles).
+  Widget _par(List<Widget> campos) {
+    if (campos.isEmpty) return const SizedBox.shrink();
+    if (campos.length == 1) return campos.first;
+    return _dupla(campos[0], campos[1]);
+  }
 
   @override
   Widget build(BuildContext context) {
     final dados = assistirDados(ref);
+    final m = dados.modalidade;
+    String rotulo(String chave, String padrao) => m.rotulo(chave, padrao);
+    bool ver(String chave) => m.visivel(chave);
+    String? opcional(String chave, String? padrao) => m.obrigatorio(chave) ? null : padrao;
     final f = _montar();
     final ajustes = _novo ? const <AjusteGestor>[] : dados.ajustesDe(_base.id);
     final bloqueado = ajustes.isNotEmpty;
@@ -187,7 +249,8 @@ class _FormFreteState extends ConsumerState<FormFrete> {
           titulo: 'Escolha o caminhão primeiro',
           texto: 'Os lançamentos ficam ligados ao caminhão em que você está.',
           acao: FilledButton(
-            onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const TelaTrocarCaminhao(primeiraVez: true))),
+            onPressed: () =>
+                Navigator.push(context, MaterialPageRoute(builder: (_) => const TelaTrocarCaminhao(primeiraVez: true))),
             child: const Text('Escolher o caminhão'),
           ),
         ),
@@ -206,13 +269,15 @@ class _FormFreteState extends ConsumerState<FormFrete> {
           children: [
             AvisoAjustado(ajustes: ajustes),
             if (_novo)
-              const Nota('Preencha o que já sabe agora. O saldo e a descarga você completa depois. '
-                  'O que digitar fica guardado mesmo se o app fechar.'),
+              const Nota(
+                'Preencha o que já sabe agora. O saldo e a descarga você completa depois. '
+                'O que digitar fica guardado mesmo se o app fechar.',
+              ),
             const TituloSecao('Carga', espacoAcima: 16),
             CampoCaminhao(valor: _caminhaoId, erro: _erroCaminhao, aoMudar: (v) => setState(() => _caminhaoId = v)),
             espaco,
             CampoData(
-              rotulo: 'Data da carga',
+              rotulo: rotulo('data_carga', 'Data da carga'),
               valor: _dataCarga,
               aoMudar: (v) {
                 _dataCarga = v;
@@ -222,7 +287,7 @@ class _FormFreteState extends ConsumerState<FormFrete> {
             espaco,
             Campo(
               controle: _origem,
-              rotulo: 'Origem (de onde saiu)',
+              rotulo: rotulo('origem', 'Origem (de onde saiu)'),
               erro: _erroOrigem,
               maiusculas: TextCapitalization.words,
               sugestoes: dados.cidadesUsadas,
@@ -231,60 +296,141 @@ class _FormFreteState extends ConsumerState<FormFrete> {
             espaco,
             Campo(
               controle: _destino,
-              rotulo: 'Destino (para onde vai)',
+              rotulo: rotulo('destino', 'Destino (para onde vai)'),
               erro: _erroDestino,
               maiusculas: TextCapitalization.words,
               sugestoes: dados.cidadesUsadas,
               aoMudar: _mudou,
             ),
-            espaco,
-            Campo(
-              controle: _embarcador,
-              rotulo: 'Embarcador ou cliente',
-              ajuda: 'Opcional',
-              maiusculas: TextCapitalization.words,
-              sugestoes: dados.embarcadoresUsados,
-              aoMudar: _mudou,
-            ),
-            const TituloSecao('Peso e preço'),
-            _dupla(
-              Campo(controle: _peso, rotulo: 'Peso na carga', tipo: TipoCampo.inteiro, sufixo: 'kg', dica: '33.040', aoMudar: _mudou),
-              Campo(controle: _tonelada, rotulo: 'Valor da tonelada', tipo: TipoCampo.dinheiro, aoMudar: _mudou),
-            ),
-            const TituloSecao('Pagamento'),
-            _dupla(
-              Campo(controle: _adiantamento, rotulo: 'Adiantamento', tipo: TipoCampo.dinheiro, aoMudar: _mudou),
-              Campo(controle: _saldo, rotulo: 'Saldo', tipo: TipoCampo.dinheiro, ajuda: 'Quando cair', aoMudar: _mudou),
-            ),
-            espaco,
-            Campo(
-              controle: _pedagio,
-              rotulo: 'Pedágio no cartão ou tag',
-              tipo: TipoCampo.dinheiro,
-              ajuda: 'O que a empresa pagou de pedágio. Pedágio do seu bolso vai em Gastos.',
-              aoMudar: _mudou,
-            ),
-            const TituloSecao('Comissão'),
-            Campo(controle: _percentual, rotulo: 'Sua comissão', tipo: TipoCampo.decimal, sufixo: '%', aoMudar: _mudou),
-            const SizedBox(height: 12),
-            Text('A comissão é sobre', style: TextStyle(fontSize: 15, color: context.cores.textoFraco)),
-            const SizedBox(height: 6),
-            EscolhaDupla(
-              valor: _sobreBruto,
-              textoSim: 'Frete + pedágio',
-              textoNao: 'Só o frete',
-              aoMudar: (v) {
-                _sobreBruto = v;
-                _mudou();
-              },
-            ),
-            const TituloSecao('Descarga'),
-            const Nota('Pode completar depois, quando descarregar.'),
-            const SizedBox(height: 10),
-            _dupla(
-              Campo(controle: _pesoDescarga, rotulo: 'Peso na descarga', tipo: TipoCampo.inteiro, sufixo: 'kg', aoMudar: _mudou),
-              Campo(controle: _descontoQuebra, rotulo: 'Desconto de quebra', tipo: TipoCampo.dinheiro, aoMudar: _mudou),
-            ),
+            if (ver('embarcador')) ...[
+              espaco,
+              Campo(
+                controle: _embarcador,
+                rotulo: rotulo('embarcador', 'Embarcador ou cliente'),
+                ajuda: opcional('embarcador', 'Opcional'),
+                erro: _erros['embarcador'],
+                maiusculas: TextCapitalization.words,
+                sugestoes: dados.embarcadoresUsados,
+                aoMudar: _mudou,
+              ),
+            ],
+            if (ver('peso_carga_kg') || ver('valor_tonelada_centavos')) ...[
+              const TituloSecao('Peso e preço'),
+              _par([
+                if (ver('peso_carga_kg'))
+                  Campo(
+                    controle: _peso,
+                    rotulo: rotulo('peso_carga_kg', 'Peso na carga'),
+                    tipo: TipoCampo.inteiro,
+                    sufixo: 'kg',
+                    dica: '33.040',
+                    erro: _erros['peso_carga_kg'],
+                    aoMudar: _mudou,
+                  ),
+                if (ver('valor_tonelada_centavos'))
+                  Campo(
+                    controle: _tonelada,
+                    rotulo: rotulo('valor_tonelada_centavos', 'Valor da tonelada'),
+                    tipo: TipoCampo.dinheiro,
+                    erro: _erros['valor_tonelada_centavos'],
+                    aoMudar: _mudou,
+                  ),
+              ]),
+            ],
+            if (ver('adiantamento_centavos') || ver('saldo_centavos') || ver('pedagio_centavos'))
+              const TituloSecao('Pagamento'),
+            _par([
+              if (ver('adiantamento_centavos'))
+                Campo(
+                  controle: _adiantamento,
+                  rotulo: rotulo('adiantamento_centavos', 'Adiantamento'),
+                  tipo: TipoCampo.dinheiro,
+                  erro: _erros['adiantamento_centavos'],
+                  aoMudar: _mudou,
+                ),
+              if (ver('saldo_centavos'))
+                Campo(
+                  controle: _saldo,
+                  rotulo: rotulo('saldo_centavos', 'Saldo'),
+                  tipo: TipoCampo.dinheiro,
+                  ajuda: opcional('saldo_centavos', 'Quando cair'),
+                  erro: _erros['saldo_centavos'],
+                  aoMudar: _mudou,
+                ),
+            ]),
+            if (ver('pedagio_centavos')) ...[
+              espaco,
+              Campo(
+                controle: _pedagio,
+                rotulo: rotulo('pedagio_centavos', 'Pedágio no cartão ou tag'),
+                tipo: TipoCampo.dinheiro,
+                ajuda: 'O que a empresa pagou de pedágio. Pedágio do seu bolso vai em Gastos.',
+                erro: _erros['pedagio_centavos'],
+                aoMudar: _mudou,
+              ),
+            ],
+            if (ver('percentual_comissao')) ...[
+              const TituloSecao('Comissão'),
+              Campo(
+                controle: _percentual,
+                rotulo: rotulo('percentual_comissao', 'Sua comissão'),
+                tipo: TipoCampo.decimal,
+                sufixo: '%',
+                erro: _erros['percentual_comissao'],
+                aoMudar: _mudou,
+              ),
+              const SizedBox(height: 12),
+              Text('A comissão é sobre', style: TextStyle(fontSize: 15, color: context.cores.textoFraco)),
+              const SizedBox(height: 6),
+              EscolhaDupla(
+                valor: _sobreBruto,
+                textoSim: 'Frete + pedágio',
+                textoNao: 'Só o frete',
+                aoMudar: (v) {
+                  _sobreBruto = v;
+                  _mudou();
+                },
+              ),
+            ],
+            if (ver('peso_descarga_kg') || ver('desconto_quebra_centavos')) ...[
+              const TituloSecao('Descarga'),
+              const Nota('Pode completar depois, quando descarregar.'),
+              const SizedBox(height: 10),
+              _par([
+                if (ver('peso_descarga_kg'))
+                  Campo(
+                    controle: _pesoDescarga,
+                    rotulo: rotulo('peso_descarga_kg', 'Peso na descarga'),
+                    tipo: TipoCampo.inteiro,
+                    sufixo: 'kg',
+                    erro: _erros['peso_descarga_kg'],
+                    aoMudar: _mudou,
+                  ),
+                if (ver('desconto_quebra_centavos'))
+                  Campo(
+                    controle: _descontoQuebra,
+                    rotulo: rotulo('desconto_quebra_centavos', 'Desconto de quebra'),
+                    tipo: TipoCampo.dinheiro,
+                    erro: _erros['desconto_quebra_centavos'],
+                    aoMudar: _mudou,
+                  ),
+              ]),
+            ],
+            if (m.extras().isNotEmpty) ...[
+              const TituloSecao('Mais informações'),
+              CamposExtras(
+                key: ValueKey(_versaoExtras),
+                campos: m.extras(),
+                valores: _extras,
+                erros: _erros,
+                sugestoesCidades: dados.cidadesUsadas,
+                aoMudar: (v) {
+                  _extras = v;
+                  _erros.removeWhere((k, _) => v.containsKey(k));
+                  _mudou();
+                },
+              ),
+            ],
             const TituloSecao('Conferência'),
             Conferencia(frete: f),
           ],
@@ -345,13 +491,18 @@ class Conferencia extends StatelessWidget {
           destaque: true,
           corValor: cores.positivo,
         ),
-        if (mensagem != null) Padding(padding: const EdgeInsets.only(top: 6), child: Nota(mensagem, cor: corMensagem)),
+        if (mensagem != null)
+          Padding(
+            padding: const EdgeInsets.only(top: 6),
+            child: Nota(mensagem, cor: corMensagem),
+          ),
         if (quebra != null) ...[
           const SizedBox(height: 12),
           Aviso(
             icone: Icons.scale_outlined,
             titulo: 'Quebra de ${semCasas(quebra)} kg',
-            texto: 'Carregou ${toneladas(f.pesoCargaKg)} t e descarregou ${toneladas(f.pesoDescargaKg)} t. '
+            texto:
+                'Carregou ${toneladas(f.pesoCargaKg)} t e descarregou ${toneladas(f.pesoDescargaKg)} t. '
                 'Pelo valor da tonelada, a quebra vale ${reais(f.valorQuebraIntegralCentavos)}. '
                 '${f.descontoQuebraCentavos > 0 ? 'Cobraram ${reais(f.descontoQuebraCentavos)}.' : 'Não descontaram.'}'
                 '${f.descontoQuebraCentavos > f.valorQuebraIntegralCentavos + 1 && f.valorQuebraIntegralCentavos > 0 ? ' Atenção: cobraram ${reais(f.descontoQuebraCentavos - f.valorQuebraIntegralCentavos)} a mais do que a quebra vale.' : ''}',

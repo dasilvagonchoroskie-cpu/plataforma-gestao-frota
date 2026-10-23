@@ -42,7 +42,9 @@ class _TelaRelatorioState extends ConsumerState<TelaRelatorio> {
       partes = const [];
       semNada = true;
     } else {
-      final fr = plural(d.fretes.length, 'frete', 'fretes');
+      final fr = dados.porViagem
+          ? plural(d.viagens.length, 'viagem', 'viagens')
+          : plural(d.fretes.length, 'frete', 'fretes');
       final ab = plural(d.abastecimentos.length, 'abastecida', 'abastecidas');
       final va = plural(d.vales.length, 'vale', 'vales');
       final ga = plural(d.gastos.length, 'gasto', 'gastos');
@@ -52,7 +54,7 @@ class _TelaRelatorioState extends ConsumerState<TelaRelatorio> {
           semNada = d.vazio;
         case ConteudoRelatorio.fretes:
           partes = [fr];
-          semNada = d.fretes.isEmpty;
+          semNada = dados.porViagem ? d.viagens.isEmpty : d.fretes.isEmpty;
         case ConteudoRelatorio.diesel:
           partes = [ab];
           semNada = d.abastecimentos.isEmpty;
@@ -96,7 +98,7 @@ class _TelaRelatorioState extends ConsumerState<TelaRelatorio> {
                   children: [
                     for (final c in ConteudoRelatorio.values)
                       ChoiceChip(
-                        label: Text(c.rotulo),
+                        label: Text(dados.porViagem && c == ConteudoRelatorio.fretes ? 'Viagens' : c.rotulo),
                         selected: _conteudo == c,
                         showCheckmark: false,
                         onSelected: (_) => setState(() => _conteudo = c),
@@ -104,21 +106,26 @@ class _TelaRelatorioState extends ConsumerState<TelaRelatorio> {
                   ],
                 ),
                 const SizedBox(height: 10),
-                Nota(_conteudo == ConteudoRelatorio.tudo
-                    ? 'Vai tudo junto: fretes, diesel, vales, gastos e as contas do período.'
-                    : 'Só a parte escolhida, com o fechamento dela.'),
+                Nota(
+                  _conteudo == ConteudoRelatorio.tudo
+                      ? 'Vai tudo junto: ${dados.porViagem ? 'viagens' : 'fretes'}, diesel, vales, gastos e as contas do período.'
+                      : 'Só a parte escolhida, com o fechamento dela.',
+                ),
                 const TituloSecao('Vai no relatório'),
                 if (partes.isNotEmpty) Text(partes.join(', '), style: const TextStyle(fontSize: 17)),
                 if (semNada) ...[
                   const SizedBox(height: 12),
                   const Aviso(
                     titulo: 'Nada anotado neste período',
-                    texto: 'O PDF vai sair sem registros. Confira se o período escolhido pega a data dos seus lançamentos.',
+                    texto:
+                        'O PDF vai sair sem registros. Confira se o período escolhido pega a data dos seus lançamentos.',
                   ),
                 ],
                 const SizedBox(height: 24),
-                const Nota('O seu patrão já vê tudo no painel, sem precisar do PDF. Use o PDF quando quiser guardar '
-                    'ou mandar o acerto para alguém.'),
+                const Nota(
+                  'O seu patrão já vê tudo no painel, sem precisar do PDF. Use o PDF quando quiser guardar '
+                  'ou mandar o acerto para alguém.',
+                ),
               ],
             ),
           ),

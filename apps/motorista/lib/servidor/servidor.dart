@@ -59,6 +59,9 @@ abstract class Servidor {
   Future<void> registrarAcesso();
   Future<Map<String, Object?>> situacao();
   Future<Map<String, Object?>> pedirEntrada(String codigo);
+
+  /// O motorista escolhe a modalidade (empresa com mais de uma ligada).
+  Future<void> escolherModalidade(String codigo);
   Future<Map<String, Object?>> sincronizarLote(Map<String, Object?> lote);
   Future<Map<String, Object?>> baixarAlteracoes(DateTime? desde);
   Future<void> sair();
@@ -95,7 +98,10 @@ ErroServidor traduzirErro(Object e) {
       return const ErroServidor('Este e-mail já está em outra conta. Use outro e-mail.', codigo: 'email_em_uso');
     }
     if (m.contains('password') && (m.contains('least') || m.contains('weak') || m.contains('should contain'))) {
-      return const ErroServidor('A senha precisa ter pelo menos 8 caracteres, com letras e números.', codigo: 'senha_fraca');
+      return const ErroServidor(
+        'A senha precisa ter pelo menos 8 caracteres, com letras e números.',
+        codigo: 'senha_fraca',
+      );
     }
     if (m.contains('same') && m.contains('password')) {
       return const ErroServidor('Escolha uma senha diferente da anterior.', codigo: 'senha_igual');
@@ -163,42 +169,39 @@ class ServidorSupabase implements Servidor {
 
   @override
   Future<void> confirmarCodigoCadastro(String email, String codigo) => _tentar(() async {
-        await _auth.verifyOTP(email: email.trim().toLowerCase(), token: codigo.trim(), type: OtpType.email);
-      });
+    await _auth.verifyOTP(email: email.trim().toLowerCase(), token: codigo.trim(), type: OtpType.email);
+  });
 
   @override
   Future<void> definirSenha(String senha) => _tentar(() async {
-        await _auth.updateUser(UserAttributes(password: senha, data: {'trocar_senha': false}));
-      });
+    await _auth.updateUser(UserAttributes(password: senha, data: {'trocar_senha': false}));
+  });
 
   @override
-  Future<Map<String, Object?>> completarCadastro(String nome, String cpf) => _tentar(() async =>
-      _mapa(await cliente.rpc('completar_cadastro', params: {'p_nome': nome.trim(), 'p_cpf': cpf})));
+  Future<Map<String, Object?>> completarCadastro(String nome, String cpf) => _tentar(
+    () async => _mapa(await cliente.rpc('completar_cadastro', params: {'p_nome': nome.trim(), 'p_cpf': cpf})),
+  );
 
   @override
   Future<void> entrarComCpf(String cpf, String senha, String aparelho) => _tentar(() async {
-        final r = await cliente.functions.invoke('entrar_com_cpf', body: {
-          'cpf': cpf,
-          'senha': senha,
-          'aparelho': aparelho,
-        });
-        final d = _mapa(r.data);
-        if (d['ok'] != true || d['refresh_token'] == null) {
-          throw ErroServidor('${d['mensagem'] ?? 'CPF ou senha incorretos.'}', codigo: '${d['codigo'] ?? ''}');
-        }
-        await _auth.setSession(d['refresh_token'] as String);
-      });
+    final r = await cliente.functions.invoke(
+      'entrar_com_cpf',
+      body: {'cpf': cpf, 'senha': senha, 'aparelho': aparelho},
+    );
+    final d = _mapa(r.data);
+    if (d['ok'] != true || d['refresh_token'] == null) {
+      throw ErroServidor('${d['mensagem'] ?? 'CPF ou senha incorretos.'}', codigo: '${d['codigo'] ?? ''}');
+    }
+    await _auth.setSession(d['refresh_token'] as String);
+  });
 
   @override
   Future<void> cadastrarMotorista(String nome, String cpf, String senha, String aparelho, {String? termos}) =>
       _tentar(() async {
-        await cliente.functions.invoke('cadastrar_motorista', body: {
-          'nome': nome.trim(),
-          'cpf': cpf,
-          'senha': senha,
-          'aparelho': aparelho,
-          'termos': ?termos,
-        });
+        await cliente.functions.invoke(
+          'cadastrar_motorista',
+          body: {'nome': nome.trim(), 'cpf': cpf, 'senha': senha, 'aparelho': aparelho, 'termos': ?termos},
+        );
       });
 
   @override
@@ -207,11 +210,11 @@ class ServidorSupabase implements Servidor {
 
   @override
   Future<String> pedirLinkSenha(String cpf) => _tentar(() async {
-        final r = await cliente.functions.invoke('pedir_link_senha', body: {'identificador': cpf});
-        final d = _mapa(r.data);
-        if (d['ok'] != true) throw ErroServidor('${d['mensagem'] ?? 'Não deu para pedir o link agora.'}');
-        return '${d['mensagem']}';
-      });
+    final r = await cliente.functions.invoke('pedir_link_senha', body: {'identificador': cpf});
+    final d = _mapa(r.data);
+    if (d['ok'] != true) throw ErroServidor('${d['mensagem'] ?? 'Não deu para pedir o link agora.'}');
+    return '${d['mensagem']}';
+  });
 
   @override
   Future<void> cadastrarEmail(String email) =>
@@ -247,12 +250,17 @@ class ServidorSupabase implements Servidor {
       _tentar(() async => _mapa(await cliente.rpc('pedir_entrada', params: {'p_codigo': codigo})));
 
   @override
+  Future<void> escolherModalidade(String codigo) =>
+      _tentar(() => cliente.rpc('escolher_minha_modalidade', params: {'p_modalidade': codigo}));
+
+  @override
   Future<Map<String, Object?>> sincronizarLote(Map<String, Object?> lote) =>
       _tentar(() async => _mapa(await cliente.rpc('sincronizar_lote', params: {'p_lote': lote})));
 
   @override
-  Future<Map<String, Object?>> baixarAlteracoes(DateTime? desde) => _tentar(() async => _mapa(await cliente
-      .rpc('baixar_alteracoes', params: {'p_desde': desde?.toUtc().toIso8601String()})));
+  Future<Map<String, Object?>> baixarAlteracoes(DateTime? desde) => _tentar(
+    () async => _mapa(await cliente.rpc('baixar_alteracoes', params: {'p_desde': desde?.toUtc().toIso8601String()})),
+  );
 
   @override
   Future<void> sair() async {

@@ -154,3 +154,113 @@ class CorpoResumo extends StatelessWidget {
     );
   }
 }
+
+/// O resumo de quem trabalha por viagem (Baú, Sider): viagens, entregas,
+/// diesel, gastos e vales do período, e os acertos que o gestor já fechou.
+/// A comissão não é calculada aqui: ela sai no acerto.
+class CorpoResumoViagens extends StatelessWidget {
+  const CorpoResumoViagens({
+    super.key,
+    required this.dados,
+    required this.todasAbastecidas,
+    required this.descricao,
+    required this.empresaNome,
+    this.acertos = const [],
+    this.aoAbrirAcerto,
+    this.textoVazio = 'Toque em "Lançar" para engatar uma carreta e anotar diesel, gastos e vales. '
+        'As contas aparecem aqui sozinhas.',
+  });
+
+  final DadosRelatorio dados;
+  final List<Abastecimento> todasAbastecidas;
+  final String descricao;
+  final String empresaNome;
+
+  /// Acertos fechados (mais novos primeiro).
+  final List<Acerto> acertos;
+  final ValueChanged<Acerto>? aoAbrirAcerto;
+  final String textoVazio;
+
+  @override
+  Widget build(BuildContext context) {
+    final d = dados;
+    final r = d.resultado;
+    final regras = d.regras;
+    final cores = context.cores;
+    final titulo = descricao.isEmpty ? '' : descricao[0].toUpperCase() + descricao.substring(1);
+    final entregas = d.viagens.fold<int>(0, (s, v) => s + v.entregasQuantidade);
+    final cidades = {for (final v in d.viagens) ...v.entregasCidades.map((c) => c.toLowerCase())}.length;
+    final emAndamento = d.viagens.where((v) => v.emAndamento).length;
+    final mediaDiesel = mediaDoPeriodo(d.abastecimentos, todasAbastecidas);
+    final litros = d.abastecimentos.fold<double>(0, (s, a) => s + a.litros);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Placa(
+          rotulo: 'Viagens',
+          valor: '${d.viagens.length}',
+          detalhe: [titulo, if (emAndamento > 0) '$emAndamento em andamento'].where((t) => t.isNotEmpty).join('  ·  '),
+          tamanhoValor: 42,
+        ),
+        const SizedBox(height: 10),
+        LinhaValor(
+          rotulo: 'Entregas',
+          valor: '$entregas',
+          detalhe: cidades == 0 ? null : plural(cidades, 'cidade', 'cidades'),
+        ),
+        LinhaValor(
+          rotulo: 'Diesel e gastos',
+          valor: regras.gastosDescontamDoLiquido ? '$menos ${reais(r.totalGastoGeral)}' : reais(r.totalGastoGeral),
+          detalhe: regras.gastosDescontamDoLiquido
+              ? 'Saem do seu bolso, então descontam no acerto'
+              : 'A empresa paga, não descontam do seu acerto',
+          corValor: regras.gastosDescontamDoLiquido ? cores.negativo : cores.textoFraco,
+        ),
+        LinhaValor(
+          rotulo: 'Vales',
+          valor: regras.valeDescontaDoLiquido ? '$menos ${reais(r.totalVale)}' : reais(r.totalVale),
+          detalhe: regras.valeDescontaDoLiquido
+              ? 'Você já recebeu adiantado, então desconta no acerto'
+              : 'Só histórico, não mexe no acerto',
+          corValor: regras.valeDescontaDoLiquido ? cores.negativo : cores.textoFraco,
+        ),
+        const SizedBox(height: 4),
+        Nota('A comissão sai no acerto que ${empresaNome.isEmpty ? 'a empresa' : 'a $empresaNome'} fecha. '
+            'Os acertos fechados aparecem aqui.'),
+        if (d.vazio) ...[
+          const SizedBox(height: 16),
+          Aviso(icone: Icons.edit_note, titulo: 'Nada lançado em $descricao', texto: textoVazio),
+        ],
+        if (acertos.isNotEmpty) ...[
+          const TituloSecao('Acertos fechados'),
+          for (final a in acertos.take(3))
+            InkWell(
+              onTap: aoAbrirAcerto == null ? null : () => aoAbrirAcerto!(a),
+              child: LinhaValor(
+                rotulo: a.periodoTexto,
+                valor: reais(a.paraReceberCentavos),
+                detalhe: '${plural(a.quantidadeViagens, 'viagem', 'viagens')}  ·  comissão ${reais(a.comissaoCentavos)}',
+                corValor: a.paraReceberCentavos < 0 ? cores.negativo : cores.positivo,
+              ),
+            ),
+        ],
+        if (d.abastecimentos.isNotEmpty) ...[
+          const TituloSecao('Diesel'),
+          LinhaValor(
+            rotulo: d.variosCaminhoes ? 'Média dos caminhões' : 'Média do caminhão',
+            valor: mediaDiesel.media == null ? '—' : '${umaCasa(mediaDiesel.media!)} km/L',
+            detalhe: mediaDiesel.media == null
+                ? 'Precisa de dois tanques cheios para calcular'
+                : '${semCasas(mediaDiesel.km)} km rodados com ${umaCasa(mediaDiesel.litros)} L',
+          ),
+          LinhaValor(
+            rotulo: 'Litros abastecidos',
+            valor: '${umaCasa(litros)} L',
+            detalhe: litros > 0 ? 'Preço médio do litro ${reais(r.totalAbastecimento / litros)}' : null,
+          ),
+        ],
+      ],
+    );
+  }
+}

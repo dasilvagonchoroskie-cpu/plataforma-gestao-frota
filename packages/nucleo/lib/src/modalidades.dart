@@ -244,7 +244,7 @@ String codigoDoNome(String nome) {
 
 /// Mostra o valor de um campo novo ("sim"/"não", datas, dinheiro...).
 String textoDoExtra(CampoModalidade? campo, Object? valor) {
-  if (valor == null) return '';
+  if (valor == null || (valor is String && valor.trim().isEmpty)) return '';
   final tipo = campo?.tipo ?? TiposCampo.texto;
   switch (tipo) {
     case TiposCampo.simNao:
@@ -265,6 +265,16 @@ String textoDoExtra(CampoModalidade? campo, Object? valor) {
       return valor.toString();
   }
 }
+
+/// Campo novo sem valor (o formulário guarda "" quando o motorista apaga).
+bool extraVazio(Object? v) => v == null || (v is String && v.trim().isEmpty);
+
+/// Erros dos campos novos obrigatórios que ficaram vazios: {"chave": "mensagem"}.
+Map<String, String> errosDosExtras(List<CampoModalidade> campos, Map<String, Object?> valores) => {
+      for (final c in campos)
+        if (c.obrigatorio && c.visivel && !c.desativado && extraVazio(valores[c.chave]))
+          c.chave: 'Preencha ${c.rotulo.toLowerCase()}.',
+    };
 
 /// "Rótulo: valor" de cada campo novo preenchido, na ordem da modalidade.
 List<String> linhasDosExtras(Map<String, Object?> extras, Modalidade? modalidade) {
@@ -387,7 +397,7 @@ class Viagem {
         if (desengateEm != null) 'desengate_em': dataIso(desengateEm!),
         'entregas_quantidade': entregasQuantidade,
         'entregas_cidades': entregasCidades,
-        if (observacao != null && observacao!.isNotEmpty) 'observacao': observacao,
+        'observacao': observacao ?? '',
         'extras': extras,
         if (criadoNoAparelhoEm != null) 'criado_no_aparelho_em': dataIso(criadoNoAparelhoEm!),
         if (apagadoEm != null) 'apagado_em': dataIso(apagadoEm!),

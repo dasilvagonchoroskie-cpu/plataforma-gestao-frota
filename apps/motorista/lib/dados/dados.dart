@@ -37,8 +37,26 @@ abstract final class Tabelas {
   static const categorias = 'categorias_gasto';
   static const ajustes = 'ajustes_gestor';
 
-  static const lancamentos = [fretes, abastecimentos, gastos, vales, ajustesKm, usos];
-  static const todas = [fretes, abastecimentos, gastos, vales, ajustesKm, usos, caminhoes, categorias, ajustes];
+  /// Viagens do Baú e do Sider (uma por carreta engatada).
+  static const viagens = 'viagens';
+
+  /// Acertos fechados pelo gestor (só leitura no celular).
+  static const acertos = 'acertos';
+
+  static const lancamentos = [fretes, viagens, abastecimentos, gastos, vales, ajustesKm, usos];
+  static const todas = [
+    fretes,
+    viagens,
+    abastecimentos,
+    gastos,
+    vales,
+    ajustesKm,
+    usos,
+    caminhoes,
+    categorias,
+    ajustes,
+    acertos,
+  ];
 }
 
 /// O que veio da última vez que o app conversou com a empresa.
@@ -50,6 +68,8 @@ class InfoMotorista {
     this.empresaStatus = '',
     this.motoristaAtivo = true,
     this.configuracao = const ConfiguracaoEmpresa(),
+    this.modalidadeCodigo,
+    this.modalidades = const [],
   });
 
   final String? motoristaId;
@@ -59,7 +79,26 @@ class InfoMotorista {
   final bool motoristaAtivo;
   final ConfiguracaoEmpresa configuracao;
 
+  /// Modalidade do motorista (null: ainda não escolhida).
+  final String? modalidadeCodigo;
+
+  /// Modalidades ligadas na empresa, com os campos ajustados pelo dono.
+  final List<Modalidade> modalidades;
+
   bool get suspensa => empresaStatus == 'suspensa';
+
+  /// A empresa tem mais de uma modalidade e o motorista ainda não escolheu.
+  bool get precisaEscolherModalidade => modalidadeCodigo == null && modalidades.length > 1;
+
+  /// Como o app funciona para este motorista. Sem a informação (servidor
+  /// antigo ou celular que ainda não baixou), funciona como o Graneleiro.
+  Modalidade get modalidade {
+    if (modalidades.isEmpty) return Modalidade.graneleiro;
+    final m = modalidadePorCodigo(modalidades, modalidadeCodigo);
+    if (m != null) return m;
+    if (modalidadeCodigo == null && modalidades.length == 1) return modalidades.first;
+    return Modalidade(codigo: modalidadeCodigo ?? 'graneleiro', nome: 'Graneleiro');
+  }
 
   factory InfoMotorista.daSituacao(Map<String, Object?> s) {
     final perfil = (s['perfil'] as Map?)?.cast<String, Object?>() ?? const {};
@@ -72,6 +111,8 @@ class InfoMotorista {
       empresaStatus: lerTexto(empresa?['status']),
       motoristaAtivo: motorista != null && lerBool(motorista['ativo'], true) && lerBool(perfil['ativo'], true),
       configuracao: ConfiguracaoEmpresa.deMapa(empresa),
+      modalidadeCodigo: lerTextoOuNulo(motorista?['modalidade']),
+      modalidades: modalidadesDaEmpresa(empresa),
     );
   }
 }
@@ -89,6 +130,8 @@ class EstadoDados {
     this.caminhoes = const [],
     this.categorias = const [],
     this.ajustes = const [],
+    this.viagens = const [],
+    this.acertos = const [],
     this.pendentes = const {},
     this.recusados = const [],
   });
@@ -108,6 +151,12 @@ class EstadoDados {
   final List<CategoriaGasto> categorias;
   final List<AjusteGestor> ajustes;
 
+  /// Viagens (Baú, Sider), mais novas primeiro.
+  final List<Viagem> viagens;
+
+  /// Acertos fechados pelo gestor, mais novos primeiro.
+  final List<Acerto> acertos;
+
   /// "tabela:id" de cada registro que ainda não chegou na nuvem.
   final Set<String> pendentes;
   final List<ItemFila> recusados;
@@ -117,6 +166,40 @@ class EstadoDados {
   bool estaPendente(String tabela, String id) => pendentes.contains('$tabela:$id');
 
   Regras get regras => Regras.daEmpresa(info.configuracao);
+
+  Modalidade get modalidade => info.modalidade;
+
+  /// Trabalha por viagem (Baú, Sider): aba Viagens no lugar de Fretes.
+  bool get porViagem => modalidade.porViagem;
+
+  /// A carreta engatada agora (viagem sem desengate).
+  Viagem? get viagemEmAndamento {
+    for (final v in viagens) {
+      if (v.emAndamento) return v;
+    }
+    return null;
+  }
+
+  Viagem? viagemComId(String? id) {
+    if (id == null) return null;
+    for (final v in viagens) {
+      if (v.id == id) return v;
+    }
+    return null;
+  }
+
+  Acerto? acertoComId(String? id) {
+    for (final a in acertos) {
+      if (a.id == id) return a;
+    }
+    return null;
+  }
+
+  /// Placas de carreta já usadas (sugestão no engate).
+  List<String> get carretasUsadas {
+    final s = <String>{for (final v in viagens) placaTexto(v.placaCarreta)}..remove('');
+    return s.toList()..sort();
+  }
 
   /// Caminhão em que o motorista está agora (última troca).
   String? get caminhaoAtualId => usos.isEmpty ? null : usos.first.caminhaoId;
@@ -176,6 +259,7 @@ class EstadoDados {
     final s = <String>{
       for (final f in fretes) ...[f.origem.trim(), f.destino.trim()],
       for (final a in abastecimentos) a.cidade.trim(),
+      for (final v in viagens) ...[v.engateLocal.trim(), v.desengateLocal.trim(), ...v.entregasCidades],
     }..remove('');
     return s.toList()..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
   }
@@ -191,38 +275,57 @@ class EstadoDados {
   }
 
   DadosRelatorio dadosDoPeriodo(Periodo periodo, {ConteudoRelatorio conteudo = ConteudoRelatorio.tudo}) => montarDados(
-        fretes: fretes,
-        abastecimentos: abastecimentos,
-        vales: vales,
-        gastos: gastos,
-        ajustes: ajustesKm,
-        periodo: periodo,
-        regras: regras,
-        conteudo: conteudo,
-        motorista: info.nome,
-        placa: _placaDoPeriodo(periodo),
-        empresa: info.empresaNome,
-        placasPorCaminhao: placasPorCaminhao,
-      );
+    fretes: fretes,
+    abastecimentos: abastecimentos,
+    vales: vales,
+    gastos: gastos,
+    ajustes: ajustesKm,
+    periodo: periodo,
+    regras: regras,
+    conteudo: conteudo,
+    motorista: info.nome,
+    placa: _placaDoPeriodo(periodo),
+    empresa: info.empresaNome,
+    placasPorCaminhao: placasPorCaminhao,
+    viagens: viagens,
+    porViagem: porViagem,
+    modalidade: modalidade,
+  );
+
+  /// Relatório do acerto fechado (o período do acerto).
+  DadosRelatorio dadosDoAcerto(Acerto a) => montarDadosDoAcerto(
+    acerto: a,
+    viagens: viagens,
+    abastecimentos: abastecimentos,
+    vales: vales,
+    gastos: gastos,
+    regras: regras,
+    motorista: info.nome,
+    placa: caminhaoAtual?.placa ?? '',
+    empresa: info.empresaNome,
+    placasPorCaminhao: placasPorCaminhao,
+    modalidade: modalidade,
+  );
 
   DadosRelatorio dadosDaViagem(Frete frete) => montarDadosDaViagem(
-        frete: frete,
-        fretes: fretes,
-        abastecimentos: abastecimentos,
-        vales: vales,
-        gastos: gastos,
-        ajustes: ajustesKm,
-        regras: regras,
-        motorista: info.nome,
-        placa: placaDe(frete.caminhaoId),
-        empresa: info.empresaNome,
-        placasPorCaminhao: placasPorCaminhao,
-      );
+    frete: frete,
+    fretes: fretes,
+    abastecimentos: abastecimentos,
+    vales: vales,
+    gastos: gastos,
+    ajustes: ajustesKm,
+    regras: regras,
+    motorista: info.nome,
+    placa: placaDe(frete.caminhaoId),
+    empresa: info.empresaNome,
+    placasPorCaminhao: placasPorCaminhao,
+  );
 
   /// Placa no cabeçalho: a do caminhão usado no período, ou "Vários".
   String _placaDoPeriodo(Periodo p) {
     final ids = {
       ...fretes.where((f) => p.contem(f.dataCarga)).map((f) => f.caminhaoId),
+      ...viagens.where((v) => p.contem(v.engateEm)).map((v) => v.caminhaoId),
       ...abastecimentos.where((a) => !a.pontoDePartida && p.contem(a.data)).map((a) => a.caminhaoId),
       ...gastos.where((g) => p.contem(g.data)).map((g) => g.caminhaoId),
     };
@@ -243,12 +346,12 @@ class Dados extends AsyncNotifier<EstadoDados> {
 
   Future<EstadoDados> _carregar() async {
     final a = ref.read(armazenamentoProvider);
-    final brutos = <String, List<Map<String, Object?>>>{
-      for (final t in Tabelas.todas) t: await a.registros(t),
-    };
+    final brutos = <String, List<Map<String, Object?>>>{for (final t in Tabelas.todas) t: await a.registros(t)};
     final ajustes = [for (final m in brutos[Tabelas.ajustes]!) AjusteGestor.deMapa(m)];
-    List<Map<String, Object?>> vivos(String t) =>
-        [for (final m in brutos[t]!) if (m['apagado_em'] == null) aplicarAjustes(m, ajustes)];
+    List<Map<String, Object?>> vivos(String t) => [
+      for (final m in brutos[t]!)
+        if (m['apagado_em'] == null) aplicarAjustes(m, ajustes),
+    ];
 
     final categorias = [for (final m in brutos[Tabelas.categorias]!) CategoriaGasto.deMapa(m)];
     final nomes = {for (final c in categorias) c.id: c.nome};
@@ -257,7 +360,8 @@ class Dados extends AsyncNotifier<EstadoDados> {
 
     return EstadoDados(
       info: info,
-      fretes: [for (final m in vivos(Tabelas.fretes)) Frete.deMapa(m)]..sort((x, y) => y.dataCarga.compareTo(x.dataCarga)),
+      fretes: [for (final m in vivos(Tabelas.fretes)) Frete.deMapa(m)]
+        ..sort((x, y) => y.dataCarga.compareTo(x.dataCarga)),
       abastecimentos: [for (final m in vivos(Tabelas.abastecimentos)) Abastecimento.deMapa(m)]
         ..sort((x, y) => y.data.compareTo(x.data) != 0 ? y.data.compareTo(x.data) : y.km.compareTo(x.km)),
       gastos: [
@@ -267,12 +371,25 @@ class Dados extends AsyncNotifier<EstadoDados> {
       vales: [for (final m in vivos(Tabelas.vales)) Vale.deMapa(m)]..sort((x, y) => y.data.compareTo(x.data)),
       ajustesKm: [for (final m in vivos(Tabelas.ajustesKm)) AjusteKm.deMapa(m)]
         ..sort((x, y) => y.quando.compareTo(x.quando)),
-      usos: [for (final m in vivos(Tabelas.usos)) UsoCaminhao.deMapa(m)]..sort((x, y) => y.inicioEm.compareTo(x.inicioEm)),
+      usos: [for (final m in vivos(Tabelas.usos)) UsoCaminhao.deMapa(m)]
+        ..sort((x, y) => y.inicioEm.compareTo(x.inicioEm)),
       caminhoes: [for (final m in brutos[Tabelas.caminhoes]!) Caminhao.deMapa(m)],
       categorias: categorias,
       ajustes: ajustes,
-      pendentes: {for (final i in fila) if (i.situacao == 'pendente') i.chave},
-      recusados: [for (final i in fila) if (i.situacao == 'recusado') i],
+      viagens: [for (final m in vivos(Tabelas.viagens)) Viagem.deMapa(m)]
+        ..sort((x, y) => y.engateEm.compareTo(x.engateEm)),
+      acertos: [
+        for (final m in brutos[Tabelas.acertos]!)
+          if (m['apagado_em'] == null) Acerto.deMapa(m),
+      ]..sort((x, y) => y.periodoFim.compareTo(x.periodoFim)),
+      pendentes: {
+        for (final i in fila)
+          if (i.situacao == 'pendente') i.chave,
+      },
+      recusados: [
+        for (final i in fila)
+          if (i.situacao == 'recusado') i,
+      ],
     );
   }
 
@@ -307,6 +424,34 @@ class Dados extends AsyncNotifier<EstadoDados> {
   Future<void> apagarGasto(Gasto g) => _apagar(Tabelas.gastos, g.paraMapa());
   Future<void> salvarVale(Vale v) => _gravar(Tabelas.vales, v.paraMapa());
   Future<void> apagarVale(Vale v) => _apagar(Tabelas.vales, v.paraMapa());
+  Future<void> salvarViagem(Viagem v) => _gravar(Tabelas.viagens, v.paraMapa());
+  Future<void> apagarViagem(Viagem v) => _apagar(Tabelas.viagens, v.paraMapa());
+
+  /// Carreta nova engatada agora, no cavalo do motorista.
+  Viagem novaViagem() => Viagem(
+    id: novoId(),
+    motoristaId: _motoristaId,
+    caminhaoId: _atual.caminhaoAtualId ?? '',
+    modalidade: _atual.modalidade.codigo,
+    placaCarreta: '',
+    engateEm: _agora(),
+    criadoNoAparelhoEm: _agora(),
+  );
+
+  /// O motorista escolhe a modalidade (uma vez; depois só o gestor troca).
+  /// Precisa de internet. Devolve a mensagem de erro ou nulo.
+  Future<String?> escolherModalidade(String codigo) async {
+    final s = ref.read(servidorProvider);
+    try {
+      await s.escolherModalidade(codigo);
+      final situacao = await s.situacao();
+      await _a.gravarEstado('situacao', situacaoParaGuardar(situacao));
+    } on ErroServidor catch (e) {
+      return e.mensagem;
+    }
+    await recarregar();
+    return null;
+  }
 
   /// Km inicial do caminhão: salva o ponto de partida e, se o km mudou,
   /// o registro da mudança (com motivo), como no Meu Frete.
@@ -332,7 +477,8 @@ class Dados extends AsyncNotifier<EstadoDados> {
       await _a.gravarRegistros(Tabelas.ajustesKm, [ajuste.paraMapa()]);
       await _a.enfileirar(Tabelas.ajustesKm, ajuste.id, ajuste.paraMapa());
     }
-    final ponto = atual?.copyWith(kmOdometro: km, data: data, cidade: cidade) ??
+    final ponto =
+        atual?.copyWith(kmOdometro: km, data: data, cidade: cidade) ??
         Abastecimento(
           id: novoId(),
           motoristaId: _motoristaId,
@@ -399,6 +545,7 @@ class Dados extends AsyncNotifier<EstadoDados> {
       dataCarga: inicioDoDia(_agora()),
       percentualComissao: c.percentualComissaoPadrao,
       comissaoSobreBruto: c.comissaoSobreBrutoPadrao,
+      modalidade: _atual.info.modalidades.isEmpty ? null : _atual.modalidade.codigo,
       criadoNoAparelhoEm: _agora(),
     );
   }

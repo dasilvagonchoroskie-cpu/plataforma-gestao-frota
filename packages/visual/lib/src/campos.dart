@@ -249,6 +249,157 @@ class CampoData extends StatelessWidget {
   }
 }
 
+/// Campo de data e hora: toca, escolhe o dia e depois a hora.
+class CampoDataHora extends StatelessWidget {
+  const CampoDataHora({
+    super.key,
+    required this.rotulo,
+    required this.valor,
+    required this.aoMudar,
+    this.erro,
+    this.textoVazio = 'Toque para escolher',
+  });
+
+  final String rotulo;
+  final DateTime? valor;
+  final ValueChanged<DateTime> aoMudar;
+  final String? erro;
+  final String textoVazio;
+
+  Future<void> _escolher(BuildContext context) async {
+    final agora = DateTime.now();
+    final base = (valor ?? agora).toLocal();
+    final d = await showDatePicker(
+      context: context,
+      initialDate: base,
+      firstDate: DateTime(2015),
+      lastDate: DateTime(agora.year + 1, 12, 31),
+      locale: const Locale('pt', 'BR'),
+      helpText: rotulo,
+      cancelText: 'Cancelar',
+      confirmText: 'Pronto',
+    );
+    if (d == null || !context.mounted) return;
+    final h = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay.fromDateTime(base),
+      helpText: 'Que horas?',
+      cancelText: 'Cancelar',
+      confirmText: 'Pronto',
+      builder: (ctx, filho) => MediaQuery(
+        data: MediaQuery.of(ctx).copyWith(alwaysUse24HourFormat: true),
+        child: filho ?? const SizedBox.shrink(),
+      ),
+    );
+    if (h == null) return;
+    aoMudar(DateTime(d.year, d.month, d.day, h.hour, h.minute));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: () => _escolher(context),
+      borderRadius: BorderRadius.circular(10),
+      child: InputDecorator(
+        decoration: InputDecoration(
+          labelText: rotulo,
+          errorText: erro,
+          suffixIcon: const Icon(Icons.schedule, size: 20),
+        ),
+        child: Text(
+          valor == null ? textoVazio : dataHoraTexto(valor!),
+          style: estiloNumero(19, peso: FontWeight.w500, cor: valor == null ? context.cores.textoFraco : null),
+        ),
+      ),
+    );
+  }
+}
+
+/// Lista de cidades: digita uma, toca em "Pôr" e ela vira uma etiqueta.
+class CampoCidades extends StatefulWidget {
+  const CampoCidades({
+    super.key,
+    required this.rotulo,
+    required this.valor,
+    required this.aoMudar,
+    this.sugestoes = const [],
+    this.erro,
+  });
+
+  final String rotulo;
+  final List<String> valor;
+  final ValueChanged<List<String>> aoMudar;
+  final List<String> sugestoes;
+  final String? erro;
+
+  @override
+  State<CampoCidades> createState() => _CampoCidadesState();
+}
+
+class _CampoCidadesState extends State<CampoCidades> {
+  final _texto = TextEditingController();
+
+  @override
+  void dispose() {
+    _texto.dispose();
+    super.dispose();
+  }
+
+  void _por() {
+    final c = _texto.text.trim().replaceAll(RegExp(r'\s+'), ' ');
+    if (c.isEmpty) return;
+    if (!widget.valor.any((x) => x.toLowerCase() == c.toLowerCase())) widget.aoMudar([...widget.valor, c]);
+    _texto.clear();
+    setState(() {});
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: Campo(
+                controle: _texto,
+                rotulo: widget.rotulo,
+                erro: widget.erro,
+                ajuda: widget.valor.isEmpty ? 'Digite uma cidade e toque em Pôr' : null,
+                maiusculas: TextCapitalization.words,
+                sugestoes: widget.sugestoes,
+                acaoTeclado: TextInputAction.done,
+                aoMudar: (_) => setState(() {}),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Padding(
+              padding: const EdgeInsets.only(top: 6),
+              child: FilledButton.tonal(onPressed: _texto.text.trim().isEmpty ? null : _por, child: const Text('Pôr')),
+            ),
+          ],
+        ),
+        if (widget.valor.isNotEmpty) ...[
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 6,
+            children: [
+              for (final c in widget.valor)
+                InputChip(
+                  label: Text(c, style: const TextStyle(fontSize: 15.5)),
+                  onDeleted: () => widget.aoMudar([...widget.valor]..remove(c)),
+                  deleteButtonTooltipMessage: 'Tirar $c',
+                ),
+            ],
+          ),
+        ],
+      ],
+    );
+  }
+}
+
 /// Opcao grande para escolher entre duas ou mais respostas.
 class OpcaoEscolha<T> extends StatelessWidget {
   const OpcaoEscolha({

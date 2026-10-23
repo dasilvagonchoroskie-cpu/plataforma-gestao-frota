@@ -4,6 +4,7 @@ import 'package:nucleo/nucleo.dart';
 import 'package:visual/visual.dart';
 
 import '../../componentes/comuns.dart';
+import '../acertos/tela_acertos.dart';
 import '../acesso/telas_acesso.dart';
 import '../configuracoes/tela_configuracoes.dart';
 import '../diesel/form_abastecimento.dart';
@@ -11,6 +12,8 @@ import '../fretes/form_frete.dart';
 import '../gastos/tela_gastos.dart';
 import '../relatorio/tela_relatorio.dart';
 import '../vales/tela_vales.dart';
+import '../viagens/form_viagem.dart';
+import '../viagens/tela_viagens.dart';
 
 /// Início: o resumo do período e o botão grande para lançar.
 class TelaResumo extends ConsumerStatefulWidget {
@@ -24,39 +27,56 @@ class _TelaResumoState extends ConsumerState<TelaResumo> {
   var _escolha = const EscolhaPeriodo(TipoPeriodo.mesAtual);
 
   void _lancar() {
+    final dados = assistirDados(ref);
+    final aberta = dados.viagemEmAndamento;
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       builder: (ctx) {
         Widget opcao(IconData icone, String titulo, String texto, Widget tela) => ListTile(
-              leading: Icon(icone, size: 30),
-              title: Text(titulo, style: const TextStyle(fontSize: 19, fontWeight: FontWeight.w600)),
-              subtitle: Text(texto, style: const TextStyle(fontSize: 15)),
-              minVerticalPadding: 14,
-              onTap: () {
-                Navigator.pop(ctx);
-                Navigator.push(context, MaterialPageRoute(builder: (_) => tela));
-              },
-            );
+          leading: Icon(icone, size: 30),
+          title: Text(titulo, style: const TextStyle(fontSize: 19, fontWeight: FontWeight.w600)),
+          subtitle: Text(texto, style: const TextStyle(fontSize: 15)),
+          minVerticalPadding: 14,
+          onTap: () {
+            Navigator.pop(ctx);
+            Navigator.push(context, MaterialPageRoute(builder: (_) => tela));
+          },
+        );
         return SafeArea(
           child: SingleChildScrollView(
             child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Padding(
-                padding: EdgeInsets.fromLTRB(20, 0, 20, 8),
-                child: Align(
-                  alignment: Alignment.centerLeft,
-                  child: Text('O que você quer lançar?', style: TextStyle(fontSize: 21, fontWeight: FontWeight.w600)),
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Padding(
+                  padding: EdgeInsets.fromLTRB(20, 0, 20, 8),
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text('O que você quer lançar?', style: TextStyle(fontSize: 21, fontWeight: FontWeight.w600)),
+                  ),
                 ),
-              ),
-              opcao(Icons.local_shipping_outlined, 'Frete', 'Carga, adiantamento, saldo', const FormFrete()),
-              opcao(Icons.local_gas_station_outlined, 'Diesel', 'Abastecida, km e litros', const FormAbastecimento()),
-              opcao(Icons.receipt_long_outlined, 'Gasto', 'Borracharia, chapa, lavagem...', const FormGasto()),
-              opcao(Icons.payments_outlined, 'Vale', 'Dinheiro que você pegou adiantado', const FormVale()),
-              const SizedBox(height: 8),
-            ],
-          ),
+                if (!dados.porViagem)
+                  opcao(Icons.local_shipping_outlined, 'Frete', 'Carga, adiantamento, saldo', const FormFrete())
+                else if (aberta == null)
+                  opcao(
+                    Icons.add_link,
+                    'Engatar carreta',
+                    'Começo de uma viagem: placa, onde e quando',
+                    const FormViagem(),
+                  )
+                else
+                  opcao(
+                    Icons.link_off,
+                    'Desengatar carreta',
+                    'Fim da viagem de ${placaTexto(aberta.placaCarreta)}',
+                    FormViagem(modo: ModoViagem.desengatar, viagem: aberta),
+                  ),
+                opcao(Icons.local_gas_station_outlined, 'Diesel', 'Abastecida, km e litros', const FormAbastecimento()),
+                opcao(Icons.receipt_long_outlined, 'Gasto', 'Borracharia, chapa, lavagem...', const FormGasto()),
+                opcao(Icons.payments_outlined, 'Vale', 'Dinheiro que você pegou adiantado', const FormVale()),
+                const SizedBox(height: 8),
+              ],
+            ),
           ),
         );
       },
@@ -108,17 +128,40 @@ class _TelaResumoState extends ConsumerState<TelaResumo> {
               ),
             ),
           const SizedBox(height: 4),
+          if (dados.porViagem && dados.viagemEmAndamento != null)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+              child: CartaoViagemAberta(viagem: dados.viagemEmAndamento!),
+            ),
           SeletorPeriodo(escolha: _escolha, aoMudar: (e) => setState(() => _escolha = e)),
           Padding(
             padding: const EdgeInsets.fromLTRB(20, 14, 20, 0),
-            child: CorpoResumo(
-              dados: d,
-              todasAbastecidas: dados.abastecimentos,
-              descricao: _escolha.descricao,
-              empresaNome: dados.info.empresaNome,
-              percentualPadrao: dados.info.configuracao.percentualComissaoPadrao,
-            ),
+            child: dados.porViagem
+                ? CorpoResumoViagens(
+                    dados: d,
+                    todasAbastecidas: dados.abastecimentos,
+                    descricao: _escolha.descricao,
+                    empresaNome: dados.info.empresaNome,
+                    acertos: dados.acertos,
+                    aoAbrirAcerto: (a) =>
+                        Navigator.push(context, MaterialPageRoute(builder: (_) => DetalheAcerto(idAcerto: a.id))),
+                  )
+                : CorpoResumo(
+                    dados: d,
+                    todasAbastecidas: dados.abastecimentos,
+                    descricao: _escolha.descricao,
+                    empresaNome: dados.info.empresaNome,
+                    percentualPadrao: dados.info.configuracao.percentualComissaoPadrao,
+                  ),
           ),
+          if (dados.porViagem && dados.acertos.length > 3)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 4, 20, 0),
+              child: TextButton(
+                onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const TelaAcertos())),
+                child: const Text('Ver todos os acertos'),
+              ),
+            ),
         ],
       ),
     );
