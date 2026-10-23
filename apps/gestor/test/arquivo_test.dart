@@ -51,19 +51,36 @@ void main() {
     expect(s.chamadas.where((c) => c.startsWith('excluir motorista')), isEmpty);
   });
 
-  testWidgets('motorista pediu para excluir a conta: o painel avisa e baixa o PDF dele', (tester) async {
+  testWidgets('motorista excluiu a conta: o painel avisa e baixa o PDF dele', (tester) async {
     final s = servidorComAmostra();
     final pedido = DateTime.now().subtract(const Duration(days: 3));
-    s.t(Fontes.perfis).firstWhere((p) => p['id'] == 'u-pedro')['exclusao_pedida_em'] = iso(pedido);
+    // Desde 23/10/2026 o login sai na hora; a data fica no cadastro dele.
+    pedroExcluiuAConta(s, pedido);
     final arquivos = guardarArquivos();
     await abrirApp(tester, s);
-    expect(find.text('Pedro pediu para excluir a conta'), findsOneWidget);
-    expect(find.textContaining('serão apagados em ${dataTexto(pedido.add(prazoExclusaoMotorista))}'), findsOneWidget);
+    expect(find.text('Pedro excluiu a conta'), findsOneWidget);
+    expect(find.textContaining('ficam até ${dataTexto(pedido.add(prazoExclusaoMotorista))}'), findsOneWidget);
     await tester.tap(find.widgetWithText(TextButton, 'Baixar PDF'));
     await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 300)));
     await tester.pumpAndSettle();
     expect(arquivos.single.nome, startsWith('Frota_arquivo_Pedro_'));
     expect(find.text('PDF com todos os dados gerado. Guarde o arquivo.'), findsOneWidget);
+  });
+
+  testWidgets('quem excluiu a conta não tem login para religar nem redefinir', (tester) async {
+    final s = servidorComAmostra();
+    pedroExcluiuAConta(s, DateTime.now().subtract(const Duration(days: 1)));
+    await abrirApp(tester, s);
+    await tester.tap(find.text('Motoristas').first);
+    await tester.pumpAndSettle();
+    expect(find.textContaining('Excluiu a conta em'), findsOneWidget);
+    await tester.tap(find.text('Pedro Henrique').first);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Mais ações'));
+    await tester.pumpAndSettle();
+    expect(find.text('Excluir motorista e dados'), findsOneWidget);
+    expect(find.text('Redefinir o acesso'), findsNothing);
+    expect(find.text('Religar na empresa'), findsNothing);
   });
 
   testWidgets('acesso da empresa acabando: o painel avisa e baixa o PDF com tudo', (tester) async {
@@ -104,4 +121,14 @@ void main() {
     expect(arquivos, hasLength(2));
     expect(find.text('Excluir a empresa e todos os dados?'), findsOneWidget);
   });
+}
+
+/// Pedro excluiu a conta: desde 23/10/2026 o login sai na hora e a data fica
+/// no cadastro dele, que fica sem login.
+void pedroExcluiuAConta(ServidorFalso s, DateTime quando) {
+  s.t(Fontes.motoristas).firstWhere((m) => m['perfil_id'] == 'u-pedro')
+    ..['exclusao_pedida_em'] = iso(quando)
+    ..['perfil_id'] = null
+    ..['ativo'] = false;
+  s.t(Fontes.perfis).removeWhere((p) => p['id'] == 'u-pedro');
 }

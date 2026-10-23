@@ -253,17 +253,20 @@ class _MenuMotorista extends ConsumerWidget {
           value: _Acao.modalidade,
           child: ListTile(leading: Icon(Icons.alt_route), title: Text('Trocar a modalidade dele')),
         ),
-        const PopupMenuItem(
-          value: _Acao.redefinir,
-          child: ListTile(leading: Icon(Icons.key_outlined), title: Text('Redefinir o acesso')),
-        ),
-        PopupMenuItem(
-          value: _Acao.ativar,
-          child: ListTile(
-            leading: Icon(m.ativo ? Icons.block : Icons.check_circle_outline),
-            title: Text(m.ativo ? 'Desligar da empresa' : 'Religar na empresa'),
+        // Quem excluiu a conta não tem login: nada para redefinir ou religar.
+        if (!m.excluiuConta) ...[
+          const PopupMenuItem(
+            value: _Acao.redefinir,
+            child: ListTile(leading: Icon(Icons.key_outlined), title: Text('Redefinir o acesso')),
           ),
-        ),
+          PopupMenuItem(
+            value: _Acao.ativar,
+            child: ListTile(
+              leading: Icon(m.ativo ? Icons.block : Icons.check_circle_outline),
+              title: Text(m.ativo ? 'Desligar da empresa' : 'Religar na empresa'),
+            ),
+          ),
+        ],
         const PopupMenuItem(
           value: _Acao.excluir,
           child: ListTile(leading: Icon(Icons.delete_forever_outlined), title: Text('Excluir motorista e dados')),
@@ -596,17 +599,19 @@ class _Cadastro extends ConsumerWidget {
                     icon: const Icon(Icons.picture_as_pdf_outlined),
                     label: const Text('Baixar tudo dele (PDF)'),
                   ),
-                  OutlinedButton.icon(
-                    onPressed: () => redefinirAcesso(context, ref, m),
-                    icon: const Icon(Icons.key_outlined),
-                    label: const Text('Redefinir o acesso'),
-                  ),
-                  OutlinedButton.icon(
-                    onPressed: () => ativarMotorista(context, ref, m),
-                    icon: Icon(m.ativo ? Icons.block : Icons.check_circle_outline),
-                    label: Text(m.ativo ? 'Desligar da empresa' : 'Religar na empresa'),
-                    style: m.ativo ? OutlinedButton.styleFrom(foregroundColor: cores.negativo) : null,
-                  ),
+                  if (!m.excluiuConta) ...[
+                    OutlinedButton.icon(
+                      onPressed: () => redefinirAcesso(context, ref, m),
+                      icon: const Icon(Icons.key_outlined),
+                      label: const Text('Redefinir o acesso'),
+                    ),
+                    OutlinedButton.icon(
+                      onPressed: () => ativarMotorista(context, ref, m),
+                      icon: Icon(m.ativo ? Icons.block : Icons.check_circle_outline),
+                      label: Text(m.ativo ? 'Desligar da empresa' : 'Religar na empresa'),
+                      style: m.ativo ? OutlinedButton.styleFrom(foregroundColor: cores.negativo) : null,
+                    ),
+                  ],
                   OutlinedButton.icon(
                     onPressed: () => excluirMotorista(context, ref, m),
                     icon: const Icon(Icons.delete_forever_outlined),
@@ -619,11 +624,12 @@ class _Cadastro extends ConsumerWidget {
                 const SizedBox(height: 12),
                 Aviso(
                   icone: Icons.delete_outline,
-                  titulo: 'Ele pediu para excluir a conta',
+                  titulo: 'Ele excluiu a conta',
                   texto:
-                      'Pedido feito em ${dataTexto(e.exclusaoPedida(m)!)}. O acesso dele já foi encerrado e os dados '
-                      'serão apagados sozinhos em ${dataTexto(e.exclusaoPedida(m)!.add(prazoExclusaoMotorista))}. '
-                      'Baixe antes o PDF com todos os dados dele (botão "Baixar tudo dele").',
+                      'Em ${dataTexto(e.exclusaoPedida(m)!)} ele excluiu a conta e o login dele foi apagado. '
+                      'Os lançamentos ficam até ${dataTexto(e.exclusaoPedida(m)!.add(prazoExclusaoMotorista))} '
+                      'e depois são apagados sozinhos. Baixe antes o PDF com todos os dados dele (botão "Baixar tudo dele"). '
+                      'Se ele voltar com uma conta nova, use "Excluir motorista e dados" para liberar o cadastro.',
                 ),
               ],
               const SizedBox(height: 8),

@@ -417,7 +417,7 @@ class LinhaMotorista extends StatelessWidget {
       title: Text(m.nome, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w600)),
       subtitle: Text(
         equipe.exclusaoPedida(m) != null
-            ? 'Pediu para excluir a conta em ${dataTexto(equipe.exclusaoPedida(m)!)}'
+            ? 'Excluiu a conta em ${dataTexto(equipe.exclusaoPedida(m)!)}'
             : '${modalidade.isEmpty ? '' : '$modalidade  ·  '}'
                   '${caminhao == null ? 'sem caminhão' : placaTexto(caminhao.placa)}  ·  último envio ${quandoTexto(envio, agora)}',
         style: equipe.exclusaoPedida(m) != null

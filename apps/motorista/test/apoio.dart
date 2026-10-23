@@ -266,7 +266,13 @@ class ServidorFalso implements Servidor {
   Future<Map<String, Object?>> excluirMinhaConta() async {
     _rede();
     contaExcluida = true;
-    return {'ok': true, 'apagada': situacaoAtual()['motorista'] == null};
+    if (situacaoAtual()['motorista'] == null) return {'ok': true, 'apagada': true};
+    return {
+      'ok': true,
+      'apagada': false,
+      'login_apagado': true,
+      'apagar_em': DateTime.now().toUtc().add(const Duration(days: 15)).toIso8601String(),
+    };
   }
 
   @override

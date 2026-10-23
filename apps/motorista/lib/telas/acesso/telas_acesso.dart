@@ -901,8 +901,9 @@ Future<void> excluirMinhaConta(BuildContext context, WidgetRef ref) async {
   final ok = await confirmarDigitando(
     context,
     titulo: 'Excluir a sua conta?',
-    texto: 'A sua conta e os seus lançamentos serão apagados. Se você está numa empresa, o acesso fecha na hora '
-        'e a empresa tem até 15 dias para guardar o que a lei obriga; depois tudo é apagado. Não dá para desfazer.',
+    texto: 'A sua conta (login, CPF e e-mail) é apagada na hora, e o CPF fica livre para uma conta nova. '
+        'Se você está numa empresa, os seus lançamentos ficam com ela por até 15 dias, para guardar o que a lei '
+        'obriga; depois são apagados. Não dá para desfazer.',
     palavra: 'EXCLUIR',
     botao: 'Excluir a conta',
   );

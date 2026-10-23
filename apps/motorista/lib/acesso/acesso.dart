@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:nucleo/nucleo.dart' show dataTexto;
 import 'package:visual/visual.dart' show versaoTermos;
 
 import '../dados/armazenamento.dart';
@@ -223,9 +224,7 @@ class Acesso extends AsyncNotifier<EstadoAcesso> {
   Future<String> excluirConta() async {
     final r = await _s.excluirMinhaConta();
     await sair();
-    return r['apagada'] == true
-        ? 'Conta excluída. Os seus dados foram apagados.'
-        : 'Pedido de exclusão feito. O seu acesso foi encerrado e os dados serão apagados em até 15 dias.';
+    return recadoDaExclusao(r);
   }
 
   /// Sai da conta e limpa o celular.
@@ -238,3 +237,12 @@ class Acesso extends AsyncNotifier<EstadoAcesso> {
 }
 
 final acessoProvider = AsyncNotifierProvider<Acesso, EstadoAcesso>(Acesso.new);
+
+/// Recado depois de excluir a conta. O login e o CPF saem na hora; quem está
+/// numa empresa deixa os lançamentos com ela até a data de [r]['apagar_em'].
+String recadoDaExclusao(Map<String, Object?> r) {
+  if (r['apagada'] == true) return 'Conta excluída. Os seus dados foram apagados.';
+  final ate = DateTime.tryParse('${r['apagar_em'] ?? ''}');
+  return 'Conta excluída. O seu CPF já está livre para uma conta nova. Os seus lançamentos ficam com a empresa '
+      '${ate == null ? 'por até 15 dias' : 'até ${dataTexto(ate.toLocal())}'} e depois são apagados.';
+}

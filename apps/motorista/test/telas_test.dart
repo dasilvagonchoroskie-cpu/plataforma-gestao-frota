@@ -3,11 +3,12 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:motorista/acesso/acesso.dart' show chaveTermosAparelho;
+import 'package:motorista/acesso/acesso.dart' show chaveTermosAparelho, recadoDaExclusao;
 import 'package:motorista/app.dart';
 import 'package:motorista/dados/armazenamento.dart';
 import 'package:motorista/dados/dados.dart';
 import 'package:motorista/telas/casca.dart';
+import 'package:nucleo/nucleo.dart' show dataTexto;
 import 'package:visual/visual.dart';
 
 import 'amostra.dart';
@@ -373,5 +374,34 @@ void main() {
     await tester.pumpAndSettle();
     expect(s.contaExcluida, isTrue);
     expect(find.text('Entrar com CPF e senha'), findsOneWidget);
+  });
+
+  test('excluir a conta: o recado diz que o CPF ficou livre e até quando a empresa guarda os lançamentos', () {
+    expect(recadoDaExclusao({'apagada': true}), 'Conta excluída. Os seus dados foram apagados.');
+    final ate = DateTime.utc(2026, 11, 7, 18);
+    expect(
+      recadoDaExclusao({'apagada': false, 'login_apagado': true, 'apagar_em': ate.toIso8601String()}),
+      'Conta excluída. O seu CPF já está livre para uma conta nova. Os seus lançamentos ficam com a empresa '
+      'até ${dataTexto(ate.toLocal())} e depois são apagados.',
+    );
+    expect(recadoDaExclusao({'apagada': false}), contains('por até 15 dias'));
+  });
+
+  testWidgets('motorista da empresa exclui a conta em Configurações e volta para a tela de entrar', (tester) async {
+    final s = servidorComCadastros();
+    await abrir(tester, s: s);
+    await tester.tap(find.byTooltip('Configurações'));
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(find.text('Excluir minha conta'), 300, scrollable: find.byType(Scrollable).first);
+    await tester.tap(find.text('Excluir minha conta'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('o CPF fica livre para uma conta nova'), findsOneWidget);
+    await tester.enterText(find.byType(TextField).last, 'EXCLUIR');
+    await tester.pumpAndSettle();
+    s.online = true;
+    await tester.tap(find.widgetWithText(FilledButton, 'Excluir a conta'));
+    await tester.pumpAndSettle();
+    expect(s.contaExcluida, isTrue);
+    expect(find.textContaining('O seu CPF já está livre para uma conta nova'), findsOneWidget);
   });
 }

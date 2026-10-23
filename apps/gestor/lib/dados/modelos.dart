@@ -138,10 +138,20 @@ class Motorista {
     this.telefone,
     this.ativo = true,
     this.modalidade,
+    this.exclusaoPedidaEm,
   });
 
   final String id;
+
+  /// Vazio quando o motorista excluiu a conta (o login já foi apagado).
   final String perfilId;
+
+  /// Quando o motorista excluiu a conta (nulo = não excluiu). O cadastro e os
+  /// lançamentos ficam com a empresa por [prazoExclusaoMotorista].
+  final DateTime? exclusaoPedidaEm;
+
+  /// Excluiu a conta: não tem login para religar nem para redefinir.
+  bool get excluiuConta => exclusaoPedidaEm != null || perfilId.isEmpty;
 
   /// Graneleiro, Baú... (nula = ainda não escolheu; a empresa tem mais de uma).
   final String? modalidade;
@@ -162,6 +172,7 @@ class Motorista {
     telefone: lerTextoOuNulo(m['telefone']),
     ativo: lerBool(m['ativo'], true),
     modalidade: lerTextoOuNulo(m['modalidade']),
+    exclusaoPedidaEm: lerDataOuNula(m['exclusao_pedida_em']),
   );
 }
 

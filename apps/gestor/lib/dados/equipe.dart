@@ -142,8 +142,10 @@ class Equipe {
   final Map<String, Map<String, Map<String, Object?>>> brutos;
   final DateTime carregadoEm;
 
-  /// Quando o motorista pediu para excluir a conta (nulo = não pediu).
+  /// Quando o motorista excluiu a conta (nulo = não excluiu). Antes de
+  /// 23/10/2026 a data ficava no perfil; agora fica no cadastro do motorista.
   DateTime? exclusaoPedida(Motorista m) {
+    if (m.exclusaoPedidaEm != null) return m.exclusaoPedidaEm;
     for (final p in perfis) {
       if (p.id == m.perfilId) return p.exclusaoPedidaEm;
     }
@@ -644,9 +646,9 @@ class Equipe {
       r.add(
         Alerta(
           TipoAlerta.exclusaoPedida,
-          '${m.primeiroNome} pediu para excluir a conta',
-          'Os dados dele serão apagados em ${dataTexto(pedido.add(prazoExclusaoMotorista))}. '
-              'Baixe antes o PDF com todos os dados dele.',
+          '${m.primeiroNome} excluiu a conta',
+          'O login dele já foi apagado. Os lançamentos ficam até ${dataTexto(pedido.add(prazoExclusaoMotorista))} '
+              'e depois são apagados. Baixe antes o PDF com todos os dados dele.',
           motoristaId: m.id,
         ),
       );
