@@ -61,7 +61,7 @@ class TelaMotoristas extends ConsumerWidget {
           if (desligados.isNotEmpty) ...[
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: TituloSecao('Desligados (${desligados.length})'),
+              child: TituloSecao('Saíram da empresa (${desligados.length})'),
             ),
             for (final m in desligados) LinhaMotorista(motorista: m, equipe: e, agora: agora),
           ],
@@ -418,6 +418,9 @@ class LinhaMotorista extends StatelessWidget {
       subtitle: Text(
         equipe.exclusaoPedida(m) != null
             ? 'Excluiu a conta em ${dataTexto(equipe.exclusaoPedida(m)!)}'
+            : m.semLogin
+            ? 'Saiu${m.desligadoEm == null ? '' : ' em ${dataTexto(m.desligadoEm!.toLocal())}'}  ·  '
+                  'CPF ${cpfTexto(m.cpf)}  ·  só o registro'
             : '${modalidade.isEmpty ? '' : '$modalidade  ·  '}'
                   '${caminhao == null ? 'sem caminhão' : placaTexto(caminhao.placa)}  ·  último envio ${quandoTexto(envio, agora)}',
         style: equipe.exclusaoPedida(m) != null

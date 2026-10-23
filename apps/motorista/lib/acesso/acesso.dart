@@ -159,13 +159,14 @@ class Acesso extends AsyncNotifier<EstadoAcesso> {
 
     String? recado;
     if (pronto) {
-      // A empresa excluiu o cadastro dele: os lançamentos dela saem do celular.
+      // Saiu da empresa (desligado ou cadastro excluído): o login fica livre e
+      // os lançamentos dela saem do celular.
       final aparelho = await a.lerEstado('dispositivo_id');
       await a.limparTudo();
       if (aparelho != null) await a.gravarEstado('dispositivo_id', aparelho);
       await ref.read(dadosProvider.notifier).recarregar();
-      recado = 'A empresa encerrou o seu cadastro e os lançamentos dela foram tirados deste celular. '
-          'Se for entrar em outra empresa, digite o código que o novo patrão gerar para você.';
+      recado = 'Você não está mais na empresa e os lançamentos dela foram tirados deste celular. '
+          'A sua conta continua valendo: para entrar em outra empresa, ou voltar, digite o código que o patrão gerar para você.';
     }
 
     final pedido = _mapa(s['pedido']);

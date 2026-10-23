@@ -3,10 +3,11 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:motorista/acesso/acesso.dart' show chaveTermosAparelho, recadoDaExclusao;
+import 'package:motorista/acesso/acesso.dart' show Etapa, acessoProvider, chaveTermosAparelho, recadoDaExclusao;
 import 'package:motorista/app.dart';
 import 'package:motorista/dados/armazenamento.dart';
 import 'package:motorista/dados/dados.dart';
+import 'package:motorista/dados/sincronizador.dart';
 import 'package:motorista/telas/casca.dart';
 import 'package:nucleo/nucleo.dart' show dataTexto;
 import 'package:visual/visual.dart';
@@ -403,5 +404,27 @@ void main() {
     await tester.pumpAndSettle();
     expect(s.contaExcluida, isTrue);
     expect(find.textContaining('O seu CPF já está livre para uma conta nova'), findsOneWidget);
+  });
+
+  test('desligado pela empresa: o celular limpa os lançamentos dela e pede o código de outra empresa', () async {
+    final s = servidorComCadastros();
+    final c = await celular(s, armazenamento: await celularNovo());
+    await c.read(sincronizadorProvider.notifier).baixar(tudo: true);
+    await c.read(dadosProvider.notifier).recarregar();
+    expect(c.read(dadosProvider).requireValue.caminhoes, isNotEmpty);
+    // A empresa desligou: o login dele ficou livre (sem empresa e sem cadastro).
+    s.situacaoFixa = {
+      'logado': true,
+      'perfil': {'id': 'u-a', 'nome': 'Motorista A', 'papel': 'motorista', 'ativo': true},
+      'empresa': null,
+      'motorista': null,
+      'pedido': {'status': 'aprovado', 'empresa_nome': 'Transportes Teste'},
+      'termos': {'versao': versaoTermos, 'aceito': true},
+    };
+    await c.read(acessoProvider.notifier).recarregar(conferir: true);
+    final estado = c.read(acessoProvider).requireValue;
+    expect(estado.etapa, Etapa.codigoEmpresa);
+    expect(estado.mensagem, contains('A sua conta continua valendo'));
+    expect(c.read(dadosProvider).requireValue.caminhoes, isEmpty, reason: 'os dados da empresa saem do celular');
   });
 }

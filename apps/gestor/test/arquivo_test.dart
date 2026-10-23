@@ -74,6 +74,8 @@ void main() {
     await tester.tap(find.text('Motoristas').first);
     await tester.pumpAndSettle();
     expect(find.textContaining('Excluiu a conta em'), findsOneWidget);
+    await tester.ensureVisible(find.text('Pedro Henrique').first);
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Pedro Henrique').first);
     await tester.pumpAndSettle();
     await tester.tap(find.byTooltip('Mais ações'));
@@ -81,6 +83,7 @@ void main() {
     expect(find.text('Excluir motorista e dados'), findsOneWidget);
     expect(find.text('Redefinir o acesso'), findsNothing);
     expect(find.text('Religar na empresa'), findsNothing);
+    expect(find.text('Gerar código para voltar'), findsOneWidget);
   });
 
   testWidgets('acesso da empresa acabando: o painel avisa e baixa o PDF com tudo', (tester) async {

@@ -10,4 +10,4 @@ const supabaseChavePublica = String.fromEnvironment(
   defaultValue: 'sb_publishable_nM7GeKdmBtrk7VxUBk6s3A_e9Yc9Mdn',
 );
 
-const versaoApp = '0.7.1';
+const versaoApp = '0.7.2';

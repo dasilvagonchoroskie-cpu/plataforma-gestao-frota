@@ -559,6 +559,13 @@ class ServidorFalso implements Servidor {
     chamadas.add('alterar $tabela $id ${campos.keys.join(',')}');
     final linha = t(tabela).firstWhere((m) => m['id'] == id);
     linha.addAll(campos);
+    // Como o banco: motorista desligado fica sem login e sem e-mail.
+    if (tabela == Fontes.motoristas && campos['ativo'] == false && linha['perfil_id'] != null) {
+      linha
+        ..['perfil_id'] = null
+        ..['email'] = null
+        ..['desligado_em'] = iso(DateTime.now());
+    }
   }
 
   @override
@@ -618,14 +625,16 @@ ServidorFalso servidorComAmostra({String usuario = euDono}) {
       'email': 'pedro@teste.com',
       'ativo': true,
     },
+    // Desligado: desde 23/10/2026 fica só o registro, sem login e sem e-mail.
     {
       'id': carlos,
       'empresa_id': empresaId,
-      'perfil_id': 'u-carlos',
+      'perfil_id': null,
       'nome': 'Carlos Souza',
       'cpf': '15350946056',
-      'email': 'carlos@teste.com',
+      'email': null,
       'ativo': false,
+      'desligado_em': iso(agora.subtract(const Duration(days: 20))),
     },
   ]);
   s.t(Fontes.caminhoes).addAll([

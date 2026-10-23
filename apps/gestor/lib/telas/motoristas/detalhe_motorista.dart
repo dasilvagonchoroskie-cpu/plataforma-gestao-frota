@@ -13,6 +13,7 @@ import '../../dados/provedores.dart';
 import '../../relatorio/compartilhar.dart';
 import '../paradas/tela_paradas.dart';
 import 'tela_acerto.dart';
+import 'tela_motoristas.dart' show mostrarConvite;
 
 /// Um motorista: o resumo como ele vê no app, os lançamentos e o cadastro.
 class TelaDetalheMotorista extends ConsumerWidget {
@@ -75,12 +76,15 @@ class TelaDetalheMotorista extends ConsumerWidget {
             const SizedBox(height: 8),
             const Centro(largura: 900, child: FaixaPeriodo()),
             if (!m.ativo)
-              const Padding(
-                padding: EdgeInsets.fromLTRB(16, 8, 16, 0),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
                 child: Aviso(
                   icone: Icons.block,
-                  titulo: 'Motorista desligado',
-                  texto: 'Ele não consegue mais enviar lançamentos. O que já mandou continua aqui.',
+                  titulo: m.desligadoEm == null
+                      ? 'Saiu da empresa'
+                      : 'Saiu da empresa em ${dataTexto(m.desligadoEm!.toLocal())}',
+                  texto: 'Aqui fica o registro dele: nome, CPF e o que já mandou. O login dele ficou livre. '
+                      'Se ele voltar, use "Gerar código para voltar" (ele começa um cadastro novo).',
                 ),
               ),
             if (m.ativo && m.modalidade == null && e.variasModalidades)
@@ -219,7 +223,7 @@ class TelaDetalheMotorista extends ConsumerWidget {
   }
 }
 
-enum _Acao { caminhao, modalidade, redefinir, ativar, excluir }
+enum _Acao { caminhao, modalidade, redefinir, ativar, voltar, excluir }
 
 class _MenuMotorista extends ConsumerWidget {
   const _MenuMotorista({required this.motorista});
@@ -240,31 +244,35 @@ class _MenuMotorista extends ConsumerWidget {
             redefinirAcesso(context, ref, m);
           case _Acao.ativar:
             ativarMotorista(context, ref, m);
+          case _Acao.voltar:
+            gerarCodigoParaVoltar(context, ref, m);
           case _Acao.excluir:
             excluirMotorista(context, ref, m);
         }
       },
       itemBuilder: (_) => [
-        const PopupMenuItem(
-          value: _Acao.caminhao,
-          child: ListTile(leading: Icon(Icons.local_shipping_outlined), title: Text('Trocar o caminhão dele')),
-        ),
-        const PopupMenuItem(
-          value: _Acao.modalidade,
-          child: ListTile(leading: Icon(Icons.alt_route), title: Text('Trocar a modalidade dele')),
-        ),
-        // Quem excluiu a conta não tem login: nada para redefinir ou religar.
-        if (!m.excluiuConta) ...[
+        // Quem saiu da empresa fica só como registro: sem login para mexer.
+        if (m.semLogin)
+          const PopupMenuItem(
+            value: _Acao.voltar,
+            child: ListTile(leading: Icon(Icons.qr_code_2), title: Text('Gerar código para voltar')),
+          )
+        else ...[
+          const PopupMenuItem(
+            value: _Acao.caminhao,
+            child: ListTile(leading: Icon(Icons.local_shipping_outlined), title: Text('Trocar o caminhão dele')),
+          ),
+          const PopupMenuItem(
+            value: _Acao.modalidade,
+            child: ListTile(leading: Icon(Icons.alt_route), title: Text('Trocar a modalidade dele')),
+          ),
           const PopupMenuItem(
             value: _Acao.redefinir,
             child: ListTile(leading: Icon(Icons.key_outlined), title: Text('Redefinir o acesso')),
           ),
-          PopupMenuItem(
+          const PopupMenuItem(
             value: _Acao.ativar,
-            child: ListTile(
-              leading: Icon(m.ativo ? Icons.block : Icons.check_circle_outline),
-              title: Text(m.ativo ? 'Desligar da empresa' : 'Religar na empresa'),
-            ),
+            child: ListTile(leading: Icon(Icons.block), title: Text('Desligar da empresa')),
           ),
         ],
         const PopupMenuItem(
@@ -438,23 +446,39 @@ Future<void> redefinirAcesso(BuildContext context, WidgetRef ref, Motorista m) a
   );
 }
 
+/// Desliga o motorista: o login dele fica livre na hora (pode entrar em outra
+/// empresa ou voltar com um código novo) e a empresa fica com o registro.
 Future<void> ativarMotorista(BuildContext context, WidgetRef ref, Motorista m) async {
+  if (!m.ativo) return gerarCodigoParaVoltar(context, ref, m);
   final ok = await confirmar(
     context,
-    titulo: m.ativo ? 'Desligar ${m.primeiroNome}?' : 'Religar ${m.primeiroNome}?',
-    texto: m.ativo
-        ? 'Ele para de enviar lançamentos e de ver os dados da empresa na próxima vez que o app conectar. '
-              'Nada do que ele já mandou é apagado.'
-        : 'Ele volta a enviar lançamentos para o painel.',
-    botao: m.ativo ? 'Desligar' : 'Religar',
-    perigo: m.ativo,
+    titulo: 'Desligar ${m.primeiroNome}?',
+    texto: 'Ele sai da empresa na hora e o login dele fica livre para entrar em outra empresa. '
+        'Aqui fica o registro dele: nome, CPF e tudo o que já mandou (o e-mail sai). '
+        'Se ele voltar, gere um código novo: ele começa um cadastro novo.',
+    botao: 'Desligar',
+    perigo: true,
   );
   if (!ok || !context.mounted) return;
   await executar(
     context,
-    () => ref.read(equipeProvider.notifier).ativarMotorista(m.id, !m.ativo),
-    sucesso: m.ativo ? 'Motorista desligado.' : 'Motorista religado.',
+    () => ref.read(equipeProvider.notifier).ativarMotorista(m.id, false),
+    sucesso: 'Motorista desligado. O login dele ficou livre.',
   );
+}
+
+/// Quem saiu e quer voltar: gera o código individual com o nome e o CPF do
+/// registro. Ele entra num cadastro novo; o registro antigo fica separado.
+Future<void> gerarCodigoParaVoltar(BuildContext context, WidgetRef ref, Motorista m) async {
+  final e = ref.read(equipeProvider).requireValue;
+  final ativas = e.modalidadesAtivas;
+  final modalidade = ativas.length > 1 && ativas.any((x) => x.codigo == m.modalidade) ? m.modalidade : null;
+  Map<String, Object?>? r;
+  final ok = await executar(context, () async {
+    r = await ref.read(equipeProvider.notifier).gerarConvite(m.nome, m.cpf, modalidade: modalidade);
+  });
+  if (!ok || r == null || !context.mounted) return;
+  await mostrarConvite(context, Convite.deMapa(r!), e.empresa.nome);
 }
 
 /// Exclui o motorista e todos os lançamentos dele. Antes, sempre, o PDF com
@@ -599,7 +623,13 @@ class _Cadastro extends ConsumerWidget {
                     icon: const Icon(Icons.picture_as_pdf_outlined),
                     label: const Text('Baixar tudo dele (PDF)'),
                   ),
-                  if (!m.excluiuConta) ...[
+                  if (m.semLogin)
+                    OutlinedButton.icon(
+                      onPressed: () => gerarCodigoParaVoltar(context, ref, m),
+                      icon: const Icon(Icons.qr_code_2),
+                      label: const Text('Gerar código para voltar'),
+                    )
+                  else ...[
                     OutlinedButton.icon(
                       onPressed: () => redefinirAcesso(context, ref, m),
                       icon: const Icon(Icons.key_outlined),
@@ -607,9 +637,9 @@ class _Cadastro extends ConsumerWidget {
                     ),
                     OutlinedButton.icon(
                       onPressed: () => ativarMotorista(context, ref, m),
-                      icon: Icon(m.ativo ? Icons.block : Icons.check_circle_outline),
-                      label: Text(m.ativo ? 'Desligar da empresa' : 'Religar na empresa'),
-                      style: m.ativo ? OutlinedButton.styleFrom(foregroundColor: cores.negativo) : null,
+                      icon: const Icon(Icons.block),
+                      label: const Text('Desligar da empresa'),
+                      style: OutlinedButton.styleFrom(foregroundColor: cores.negativo),
                     ),
                   ],
                   OutlinedButton.icon(
@@ -629,7 +659,7 @@ class _Cadastro extends ConsumerWidget {
                       'Em ${dataTexto(e.exclusaoPedida(m)!)} ele excluiu a conta e o login dele foi apagado. '
                       'Os lançamentos ficam até ${dataTexto(e.exclusaoPedida(m)!.add(prazoExclusaoMotorista))} '
                       'e depois são apagados sozinhos. Baixe antes o PDF com todos os dados dele (botão "Baixar tudo dele"). '
-                      'Se ele voltar com uma conta nova, use "Excluir motorista e dados" para liberar o cadastro.',
+                      'Se ele voltar, use "Gerar código para voltar": ele começa um cadastro novo.',
                 ),
               ],
               const SizedBox(height: 8),

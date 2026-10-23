@@ -7,7 +7,7 @@ const supabaseChavePublica = String.fromEnvironment(
   defaultValue: 'sb_publishable_nM7GeKdmBtrk7VxUBk6s3A_e9Yc9Mdn',
 );
 
-const versaoApp = '0.7.1';
+const versaoApp = '0.7.2';
 
 /// Endereço do painel web (vai no recado para o dono de uma empresa nova).
 /// A esteira passa o endereço certo na compilação (--dart-define=PAINEL_URL).
