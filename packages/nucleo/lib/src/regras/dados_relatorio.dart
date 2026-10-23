@@ -1,3 +1,4 @@
+import '../modalidades.dart';
 import '../modelos.dart';
 import 'periodo.dart';
 import 'resumo.dart';
@@ -33,6 +34,10 @@ class DadosRelatorio {
     this.empresa = '',
     this.embarcador = '',
     this.placasPorCaminhao = const {},
+    this.viagens = const [],
+    this.porViagem = false,
+    this.acerto,
+    this.modalidade,
   });
 
   final Periodo periodo;
@@ -62,13 +67,28 @@ class DadosRelatorio {
   /// Placa de cada caminhão (para mostrar em cada linha quando há mais de um).
   final Map<String, String> placasPorCaminhao;
 
+  /// Viagens do Baú e do Sider (engate no período).
+  final List<Viagem> viagens;
+
+  /// Motorista que trabalha por viagem (Baú, Sider): o relatório mostra as
+  /// viagens no lugar dos fretes e a comissão vem do acerto do gestor.
+  final bool porViagem;
+
+  /// Acerto fechado pelo gestor (relatório do acerto).
+  final Acerto? acerto;
+
+  /// Para os nomes dos campos novos (extras).
+  final Modalidade? modalidade;
+
   bool get ehViagem => viagem.isNotEmpty;
 
-  bool get vazio => fretes.isEmpty && abastecimentos.isEmpty && vales.isEmpty && gastos.isEmpty;
+  bool get vazio =>
+      fretes.isEmpty && viagens.isEmpty && abastecimentos.isEmpty && vales.isEmpty && gastos.isEmpty;
 
   /// Mais de um caminhão nos lançamentos do relatório.
   bool get variosCaminhoes => {
         ...fretes.map((f) => f.caminhaoId),
+        ...viagens.map((v) => v.caminhaoId),
         ...abastecimentos.map((a) => a.caminhaoId),
         ...gastos.map((g) => g.caminhaoId),
       }.length > 1;
@@ -89,6 +109,10 @@ DadosRelatorio montarDados({
   String empresa = '',
   String embarcador = '',
   Map<String, String> placasPorCaminhao = const {},
+  List<Viagem> viagens = const [],
+  bool porViagem = false,
+  Acerto? acerto,
+  Modalidade? modalidade,
 }) {
   bool vivo(DateTime? apagado) => apagado == null;
   final fretesP = soEsteFrete != null
@@ -99,6 +123,8 @@ DadosRelatorio montarDados({
   final valesP = vales.where((v) => vivo(v.apagadoEm) && periodo.contem(v.data)).toList();
   final gastosP = gastos.where((g) => vivo(g.apagadoEm) && periodo.contem(g.data)).toList();
   final ajustesP = ajustes.where((a) => periodo.contem(a.quando)).toList();
+  final viagensP = viagens.where((v) => vivo(v.apagadoEm) && periodo.contem(v.engateEm)).toList()
+    ..sort((a, b) => a.engateEm.compareTo(b.engateEm));
 
   final resultado = calcularResumo(
     fretes: fretesP,
@@ -125,6 +151,46 @@ DadosRelatorio montarDados({
     empresa: empresa,
     embarcador: embarcador,
     placasPorCaminhao: placasPorCaminhao,
+    viagens: viagensP,
+    porViagem: porViagem,
+    acerto: acerto,
+    modalidade: modalidade,
+  );
+}
+
+/// Relatório do acerto fechado (Baú e Sider): o período do acerto, as
+/// viagens, o diesel, os vales e os gastos do motorista nele.
+DadosRelatorio montarDadosDoAcerto({
+  required Acerto acerto,
+  required List<Viagem> viagens,
+  required List<Abastecimento> abastecimentos,
+  required List<Vale> vales,
+  required List<Gasto> gastos,
+  required Regras regras,
+  String motorista = '',
+  String placa = '',
+  String empresa = '',
+  Map<String, String> placasPorCaminhao = const {},
+  Modalidade? modalidade,
+}) {
+  final i = acerto.periodoInicio;
+  final f = acerto.periodoFim;
+  return montarDados(
+    fretes: const [],
+    abastecimentos: abastecimentos.where((a) => a.motoristaId == acerto.motoristaId).toList(),
+    vales: vales.where((v) => v.motoristaId == acerto.motoristaId).toList(),
+    gastos: gastos.where((g) => g.motoristaId == acerto.motoristaId).toList(),
+    ajustes: const [],
+    periodo: Periodo(DateTime(i.year, i.month, i.day), DateTime(f.year, f.month, f.day, 23, 59, 59, 999)),
+    regras: regras,
+    motorista: motorista,
+    placa: placa,
+    empresa: empresa,
+    placasPorCaminhao: placasPorCaminhao,
+    viagens: viagens.where((v) => v.motoristaId == acerto.motoristaId).toList(),
+    porViagem: true,
+    acerto: acerto,
+    modalidade: modalidade,
   );
 }
 

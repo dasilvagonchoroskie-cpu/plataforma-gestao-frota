@@ -71,6 +71,8 @@ class Frete {
     this.pedagioCentavos = 0,
     this.pesoDescargaKg = 0,
     this.descontoQuebraCentavos = 0,
+    this.modalidade,
+    this.extras = const {},
     this.empresaId,
     this.criadoNoAparelhoEm,
     this.atualizadoEm,
@@ -82,6 +84,12 @@ class Frete {
   final String? empresaId;
   final String motoristaId;
   final String caminhaoId;
+
+  /// Graneleiro, Grade baixa, Caçamba... (null: o servidor decide; Graneleiro).
+  final String? modalidade;
+
+  /// Campos novos criados pela Plataforma ({"chave": valor}).
+  final Map<String, Object?> extras;
   final String origem;
   final String destino;
 
@@ -162,6 +170,7 @@ class Frete {
     int? pedagioCentavos,
     double? pesoDescargaKg,
     int? descontoQuebraCentavos,
+    Map<String, Object?>? extras,
     DateTime? apagadoEm,
     List<String>? camposAjustados,
   }) =>
@@ -169,6 +178,8 @@ class Frete {
         id: id,
         empresaId: empresaId,
         motoristaId: motoristaId,
+        modalidade: modalidade,
+        extras: extras ?? this.extras,
         caminhaoId: caminhaoId ?? this.caminhaoId,
         origem: origem ?? this.origem,
         destino: destino ?? this.destino,
@@ -207,6 +218,8 @@ class Frete {
         'pedagio_centavos': pedagioCentavos,
         'peso_descarga_kg': pesoDescargaKg,
         'desconto_quebra_centavos': descontoQuebraCentavos,
+        if (modalidade != null) 'modalidade': modalidade,
+        if (extras.isNotEmpty) 'extras': extras,
         if (criadoNoAparelhoEm != null) 'criado_no_aparelho_em': dataIso(criadoNoAparelhoEm!),
         if (apagadoEm != null) 'apagado_em': dataIso(apagadoEm!),
       };
@@ -229,6 +242,8 @@ class Frete {
         pedagioCentavos: lerInt(m['pedagio_centavos']),
         pesoDescargaKg: lerDouble(m['peso_descarga_kg']),
         descontoQuebraCentavos: lerInt(m['desconto_quebra_centavos']),
+        modalidade: lerTextoOuNulo(m['modalidade']),
+        extras: m['extras'] is Map ? (m['extras'] as Map).cast<String, Object?>() : const {},
         criadoNoAparelhoEm: lerDataOuNula(m['criado_no_aparelho_em']),
         atualizadoEm: lerDataOuNula(m['atualizado_em']),
         apagadoEm: lerDataOuNula(m['apagado_em']),

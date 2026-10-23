@@ -4,6 +4,7 @@ import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 
 import '../formato.dart';
+import '../modalidades.dart';
 import '../modelos.dart';
 import '../placa.dart';
 import '../regras/ajustes.dart';
@@ -52,6 +53,12 @@ String nomeDoArquivoPdf(DadosRelatorio d) {
   final quem = d.motorista.isEmpty || d.motorista == 'Todos'
       ? ''
       : '${semAcento(d.motorista.split(' ').first).replaceAll(RegExp(r'[^A-Za-z0-9]'), '')}_';
+  if (d.acerto != null) {
+    final a = d.acerto!;
+    final i = dataTexto(a.periodoInicio).replaceAll('/', '-');
+    final f = dataTexto(a.periodoFim).replaceAll('/', '-');
+    return 'Frota_$quem${placa}acerto_${i}_a_$f.pdf';
+  }
   if (d.ehViagem) {
     var v = d.viagem.replaceAll(' para ', '-');
     v = semAcento(v).replaceAll(RegExp(r'[^A-Za-z0-9\-]'), '');
@@ -59,7 +66,8 @@ String nomeDoArquivoPdf(DadosRelatorio d) {
     return 'Frota_$quem${placa}viagem_${v}_$inicio.pdf';
   }
   final fim = dataTexto(d.periodo.fim).replaceAll('/', '-');
-  return 'Frota_$quem$placa${d.conteudo.arquivo}_${inicio}_a_$fim.pdf';
+  final arquivo = d.porViagem && d.conteudo == ConteudoRelatorio.fretes ? 'viagens' : d.conteudo.arquivo;
+  return 'Frota_$quem$placa${arquivo}_${inicio}_a_$fim.pdf';
 }
 
 class _Pdf {
@@ -149,8 +157,13 @@ Future<Uint8List> gerarPdf(DadosRelatorio d, FontesPdf fontes, {DateTime? agora}
   conteudo.addAll(_cabecalho(p, d, agora ?? DateTime.now()));
   switch (d.conteudo) {
     case ConteudoRelatorio.tudo:
-      conteudo.addAll(_resumo(p, d));
-      conteudo.addAll(_fretes(p, d.fretes));
+      if (d.porViagem) {
+        conteudo.addAll(_resumoViagens(p, d));
+        conteudo.addAll(_viagens(p, d));
+      } else {
+        conteudo.addAll(_resumo(p, d));
+        conteudo.addAll(_fretes(p, d.fretes, d.modalidade));
+      }
       conteudo.addAll(_abastecimentos(p, d.abastecimentos, d.abastecimentosCompletos));
       conteudo.addAll(_vales(p, d.vales, d.resultado.totalVale));
       conteudo.addAll(_gastos(p, d.gastos, d.resultado.totalGastos));
@@ -158,13 +171,17 @@ Future<Uint8List> gerarPdf(DadosRelatorio d, FontesPdf fontes, {DateTime? agora}
       conteudo.addAll(_abastecimentos(p, d.abastecimentos, d.abastecimentosCompletos));
       conteudo.addAll(_fechoDiesel(p, d));
     case ConteudoRelatorio.fretes:
-      conteudo.addAll(_fretes(p, d.fretes));
-      conteudo.addAll(_fechoFretes(p, d.resultado));
+      if (d.porViagem) {
+        conteudo.addAll(_viagens(p, d));
+      } else {
+        conteudo.addAll(_fretes(p, d.fretes, d.modalidade));
+        conteudo.addAll(_fechoFretes(p, d.resultado));
+      }
     case ConteudoRelatorio.vales:
       conteudo.addAll(_vales(p, d.vales, d.resultado.totalVale));
     case ConteudoRelatorio.gastos:
       conteudo.addAll(_gastos(p, d.gastos, d.resultado.totalGastos));
-      conteudo.addAll(_fechoGastos(p, d));
+      if (!d.porViagem) conteudo.addAll(_fechoGastos(p, d));
   }
   conteudo.addAll(_ajustesKm(p, d.ajustes));
   conteudo.addAll(_avisoAjustes(p, d));
@@ -188,8 +205,18 @@ Future<Uint8List> gerarPdf(DadosRelatorio d, FontesPdf fontes, {DateTime? agora}
 
 List<pw.Widget> _cabecalho(_Pdf p, DadosRelatorio d, DateTime agora) {
   final String subtitulo;
-  if (d.ehViagem) {
+  if (d.acerto != null) {
+    subtitulo = 'Acerto do motorista${d.modalidade == null ? '' : ' (${d.modalidade!.nome})'}';
+  } else if (d.ehViagem) {
     subtitulo = 'Acerto da viagem: ${d.viagem}';
+  } else if (d.porViagem) {
+    subtitulo = switch (d.conteudo) {
+      ConteudoRelatorio.tudo => 'Relatório de viagens, diesel, vales e gastos',
+      ConteudoRelatorio.fretes => 'Relatório de viagens',
+      ConteudoRelatorio.diesel => 'Relatório de diesel',
+      ConteudoRelatorio.vales => 'Relatório de vales',
+      ConteudoRelatorio.gastos => 'Relatório de gastos',
+    };
   } else {
     switch (d.conteudo) {
       case ConteudoRelatorio.tudo:
@@ -472,7 +499,96 @@ List<pw.Widget> _fechoGastos(_Pdf p, DadosRelatorio d) {
   ];
 }
 
-List<pw.Widget> _fretes(_Pdf p, List<Frete> lista) {
+/// Resumo de quem trabalha por viagem (Baú, Sider): viagens, entregas, gastos,
+/// vales e, quando há, o acerto fechado pelo gestor.
+List<pw.Widget> _resumoViagens(_Pdf p, DadosRelatorio d) {
+  final r = d.resultado;
+  final regras = d.regras;
+  final a = d.acerto;
+  final entregas = d.viagens.fold<int>(0, (s, v) => s + v.entregasQuantidade);
+  final emAndamento = d.viagens.where((v) => v.emAndamento).length;
+  final w = <pw.Widget>[p.titulo(a != null ? 'Acerto do período' : 'Resumo do período')];
+  w.add(p.valor('Viagens', '${d.viagens.length}'));
+  w.add(p.nota(
+    '${plural(entregas, 'entrega', 'entregas')}${emAndamento > 0 ? '   |   ${plural(emAndamento, 'em andamento', 'em andamento')}' : ''}',
+    recuo: 8,
+  ));
+  if (a == null) {
+    w.add(p.valor('Total gasto', reais(r.totalGastoGeral)));
+    w.add(p.nota('Diesel ${reais(r.totalAbastecimento)}   |   Outros gastos ${reais(r.totalGastos)}', recuo: 8, abaixo: 1));
+    w.add(p.nota(
+      regras.gastosDescontamDoLiquido
+          ? 'Pago pelo motorista. Desconta do acerto.'
+          : 'Pago pela empresa. Não desconta do acerto do motorista.',
+      recuo: 8,
+    ));
+    w.add(p.valor('Total de vale', reais(r.totalVale)));
+    w.add(p.nota(
+      regras.valeDescontaDoLiquido ? 'Já adiantado ao motorista. Desconta do acerto.' : 'Só histórico. Não desconta do acerto.',
+      recuo: 8,
+    ));
+    w.add(p.nota('A comissão entra no acerto que o gestor fecha. Este período ainda não tem acerto fechado.',
+        cor: _tintaLaranja, tamanho: 10));
+    return w;
+  }
+  w.add(p.valor('Comissão', reais(a.comissaoCentavos)));
+  for (final x in a.descontos) {
+    w.add(p.item('( - ) ${x.descricao}', reais(x.valorCentavos)));
+  }
+  if (a.totalDescontosCentavos > 0) w.add(p.valor('( - ) Descontos', reais(a.totalDescontosCentavos)));
+  w.add(p.valor(a.descontaVales ? '( - ) Vales' : 'Vales', reais(a.valesCentavos)));
+  w.add(p.nota(a.descontaVales ? 'Já adiantado ao motorista. Desconta do acerto.' : 'Só histórico. Não desconta do acerto.',
+      recuo: 8));
+  w.add(p.valor(a.descontaGastos ? '( - ) Diesel e gastos' : 'Diesel e gastos', reais(a.dieselCentavos + a.gastosCentavos)));
+  w.add(p.nota('Diesel ${reais(a.dieselCentavos)}   |   Outros gastos ${reais(a.gastosCentavos)}', recuo: 8, abaixo: 1));
+  w.add(p.nota(
+    a.descontaGastos ? 'Pago pelo motorista. Desconta do acerto.' : 'Pago pela empresa. Não desconta do acerto.',
+    recuo: 8,
+  ));
+  w.add(p.bloco('VALOR A RECEBER', reais(a.paraReceberCentavos), contaDoAcerto(a),
+      cor: a.paraReceberCentavos < 0 ? _tintaVermelha : _tintaVerde,
+      fundo: a.paraReceberCentavos < 0 ? _fundoVermelho : _fundoVerde));
+  if ((a.observacao ?? '').trim().isNotEmpty) w.add(p.nota('Observação: ${a.observacao!.trim()}', tamanho: 10));
+  if (a.fechadoEm != null) {
+    w.add(p.nota('Acerto fechado em ${dataHoraTexto(a.fechadoEm!)}. Vales, diesel e gastos somados no fechamento.',
+        tamanho: 9));
+  }
+  return w;
+}
+
+List<pw.Widget> _viagens(_Pdf p, DadosRelatorio d) {
+  final lista = d.viagens;
+  final w = <pw.Widget>[p.titulo('Viagens (${lista.length})')];
+  if (lista.isEmpty) return w..add(p.nota('Nenhuma viagem neste período.', tamanho: 11));
+  for (final v in lista) {
+    final linhas = <pw.Widget>[
+      pw.Text('${dataTexto(v.engateEm)}   ${v.rota}${p.placaDaLinha(v.caminhaoId)}', style: p.t(12, negrito: true)),
+      p.nota(
+        'Carreta ${placaTexto(v.placaCarreta)}   Engatou ${dataHoraTexto(v.engateEm)}'
+        '${v.emAndamento ? '   Em andamento' : '   Desengatou ${dataHoraTexto(v.desengateEm!)}'}',
+        recuo: 8,
+        tamanho: 10,
+        abaixo: 1,
+      ),
+      if (v.entregasQuantidade > 0 || v.entregasCidades.isNotEmpty)
+        p.nota(
+          '${plural(v.entregasQuantidade, 'entrega', 'entregas')}'
+          '${v.entregasCidades.isEmpty ? '' : ': ${v.entregasCidades.join(', ')}'}',
+          recuo: 8,
+          tamanho: 10,
+          abaixo: 1,
+          cor: _tintaVerde,
+        ),
+      if ((v.observacao ?? '').trim().isNotEmpty) p.nota('Obs.: ${v.observacao!.trim()}', recuo: 8, tamanho: 10, abaixo: 1),
+      for (final l in linhasDosExtras(v.extras, d.modalidade)) p.nota(l, recuo: 8, tamanho: 10, abaixo: 1),
+      pw.SizedBox(height: 8),
+    ];
+    w.add(pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: linhas));
+  }
+  return w;
+}
+
+List<pw.Widget> _fretes(_Pdf p, List<Frete> lista, Modalidade? modalidade) {
   final w = <pw.Widget>[p.titulo('Fretes (${lista.length})')];
   if (lista.isEmpty) return w..add(p.nota('Nenhum frete neste período.', tamanho: 11));
   final ordenados = List<Frete>.from(lista)..sort((a, b) => a.dataCarga.compareTo(b.dataCarga));
@@ -511,6 +627,9 @@ List<pw.Widget> _fretes(_Pdf p, List<Frete> lista) {
       cor: _tintaVerde,
       abaixo: f.ajustado ? 1 : 10,
     ));
+    for (final l in linhasDosExtras(f.extras, modalidade)) {
+      linhas.add(p.nota(l, recuo: 8, tamanho: 10, abaixo: 1));
+    }
     if (f.ajustado) {
       linhas.add(p.nota('* ${textoCamposAjustados(f.camposAjustados)}', recuo: 8, tamanho: 9, cor: _tintaLaranja, abaixo: 10));
     }

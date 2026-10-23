@@ -1,4 +1,5 @@
 import '../formato.dart';
+import '../modalidades.dart';
 import '../modelos.dart';
 import '../placa.dart';
 import '../regras/ajustes.dart';
@@ -87,6 +88,27 @@ String csvVales(List<Vale> lista, {Map<String, String> motoristas = const {}}) {
       [
         dataTexto(v.data), motoristas[v.motoristaId] ?? '', _reaisCsv(v.valorCentavos), v.observacao ?? '',
         v.camposAjustados.map(nomeDoCampo).join(', '),
+      ],
+  ]);
+}
+
+String csvViagens(List<Viagem> lista,
+    {Map<String, String> motoristas = const {}, Map<String, String> placas = const {}, Modalidade? modalidade}) {
+  final ordenados = List<Viagem>.from(lista)..sort((a, b) => a.engateEm.compareTo(b.engateEm));
+  final extras = <String>[
+    for (final c in modalidade?.campos ?? const <CampoModalidade>[]) if (c.extra) c.chave,
+  ];
+  return gerarCsv([
+    'Engate', 'Motorista', 'Cavalo', 'Carreta', 'Onde engatou', 'Desengate', 'Até onde levou', 'Entregas',
+    'Cidades das entregas', 'Observação',
+    for (final k in extras) modalidade!.campo(k)!.rotulo,
+  ], [
+    for (final v in ordenados)
+      [
+        dataHoraTexto(v.engateEm), motoristas[v.motoristaId] ?? '', placaTexto(placas[v.caminhaoId] ?? ''),
+        placaTexto(v.placaCarreta), v.engateLocal, v.desengateEm == null ? 'em andamento' : dataHoraTexto(v.desengateEm!),
+        v.desengateLocal, v.entregasQuantidade, v.entregasCidades.join(', '), v.observacao ?? '',
+        for (final k in extras) textoDoExtra(modalidade!.campo(k), v.extras[k]),
       ],
   ]);
 }
