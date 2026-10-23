@@ -224,3 +224,36 @@ tudo), anotadas aqui:
 6. **SMTP próprio** (`docs/EMAIL.md`), e então tirar dos apps a tela antiga de "código por e-mail" e
    desligar o cadastro aberto do Supabase Auth (hoje ligado só por causa dessa tela).
 7. **Nome completo do Evandro** para os textos legais.
+
+## Modalidades de operação (22/10/2026, pedido do usuário)
+
+Respostas do Evandro antes de começar:
+
+- **Sider = Baú; Caçamba = Graneleiro** (Grade baixa também começa igual ao Graneleiro).
+- **Baú sem dinheiro do frete na viagem:** nessas empresas o frete cai na conta da empresa e o motorista não
+  pega valor em mãos. Vales, diesel e gastos continuam como hoje (o motorista lança as notas).
+- **Acerto:** o gestor lança a comissão em reais e os descontos (motivo e valor); para receber = comissão −
+  descontos − vales (diesel e gastos só se a regra da empresa mandar). O motorista vê o acerto fechado no app.
+- **Campos:** o dono mostra, esconde, torna obrigatório e renomeia no painel; campos totalmente novos são
+  criados pela Plataforma (sem APK novo).
+
+Decisões tomadas na construção (confirmar no piloto):
+
+- **Cavalo fixo no Baú:** se o motorista ainda não tem caminhão, ele escolhe na primeira vez; depois o app
+  esconde o "Trocar" e só o gestor troca (no painel). O banco não bloqueia a troca enviada por um app antigo.
+- **Uma carreta por vez:** o app pede para desengatar antes de engatar outra. O banco não impede duas viagens
+  abertas (para não recusar o que foi feito sem internet).
+- **Viagem não tem correção do gestor** (como o frete tem): para corrigir, o motorista muda no app. Fica como
+  melhoria futura.
+- **Obrigatório** é conferido no app; o banco confere o formato (placa, datas, tamanhos).
+- **Acerto:** períodos do mesmo motorista não podem se sobrepor; corrigir muda o mesmo acerto (a auditoria
+  guarda o antes); não há botão para apagar acerto. Os dias do período são os de Brasília.
+- **Motorista sem modalidade** (empresa com mais de uma): o app pede a escolha antes de abrir (precisa de
+  internet). O gestor também pode definir pelo painel.
+- **Empresa nova** começa só com Graneleiro; o dono liga as outras.
+- **Exclusão de dados:** as funções de exclusão já aprovadas (motorista e empresa) passaram a apagar também
+  viagens, acertos e as modalidades da empresa. Sem isso, excluir um motorista com viagem daria erro.
+- **Campos novos da Plataforma:** até 20 por modalidade, tipos texto, número, número inteiro, dinheiro, data,
+  data e hora, sim ou não e cidade; o tipo não muda depois; campo desativado some dos formulários e o que já
+  foi anotado fica guardado. Os campos de fábrica não mudam pela Plataforma.
+

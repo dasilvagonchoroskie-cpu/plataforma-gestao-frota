@@ -77,6 +77,19 @@ depois, se ninguém liberar. A limpeza roda todo dia às 03:20 (horário de Bras
 O dono também pode excluir a conta da empresa e todos os dados pelo app (Configurações > Excluir a conta
 da empresa), mesmo com o acesso encerrado. O motorista exclui a própria conta em Configurações.
 
+## Modalidades e campos (Plataforma)
+
+No app do gestor ou no painel, com a conta do super administrador: Configurações > Área da Plataforma >
+botão "Modalidades e campos" (ícone de caminho). Ali dá para:
+
+- **Criar uma modalidade:** "Nova modalidade", nome e como funciona (por frete, como o Graneleiro, ou por
+  viagem, como o Baú). Depois o dono de cada empresa liga em Configurações > Modalidades de operação.
+- **Criar um campo novo:** abra a modalidade e toque em "Novo campo": nome, tipo, se é obrigatório e (por
+  viagem) quando o motorista preenche. Aparece no app do motorista na próxima conexão, sem APK novo.
+- **Desativar um campo novo:** toque nele e ligue "Desativado". O que já foi anotado fica guardado.
+
+O dono de cada empresa renomeia, esconde e torna obrigatório em Configurações > Modalidades de operação.
+
 ## Mudar plano, limite ou suspender
 
 Só pelo SQL Editor (o dono da empresa não muda isso):

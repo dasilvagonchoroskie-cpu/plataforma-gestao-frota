@@ -44,6 +44,13 @@ limitado), **Baixa** (defesa em profundidade).
 | 33 | Área Plataforma sem verificação em duas etapas. | Baixa | Decisão do dono (22/10/2026): sem Google Authenticator por enquanto. Melhoria futura anotada em `docs/PASSAGEM.md`. | Pendente (futuro) |
 | 27 | As 4 etiquetas antigas dos Releases ainda apontam para o histórico de antes da limpeza (o GitHub não deixa mudar etiquetas por esta sessão). | Baixa | A Esteira move as etiquetas para a versão publicada assim que publicar o primeiro APK oficial. A chave antiga já não vale para APKs novos. | Automático com os segredos |
 
+### Modalidades (22/10/2026)
+
+- As tabelas novas (`modalidades`, `empresas_modalidades`, `viagens`, `acertos`) nascem com RLS e entram
+  sozinhas na conferência geral do teste 07 (nenhuma empresa vê dados de outra, motorista não vê de outro,
+  empresa bloqueada não vê nada). O app não grava direto nelas: viagens pela sincronização, o resto por
+  funções que conferem dono, gestor, motorista ou super administrador (teste 09).
+
 ## Como a segurança está montada
 
 - **Isolamento:** RLS em todas as tabelas; funções de permissão negam tudo para empresa bloqueada, com

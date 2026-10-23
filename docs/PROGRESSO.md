@@ -168,6 +168,27 @@ Pedido do Evandro: cadastrar e cuidar das empresas pelo app, sem abrir o Supabas
   nas contas antigas (antes de continuar; adiável sem internet), lembrete no Resumo até confirmar ("Mandar
   de novo" e "Já confirmei"). `flutter analyze` sem problemas; `flutter test --exclude-tags capturas` → 34.
 
+## Modalidades de operação — 22 e 23/10/2026 (primeira entrega da esteira)
+
+Pedido do Evandro: Graneleiro, Grade baixa, Caçamba, Baú e Sider; tudo o que existe vira Graneleiro; Baú por
+viagem (uma por carreta), acerto com comissão e descontos lançados pelo gestor; campos ajustáveis sem APK novo.
+
+- **feito e testado** — Banco (migration `modalidades`): catálogo, modalidades da empresa (Graneleiro em todas
+  as que existem), modalidade do motorista e do código individual, `viagens`, `acertos`, sincronização das
+  viagens, campos efetivos na situação da conta, ações do dono, do gestor e da Plataforma, exclusão estendida às
+  tabelas novas. Comando: `PGHOST=/tmp PGPORT=54329 PGUSER=postgres PGTAP_SQL=… supabase/tests/local/rodar.sh`
+  → `total de verificações que passaram: 373` (teste 09: 67).
+- **feito e testado** — Núcleo: modelos de modalidade, viagem e acerto, PDF do acerto e das viagens, planilha
+  de viagens. `dart analyze` sem problemas; `dart test` → 49 testes.
+- **feito e testado** — Frota Motorista 0.5.0: escolha da modalidade, aba Viagens (engatar, anotar entregas,
+  desengatar, sem internet), cavalo fixo no Baú, acertos no Resumo e em Configurações, campos do frete conforme
+  o dono e campos novos. `flutter analyze` sem problemas; `flutter test --exclude-tags capturas` → 40 testes.
+- **feito e testado** — Frota Gestor 0.5.0: Configurações > Modalidades (ligar, campos), cadastro do motorista
+  com modalidade, troca de modalidade, abas Viagens e Acertos, fazer e corrigir acerto, lançamentos e planilha de
+  viagens, painel com viagens, Plataforma > Modalidades e campos. `flutter analyze` sem problemas;
+  `flutter test --exclude-tags capturas` → 45 testes.
+- **em andamento** — Esteira (testes no Supabase local, emulador e APKs oficiais) e aplicação na nuvem.
+
 ## Fase 7 — acabamento e piloto
 
 - **em andamento** — SMTP próprio (Brevo, configuração no painel do Supabase pelo dono).

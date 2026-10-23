@@ -119,6 +119,15 @@ Regras gerais: id uuid em todas as tabelas, gerado no celular quando o registro 
 
 Todo lançamento de frete, abastecimento e gasto guarda `motorista_id` e `caminhao_id`. O vale guarda só o motorista. Assim o relatório continua correto mesmo que o motorista troque de caminhão ou o caminhão tenha mais de um motorista.
 
+### Modalidades de operação (pedido do dono em 22/10/2026)
+
+- `modalidades` (catálogo da plataforma): codigo, nome, tipo (`frete` como o Graneleiro, ou `viagem` como o Baú), campos (lista: chave, rótulo, tipo, obrigatório, pode_ocultar, etapa, extra, desativado). Começa com Graneleiro, Grade baixa e Caçamba (por frete) e Baú e Sider (por viagem). A Plataforma cria modalidades e campos novos (campos novos ficam em `extras`).
+- `empresas_modalidades`: empresa_id, modalidade, ativa, campos (ajustes do dono: rótulo, visível, obrigatório). Empresa nova começa com Graneleiro.
+- `motoristas.modalidade` (vazia = o motorista escolhe no app; com uma só ligada, fica nela) e `convites_motorista.modalidade`.
+- `fretes.modalidade` e `fretes.extras`.
+- `viagens` (Baú, Sider): motorista_id, caminhao_id (o cavalo), modalidade, placa_carreta, engate_local, engate_em, desengate_local, desengate_em (vazio = em andamento), entregas_quantidade, entregas_cidades, observacao, extras. Uma viagem por carreta; sem dinheiro do frete.
+- `acertos`: motorista_id, período (dias de Brasília), comissao_centavos e descontos lançados pelo gestor; vales, diesel e gastos somados pelo servidor no fechamento; para_receber = comissão − descontos − vales (se a regra manda) − diesel e gastos (se a regra manda). O motorista vê o acerto fechado.
+
 O valor efetivo de um registro é o original mais o último ajuste. Criar views (por exemplo `fretes_efetivos`) que aplicam os ajustes, e marcar na tela quando o valor foi ajustado.
 
 ### Funções e Edge Functions
@@ -165,6 +174,7 @@ Letras grandes, poucos toques, linguagem simples, pensado para quem tem pouca es
 - Resumo e relatório em PDF para compartilhar.
 - Configurações: trocar de caminhão, sincronizar, sobre.
 - Ao lançar, o app mostra o caminhão atual no topo, com botão para trocar (seção 16).
+- Modalidades: se a empresa tem mais de uma e o motorista não tem, o app pergunta uma vez. No Baú e no Sider a aba Fretes vira Viagens (engatar e desengatar carreta, entregas), o cavalo é fixo (só o gestor troca) e os acertos fechados aparecem no Resumo. Os campos seguem o que o dono ajustou.
 
 ### App e painel do gestor
 
@@ -177,7 +187,9 @@ Mesmo código, layout se adapta:
 - Lançamentos: todas as listas com filtro por período, motorista, caminhão e embarcador.
 - Ajustes: corrigir um valor com motivo, com histórico.
 - Relatórios: PDF e CSV por motorista, caminhão, embarcador e período.
-- Configurações: categorias de gasto, gestores, dados da empresa.
+- Configurações: categorias de gasto, gestores, dados da empresa, modalidades de operação (o dono liga e ajusta os campos).
+- Motorista do Baú ou do Sider: abas Viagens e Acertos (fazer o acerto: período, comissão em reais, descontos, PDF).
+- Plataforma: modalidades e campos novos.
 - Ver como o motorista vê: o resumo e o relatório iguais ao do app dele.
 
 No computador: menu lateral e tabelas. No celular: navegação inferior e cartões. A lógica é a mesma.
