@@ -200,6 +200,9 @@ jobs:
 
   gestor:
     name: App e painel do gestor (análise, testes, APK e site)
+    # O painel web vai ao ar neste trabalho: só depois de o banco passar nos
+    # testes (em 23/10/2026 o painel novo foi ao ar com o banco reprovado).
+    needs: [banco]
     runs-on: ubuntu-latest
     permissions:
       contents: write   # guardar o registro e publicar o painel no ramo gh-pages
