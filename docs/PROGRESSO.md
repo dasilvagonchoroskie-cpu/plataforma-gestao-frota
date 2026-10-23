@@ -246,6 +246,22 @@ automática, o painel avisa antes do prazo com o botão do PDF.
   `exportar_dados_empresa` criada e exclusão com paradas. APKs oficiais (certificado 9c6ec010…22d2): Frota
   Motorista 0.6.0 e Frota Gestor 0.6.1, entregues ao Evandro.
 
+## Visual do cartaz — 23/10/2026
+
+Pedido do Evandro (cartaz de propaganda): interface igual ao cartaz. Escolhas dele: cores do cartaz, tela
+inicial do motorista com botões grandes e ícones dos apps iguais aos do cartaz.
+
+- **feito e testado** — Tema azul-marinho e verde (escuro por padrão, claro ou igual ao aparelho em
+  Configurações > Aparência), ícones coloridos por parte, cartões do painel com ícone e últimos lançamentos.
+- **feito e testado** — Frota Motorista 0.7.0: abas Início (botões grandes com a linha do mês), Lançamentos
+  (tudo numa lista, com filtro) e Resumo; o caminhão, os avisos, a parada e a carreta em andamento ficam no
+  Início. `flutter analyze` sem problemas; `flutter test --exclude-tags capturas` → 48 testes; 15 imagens das
+  telas.
+- **feito e testado** — Frota Gestor 0.7.0: menu do lado com a marca do app, mesmo tema. `flutter test
+  --exclude-tags capturas` → 58 testes; 14 imagens.
+- **feito** — Ícones novos dos dois apps e do painel web (`ferramentas/icones/gerar.py`).
+- **em andamento** — Esteira e APKs.
+
 ## Fase 7 — acabamento e piloto
 
 - **em andamento** — SMTP próprio (Brevo, configuração no painel do Supabase pelo dono).

@@ -177,8 +177,10 @@ Esta é a parte mais delicada do projeto. Fazer com calma e testar muito.
 Letras grandes, poucos toques, linguagem simples, pensado para quem tem pouca escolaridade:
 
 - Cadastro (e-mail, código, nome, CPF e senha), entrar com CPF e senha, esqueci a senha e pedido de entrada na empresa.
-- Início: resumo do período e botão grande para adicionar.
-- Fretes (lista, novo, detalhe), Diesel, Gastos, Vales.
+- Abas de baixo: Início, Lançamentos e Resumo (visual do cartaz, 23/10/2026). O Início tem botões grandes com
+  ícone colorido e uma linha do mês: Fretes (ou Viagens), Diesel, Gastos, Vales, Paradas, Acertos e Resumo.
+  Lançamentos junta tudo numa lista só, com filtro por tipo. O botão "Lançar" está nas três.
+- Fretes (lista, novo, detalhe), Diesel, Gastos, Vales (abrem pelo Início).
 - Resumo e relatório em PDF para compartilhar.
 - Configurações: trocar de caminhão, sincronizar, sobre.
 - Ao lançar, o app mostra o caminhão atual no topo, com botão para trocar (seção 16).
@@ -203,6 +205,11 @@ Mesmo código, layout se adapta:
 - Ver como o motorista vê: o resumo e o relatório iguais ao do app dele.
 
 No computador: menu lateral e tabelas. No celular: navegação inferior e cartões. A lógica é a mesma.
+
+Visual (23/10/2026, igual ao cartaz da plataforma): azul-marinho com verde-limão, ícones coloridos por parte
+(fretes, diesel, gastos, vales, paradas...), cartões com números grandes. Os dois apps abrem no tema escuro; o
+claro (melhor no sol forte) e o "igual ao celular" ficam em Configurações > Aparência. Ícones dos apps: quadrado
+verde com o caminhão (motorista) e quadrado quase preto com o gráfico e o caminhão (gestor).
 
 ## 10. Segurança, qualidade e operação
 

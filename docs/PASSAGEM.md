@@ -293,3 +293,12 @@ Decisões tomadas na construção (confirmar no piloto):
 - **Ordem da esteira:** o painel web vai ao ar alguns minutos antes de o banco da nuvem ser atualizado. Por
   isso tabela nova entra no painel como opcional (abre sem ela) e a esteira só publica depois de o banco passar
   nos testes.
+
+## Visual do cartaz (23/10/2026, pedido do usuário)
+
+- **Escuro por padrão**, como o cartaz; o motorista e o gestor escolhem claro ou "igual ao celular" em
+  Configurações > Aparência (guardado só naquele aparelho).
+- **Motorista:** três abas (Início, Lançamentos, Resumo). Fretes, Diesel, Gastos, Vales, Paradas e Acertos
+  abrem pelos botões do Início (cada um com o botão de novo lançamento) e pelo "Lançar".
+- **Lançamentos** do motorista: tudo numa lista (fretes, viagens, diesel, gastos e vales), do mais novo para o
+  mais velho; as paradas ficam só na tela delas.
