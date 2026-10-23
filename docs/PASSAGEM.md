@@ -251,8 +251,10 @@ Decisões tomadas na construção (confirmar no piloto):
 - **Motorista sem modalidade** (empresa com mais de uma): o app pede a escolha antes de abrir (precisa de
   internet). O gestor também pode definir pelo painel.
 - **Empresa nova** começa só com Graneleiro; o dono liga as outras.
-- **Exclusão de dados:** as funções de exclusão já aprovadas (motorista e empresa) passaram a apagar também
-  viagens, acertos e as modalidades da empresa. Sem isso, excluir um motorista com viagem daria erro.
+- **Exclusão de dados (esperando a aprovação do Evandro):** as funções de exclusão já aprovadas (motorista e
+  empresa) precisam apagar também viagens, acertos e as modalidades da empresa. Pela regra do dono, isso só
+  entra com a linha `aprovado-por` na migration. Enquanto não entra, excluir um motorista que tem viagem ou
+  acerto dá erro e nada é apagado (os outros continuam sendo excluídos normalmente).
 - **Campos novos da Plataforma:** até 20 por modalidade, tipos texto, número, número inteiro, dinheiro, data,
   data e hora, sim ou não e cidade; o tipo não muda depois; campo desativado some dos formulários e o que já
   foi anotado fica guardado. Os campos de fábrica não mudam pela Plataforma.

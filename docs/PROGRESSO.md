@@ -176,8 +176,10 @@ viagem (uma por carreta), acerto com comissão e descontos lançados pelo gestor
 - **feito e testado** — Banco (migration `modalidades`): catálogo, modalidades da empresa (Graneleiro em todas
   as que existem), modalidade do motorista e do código individual, `viagens`, `acertos`, sincronização das
   viagens, campos efetivos na situação da conta, ações do dono, do gestor e da Plataforma, exclusão estendida às
-  tabelas novas. Comando: `PGHOST=/tmp PGPORT=54329 PGUSER=postgres PGTAP_SQL=… supabase/tests/local/rodar.sh`
-  → `total de verificações que passaram: 373` (teste 09: 67).
+  tabelas novas (a extensão da exclusão espera aprovação, abaixo). Comando: `PGHOST=/tmp PGPORT=54329 PGUSER=postgres PGTAP_SQL=… supabase/tests/local/rodar.sh`
+  → `total de verificações que passaram: 369` (teste 09: 63).
+- **esperando aprovação** — Exclusão de motorista e de empresa apagar também viagens, acertos e modalidades
+  (regra do dono: função que apaga dados só entra aprovada). Até lá, excluir quem tem viagem dá erro sem apagar nada.
 - **feito e testado** — Núcleo: modelos de modalidade, viagem e acerto, PDF do acerto e das viagens, planilha
   de viagens. `dart analyze` sem problemas; `dart test` → 49 testes.
 - **feito e testado** — Frota Motorista 0.5.0: escolha da modalidade, aba Viagens (engatar, anotar entregas,

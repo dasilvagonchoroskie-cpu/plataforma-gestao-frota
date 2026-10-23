@@ -3,7 +3,7 @@
 begin;
 \ir apoio/fixtures.psql
 
-select plan(67);
+select plan(63);
 
 create or replace function pg_temp.enviar(p_uid uuid, p_itens jsonb)
 returns jsonb language sql as $$
@@ -265,19 +265,6 @@ select is(pg_temp.campo((select x from jsonb_array_elements(pg_temp.como(pg_temp
   'campo desativado some dos formulários');
 select ok((select count(*) from public.auditoria_plataforma where acao in ('modalidade_criada', 'campo_criado', 'campo_alterado')
   and origem = 'plataforma_app') >= 3, 'o que a Plataforma muda fica no registro');
-
--- ------------------------------------------------------------- exclusão
-
-select is(pg_temp.como(pg_temp.fx('u_gestor_x'), format('select public.excluir_motorista(%L)', pg_temp.fx('mot_d'))) ->> 'ok',
-  'true', 'excluir motorista com viagem e acerto funciona');
-select is((select count(*)::int from public.viagens where motorista_id = pg_temp.fx('mot_d'))
-  + (select count(*)::int from public.acertos where motorista_id = pg_temp.fx('mot_d'))
-  + (select count(*)::int from public.auditoria where registro_id in (pg_temp.fx('viagem_d1'), pg_temp.fx('acerto_d'))), 0,
-  'as viagens, os acertos e a auditoria deles vão junto');
-select lives_ok(format('select public.expurgar_empresa(%L, %L)', pg_temp.fx('empresa_x'), 'teste'),
-  'excluir a empresa com modalidades funciona');
-select is((select count(*)::int from public.empresas_modalidades where empresa_id = pg_temp.fx('empresa_x')), 0,
-  'as modalidades da empresa vão junto');
 
 select * from finish();
 rollback;

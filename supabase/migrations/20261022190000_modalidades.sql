@@ -1344,112 +1344,6 @@ begin
 end;
 $$;
 
--- ------------------------------------------------- exclusão de dados
-
--- Iguais às anteriores (aprovadas em 22/10/2026), agora também com as
--- viagens, os acertos e as modalidades da empresa. Sem isso, excluir um
--- motorista com viagem ou acerto daria erro.
-create or replace function public.expurgar_motorista(p_motorista uuid, p_apagar_conta boolean)
-returns void
-language plpgsql
-security definer
-set search_path = ''
-as $$
-declare
-  m public.motoristas;
-  v_ids uuid[];
-begin
-  select * into m from public.motoristas where id = p_motorista;
-  if not found then
-    return;
-  end if;
-  perform pg_catalog.set_config('frota.sem_auditoria', 'sim', true);
-
-  select coalesce(pg_catalog.array_agg(t.id), '{}') into v_ids from (
-    select f.id from public.fretes f where f.empresa_id = m.empresa_id and f.motorista_id = m.id
-    union all select a.id from public.abastecimentos a where a.empresa_id = m.empresa_id and a.motorista_id = m.id
-    union all select g.id from public.gastos_viagem g where g.empresa_id = m.empresa_id and g.motorista_id = m.id
-    union all select v.id from public.vales v where v.empresa_id = m.empresa_id and v.motorista_id = m.id
-    union all select k.id from public.ajustes_km k where k.empresa_id = m.empresa_id and k.motorista_id = m.id
-    union all select u.id from public.uso_caminhao u where u.empresa_id = m.empresa_id and u.motorista_id = m.id
-    union all select vi.id from public.viagens vi where vi.empresa_id = m.empresa_id and vi.motorista_id = m.id
-    union all select ac.id from public.acertos ac where ac.empresa_id = m.empresa_id and ac.motorista_id = m.id
-  ) t;
-
-  delete from public.ajustes_gestor where empresa_id = m.empresa_id and registro_id = any (v_ids);
-  -- Lançamento de outro motorista ligado a um frete deste fica sem o frete.
-  update public.abastecimentos set frete_id = null
-  where empresa_id = m.empresa_id and motorista_id <> m.id and frete_id = any (v_ids);
-  update public.gastos_viagem set frete_id = null
-  where empresa_id = m.empresa_id and motorista_id <> m.id and frete_id = any (v_ids);
-  delete from public.ajustes_km where empresa_id = m.empresa_id and motorista_id = m.id;
-  delete from public.gastos_viagem where empresa_id = m.empresa_id and motorista_id = m.id;
-  delete from public.abastecimentos where empresa_id = m.empresa_id and motorista_id = m.id;
-  delete from public.vales where empresa_id = m.empresa_id and motorista_id = m.id;
-  delete from public.fretes where empresa_id = m.empresa_id and motorista_id = m.id;
-  delete from public.viagens where empresa_id = m.empresa_id and motorista_id = m.id;
-  delete from public.acertos where empresa_id = m.empresa_id and motorista_id = m.id;
-  delete from public.uso_caminhao where empresa_id = m.empresa_id and motorista_id = m.id;
-  delete from public.dispositivos where empresa_id = m.empresa_id and perfil_id = m.perfil_id;
-  delete from public.pedidos_entrada where perfil_id = m.perfil_id;
-  delete from public.convites_motorista
-  where empresa_id = m.empresa_id and (usado_por = m.perfil_id or cpf = m.cpf);
-  delete from public.auditoria
-  where empresa_id = m.empresa_id
-    and (registro_id = any (v_ids) or registro_id = m.id or autor_id = m.perfil_id);
-  delete from public.motoristas where id = m.id;
-
-  if p_apagar_conta then
-    perform public.expurgar_perfil(m.perfil_id);
-  else
-    update public.perfis set empresa_id = null, ativo = true, exclusao_pedida_em = null
-    where id = m.perfil_id;
-  end if;
-  perform pg_catalog.set_config('frota.sem_auditoria', '', true);
-end;
-$$;
-
-create or replace function public.expurgar_empresa(p_empresa uuid, p_motivo text)
-returns void
-language plpgsql
-security definer
-set search_path = ''
-as $$
-declare
-  v_perfil uuid;
-begin
-  perform pg_catalog.set_config('frota.sem_auditoria', 'sim', true);
-  delete from public.ajustes_gestor where empresa_id = p_empresa;
-  delete from public.ajustes_km where empresa_id = p_empresa;
-  delete from public.gastos_viagem where empresa_id = p_empresa;
-  delete from public.abastecimentos where empresa_id = p_empresa;
-  delete from public.vales where empresa_id = p_empresa;
-  delete from public.fretes where empresa_id = p_empresa;
-  delete from public.viagens where empresa_id = p_empresa;
-  delete from public.acertos where empresa_id = p_empresa;
-  delete from public.uso_caminhao where empresa_id = p_empresa;
-  delete from public.dispositivos where empresa_id = p_empresa;
-  delete from public.pedidos_entrada where empresa_id = p_empresa;
-  delete from public.convites_motorista where empresa_id = p_empresa;
-  delete from public.motoristas where empresa_id = p_empresa;
-  delete from public.caminhoes where empresa_id = p_empresa;
-  delete from public.categorias_gasto where empresa_id = p_empresa;
-  delete from public.empresas_modalidades where empresa_id = p_empresa;
-  delete from public.auditoria where empresa_id = p_empresa;
-  delete from public.acessos_autorizados where empresa_id = p_empresa;
-  for v_perfil in select p.id from public.perfis p where p.empresa_id = p_empresa loop
-    perform public.expurgar_perfil(v_perfil);
-  end loop;
-  update public.empresas
-     set nome = 'Empresa excluída', documento = null, codigo_entrada = public.gerar_codigo_entrada(),
-         apagado_em = pg_catalog.now(), excluida_em = pg_catalog.now(),
-         bloqueada_em = coalesce(bloqueada_em, pg_catalog.now()),
-         motivo_bloqueio = pg_catalog.left(coalesce(p_motivo, 'Conta excluída'), 200), excluir_em = null
-   where id = p_empresa;
-  perform pg_catalog.set_config('frota.sem_auditoria', '', true);
-end;
-$$;
-
 -- ------------------------------------------------------------ privilégios
 
 revoke all on function public.campos_padrao_modalidade(text) from public, anon, authenticated;
@@ -1472,8 +1366,6 @@ revoke all on function public.situacao_acesso() from public, anon;
 revoke all on function public.sync_gravar_item(text, jsonb, uuid, uuid, uuid) from public, anon, authenticated;
 revoke all on function public.sincronizar_lote(jsonb) from public, anon;
 revoke all on function public.baixar_alteracoes(timestamptz) from public, anon;
-revoke all on function public.expurgar_motorista(uuid, boolean) from public, anon, authenticated;
-revoke all on function public.expurgar_empresa(uuid, text) from public, anon, authenticated;
 
 grant execute on function public.modalidades_da_empresa() to authenticated;
 grant execute on function public.salvar_modalidade_empresa(text, boolean, jsonb) to authenticated;
