@@ -1,7 +1,7 @@
 name: gestor
 description: App de celular e painel web do gestor e do dono da Plataforma de Gestão de Frota.
 publish_to: none
-version: 0.5.0+1
+version: 0.6.0+1
 
 environment:
   sdk: ^3.8.0

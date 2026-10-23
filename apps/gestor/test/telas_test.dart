@@ -155,7 +155,7 @@ void main() {
     await abrirApp(tester, servidorComAmostra(usuario: euGestor));
     await tester.tap(find.text('Configurações'));
     await tester.pumpAndSettle();
-    expect(find.text('Só o dono muda os dados, as regras e as modalidades da empresa.'), findsOneWidget);
+    expect(find.text('Só o dono muda os dados, as regras, as modalidades e as paradas da empresa.'), findsOneWidget);
     await tester.tap(find.text('Donos e gestores'));
     await tester.pumpAndSettle();
     expect(find.text('Liberar gestor'), findsNothing);

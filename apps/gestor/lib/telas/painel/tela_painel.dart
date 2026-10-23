@@ -26,6 +26,13 @@ class TelaPainel extends ConsumerWidget {
     final alertas = e.alertas(agora);
     final media = mediaDoPeriodo(d.abastecimentos, e.abastecimentos);
     final litros = d.abastecimentos.fold<double>(0, (s, a) => s + a.litros);
+    // Paradas (quando a empresa usa): quantos passaram do limite no período.
+    final acimaDoLimite = !e.paradasAtivas
+        ? const <String>[]
+        : [
+            for (final m in e.motoristas)
+              if (e.resumoParadas(m.id, periodo, agora).acimaDoLimite.isNotEmpty) m.primeiroNome,
+          ];
     final linhas = e.linhasMotoristas(periodo)
       ..sort((a, b) {
         if (a.motorista.ativo != b.motorista.ativo) return a.motorista.ativo ? -1 : 1;
@@ -110,6 +117,17 @@ class TelaPainel extends ConsumerWidget {
                     icone: Icons.hourglass_bottom,
                     cor: r.fretesEmAberto > 0 ? cores.atencao : null,
                   ),
+                  if (e.paradasAtivas)
+                    CartaoNumero(
+                      rotulo: 'Paradas',
+                      valor: acimaDoLimite.isEmpty ? 'Dentro do limite' : plural(acimaDoLimite.length, 'motorista', 'motoristas'),
+                      detalhe: acimaDoLimite.isEmpty
+                          ? 'Nenhum intervalo sem descanso acima do limite'
+                          : 'Acima do limite: ${acimaDoLimite.join(', ')}',
+                      icone: Icons.pause_circle_outline,
+                      cor: acimaDoLimite.isEmpty ? null : cores.negativo,
+                      aoTocar: () => ref.read(secaoProvider.notifier).ir(Secao.paradas),
+                    ),
                 ],
               ),
             ),
@@ -325,8 +343,9 @@ class _LinhaCaminhaoPainel extends ConsumerWidget {
         padding: const EdgeInsets.fromLTRB(20, 10, 20, 10),
         child: Row(
           children: [
-            PlacaVeiculo(c.placa, tamanho: 16),
-            const SizedBox(width: 14),
+            // No celular a placa fica menor para sobrar lugar para o texto.
+            PlacaVeiculo(c.placa, tamanho: telaLarga(context) ? 16 : 12),
+            SizedBox(width: telaLarga(context) ? 14 : 10),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,

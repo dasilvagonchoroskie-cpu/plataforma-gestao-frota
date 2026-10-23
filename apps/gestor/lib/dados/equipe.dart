@@ -85,6 +85,8 @@ class Equipe {
     this.viagens = const [],
     this.acertos = const [],
     this.modalidades = const [],
+    this.paradas = const [],
+    this.motivosParada = const [],
     required this.brutos,
     required this.carregadoEm,
   });
@@ -118,6 +120,10 @@ class Equipe {
   /// Todas as modalidades do catálogo, com a situação na empresa (ativa),
   /// os campos já ajustados e os ajustes do dono.
   final List<Modalidade> modalidades;
+
+  /// Paradas dos motoristas (mais novas primeiro) e o catálogo de motivos.
+  final List<Parada> paradas;
+  final List<MotivoParada> motivosParada;
 
   /// Linha como veio do banco (valores efetivos), por tabela e id. A tela de
   /// correção lê daqui o valor atual de cada campo.
@@ -211,6 +217,11 @@ class Equipe {
       modalidades: modalidades != null
           ? [for (final m in modalidades) Modalidade.deMapa(m)]
           : modalidadesDaEmpresa(empresaSituacao),
+      paradas: [
+        for (final m in t(Fontes.paradas))
+          if (vivo(m)) Parada.deMapa(m),
+      ]..sort((a, b) => b.inicioEm.compareTo(a.inicioEm)),
+      motivosParada: [for (final m in t(Fontes.motivosParada)) MotivoParada.deMapa(m)],
       brutos: {
         'fretes': porId(t(Fontes.fretes)),
         'abastecimentos': porId(t(Fontes.abastecimentos)),
@@ -225,6 +236,38 @@ class Equipe {
 
   bool get souDono => eu.dono;
   Regras get regras => Regras.daEmpresa(empresa.configuracao);
+
+  // -------------------------------------------------------------- paradas
+
+  /// O que a empresa escolheu: ligado ou não, o limite e os motivos (o
+  /// catálogo do banco; sem ele, os que vieram na situação da conta).
+  ConfiguracaoParadas get configParadas => ConfiguracaoParadas(
+    ativas: empresa.paradasAtivas,
+    limiteMinutos: empresa.limiteSemDescansoMinutos,
+    motivos: motivosParada,
+  );
+
+  bool get paradasAtivas => empresa.paradasAtivas;
+
+  List<Parada> paradasDe(String motoristaId) => paradas.where((p) => p.motoristaId == motoristaId).toList();
+
+  ResumoParadas resumoParadas(String motoristaId, Periodo periodo, DateTime agora) => resumirParadas(
+    paradas: paradasDe(motoristaId),
+    motivos: motivosParada,
+    periodo: periodo,
+    limiteMinutos: empresa.limiteSemDescansoMinutos,
+    agora: agora,
+  );
+
+  /// Tudo o que o relatório de paradas do motorista precisa (PDF e planilha).
+  DadosParadas dadosParadas(String motoristaId, Periodo periodo, DateTime agora) => DadosParadas(
+    periodo: periodo,
+    resumo: resumoParadas(motoristaId, periodo, agora),
+    motivos: motivosParada,
+    empresa: empresa.nome,
+    motorista: nomeMotorista(motoristaId),
+    placasPorCaminhao: placas,
+  );
 
   // ---------------------------------------------------------- modalidades
 

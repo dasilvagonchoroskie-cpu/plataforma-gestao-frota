@@ -10,6 +10,7 @@ import '../../dados/equipe.dart';
 import '../../dados/modelos.dart';
 import '../../dados/provedores.dart';
 import '../../relatorio/compartilhar.dart';
+import '../paradas/tela_paradas.dart';
 import 'tela_acerto.dart';
 
 /// Um motorista: o resumo como ele vê no app, os lançamentos e o cadastro.
@@ -39,9 +40,11 @@ class TelaDetalheMotorista extends ConsumerWidget {
     final tudo = e.recorte(motoristaId: m.id);
     // Baú e Sider: Viagens no lugar de Fretes e a aba dos acertos.
     final porViagem = e.porViagem(m.id);
+    // Paradas: só quando a empresa usa o registro.
+    final comParadas = e.paradasAtivas;
 
     return DefaultTabController(
-      length: porViagem ? 7 : 6,
+      length: 6 + (porViagem ? 1 : 0) + (comParadas ? 1 : 0),
       initialIndex: abaInicial,
       child: Scaffold(
         appBar: AppBar(
@@ -61,6 +64,7 @@ class TelaDetalheMotorista extends ConsumerWidget {
               const Tab(text: 'Gastos'),
               const Tab(text: 'Vales'),
               if (porViagem) const Tab(text: 'Acertos'),
+              if (comParadas) const Tab(text: 'Paradas'),
               const Tab(text: 'Cadastro'),
             ],
           ),
@@ -202,6 +206,7 @@ class TelaDetalheMotorista extends ConsumerWidget {
                     ],
                   ),
                   if (porViagem) ListaAcertos(motoristaId: m.id),
+                  if (comParadas) ListaCentral(largura: 900, children: [CorpoParadasMotorista(motoristaId: m.id)]),
                   _Cadastro(motorista: m),
                 ],
               ),

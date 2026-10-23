@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:gestor/telas/lancamentos/detalhe_lancamento.dart';
 
 import 'apoio.dart';
+import 'paradas_test.dart' show servidorComParadas;
 
 /// Imagens das telas no computador (1440 x 900) e no celular (1078 x 2337)
 /// para conferir o visual. Roda com: flutter test --tags capturas --update-goldens
@@ -111,6 +112,23 @@ void main() {
     debugDisableShadows = false;
     await abrirApp(t, servidorComAmostra()..sessao = false, tela: const Size(1440, 900));
     await foto(t, '11_entrar');
+  });
+
+  testWidgets('13 paradas', (t) async {
+    debugDisableShadows = false;
+    await abrirApp(t, servidorComParadas(), tela: const Size(1440, 900));
+    await ir(t, 'Paradas');
+    await ir(t, 'João Batista');
+    await foto(t, '13_paradas_motorista');
+  });
+
+  testWidgets('14 paradas configuracao', (t) async {
+    debugDisableShadows = false;
+    await abrirApp(t, servidorComParadas(), tela: celular, densidade: 2.75);
+    await t.tap(find.byTooltip('Configurações'));
+    await t.pumpAndSettle();
+    await ir(t, 'Registro de paradas');
+    await foto(t, '14_paradas_configuracao');
   });
 
   testWidgets('12 painel escuro', (t) async {

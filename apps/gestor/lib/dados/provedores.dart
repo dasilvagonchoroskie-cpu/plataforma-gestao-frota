@@ -323,6 +323,10 @@ class EquipeNotifier extends AsyncNotifier<Equipe> {
   Future<void> ativarCategoria(String id, bool ativa) =>
       _eRecarregar(() => _s.alterar('categorias_gasto', id, {'ativa': ativa}));
 
+  /// O dono liga ou desliga o registro de paradas e muda o limite.
+  Future<void> salvarParadas({required bool ativas, required int limiteMinutos}) =>
+      salvarEmpresa({'paradas_ativas': ativas, 'limite_sem_descanso_minutos': limiteMinutos});
+
   Future<void> salvarEmpresa(Map<String, Object?> campos) =>
       _eRecarregar(() => _s.alterar('empresas', _e.empresa.id, campos));
 

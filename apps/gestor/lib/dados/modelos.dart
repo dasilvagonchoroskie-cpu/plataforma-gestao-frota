@@ -12,6 +12,8 @@ class Empresa {
     this.limiteCaminhoes = 5,
     this.configuracao = const ConfiguracaoEmpresa(),
     this.acessoAte,
+    this.paradasAtivas = false,
+    this.limiteSemDescansoMinutos,
   });
 
   final String id;
@@ -26,6 +28,12 @@ class Empresa {
   /// Fim do período de teste (nulo = sem prazo).
   final DateTime? acessoAte;
 
+  /// Registro de paradas ligado (o dono liga em Configurações).
+  final bool paradasAtivas;
+
+  /// Tempo máximo sem descanso que a empresa definiu, em minutos.
+  final int? limiteSemDescansoMinutos;
+
   bool get suspensa => status == 'suspensa';
   bool get emTeste => status == 'teste';
 
@@ -39,6 +47,8 @@ class Empresa {
     limiteCaminhoes: lerInt(m['limite_caminhoes'], 5),
     configuracao: ConfiguracaoEmpresa.deMapa(m),
     acessoAte: lerDataOuNula(m['acesso_ate']),
+    paradasAtivas: lerBool(m['paradas_ativas']),
+    limiteSemDescansoMinutos: m['limite_sem_descanso_minutos'] == null ? null : lerInt(m['limite_sem_descanso_minutos']),
   );
 }
 

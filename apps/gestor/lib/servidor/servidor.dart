@@ -37,6 +37,10 @@ class Fontes {
   static const viagens = 'viagens';
   static const acertos = 'acertos';
 
+  /// Registro de paradas (só quando a empresa liga) e o catálogo de motivos.
+  static const paradas = 'paradas';
+  static const motivosParada = 'motivos_parada';
+
   static const todas = [
     empresa,
     perfis,
@@ -55,6 +59,8 @@ class Fontes {
     convites,
     viagens,
     acertos,
+    paradas,
+    motivosParada,
   ];
 }
 
@@ -329,8 +335,10 @@ class ServidorSupabase implements Servidor {
   Future<List<Map<String, Object?>>> _tudo(String fonte) async {
     const passo = 1000;
     final linhas = <Map<String, Object?>>[];
+    // O catálogo de motivos não tem id: a chave é o código.
+    final chave = fonte == Fontes.motivosParada ? 'codigo' : 'id';
     for (var de = 0; ; de += passo) {
-      final parte = await cliente.from(fonte).select().order('id').range(de, de + passo - 1);
+      final parte = await cliente.from(fonte).select().order(chave).range(de, de + passo - 1);
       linhas.addAll(parte.map((e) => Map<String, Object?>.from(e)));
       if (parte.length < passo) break;
     }

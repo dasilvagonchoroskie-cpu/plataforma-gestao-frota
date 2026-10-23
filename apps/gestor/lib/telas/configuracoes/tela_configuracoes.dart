@@ -12,6 +12,7 @@ import '../../dados/provedores.dart';
 import '../acesso/telas_acesso.dart';
 import '../casca.dart';
 import '../plataforma/tela_plataforma.dart';
+import 'tela_config_paradas.dart';
 import 'tela_modalidades.dart';
 
 /// Configurações: dados e regras da empresa, categorias de gasto, gestores,
@@ -87,10 +88,21 @@ class TelaConfiguracoes extends ConsumerWidget {
             trailing: const Icon(Icons.chevron_right),
             onTap: () => abrir(const TelaModalidades()),
           ),
+          ListTile(
+            leading: const Icon(Icons.pause_circle_outline),
+            title: const Text('Registro de paradas'),
+            subtitle: Text(
+              emp.paradasAtivas
+                  ? 'Ligado. Limite sem descanso: ${emp.limiteSemDescansoMinutos == null ? '—' : limiteTexto(emp.limiteSemDescansoMinutos!)}.'
+                  : 'Desligado (os motoristas não veem a aba).',
+            ),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => abrir(const TelaConfigParadas()),
+          ),
           if (!e.souDono)
             const Padding(
               padding: EdgeInsets.fromLTRB(20, 0, 20, 4),
-              child: Nota('Só o dono muda os dados, as regras e as modalidades da empresa.'),
+              child: Nota('Só o dono muda os dados, as regras, as modalidades e as paradas da empresa.'),
             ),
           const Padding(padding: EdgeInsets.symmetric(horizontal: 16), child: TituloSecao('Cadastros')),
           ListTile(

@@ -11,6 +11,7 @@ import 'configuracoes/tela_configuracoes.dart';
 import 'lancamentos/tela_lancamentos.dart';
 import 'motoristas/tela_motoristas.dart';
 import 'painel/tela_painel.dart';
+import 'paradas/tela_paradas.dart';
 import 'plataforma/tela_plataforma.dart';
 import 'relatorios/tela_relatorios.dart';
 
@@ -20,6 +21,10 @@ enum Secao {
   caminhoes('Caminhões', Icons.local_shipping_outlined, Icons.local_shipping),
   lancamentos('Lançamentos', Icons.receipt_long_outlined, Icons.receipt_long),
   relatorios('Relatórios', Icons.picture_as_pdf_outlined, Icons.picture_as_pdf),
+
+  /// Só aparece quando a empresa usa o registro de paradas. No celular não
+  /// cabe embaixo: abre pelo cartão do Painel.
+  paradas('Paradas', Icons.pause_circle_outline, Icons.pause_circle),
   configuracoes('Configurações', Icons.settings_outlined, Icons.settings);
 
   const Secao(this.rotulo, this.icone, this.iconeMarcado);
@@ -89,6 +94,7 @@ class _CascaState extends ConsumerState<Casca> with WidgetsBindingObserver {
     Secao.caminhoes => const TelaCaminhoes(),
     Secao.lancamentos => const TelaLancamentos(),
     Secao.relatorios => const TelaRelatorios(),
+    Secao.paradas => const TelaParadas(),
     Secao.configuracoes => const TelaConfiguracoes(),
   };
 
@@ -98,6 +104,8 @@ class _CascaState extends ConsumerState<Casca> with WidgetsBindingObserver {
     final largo = telaLarga(context);
     final e = assistirEquipe(ref);
     final pendentes = e.pedidosPendentes.length;
+    // Quem não usa o registro de paradas nem vê a seção.
+    final secoes = [for (final s in Secao.values) if (s != Secao.paradas || e.paradasAtivas) s];
 
     Widget icone(Secao s, bool marcado) {
       final i = Icon(marcado ? s.iconeMarcado : s.icone);
@@ -115,8 +123,8 @@ class _CascaState extends ConsumerState<Casca> with WidgetsBindingObserver {
             NavigationRail(
               extended: MediaQuery.sizeOf(context).width >= 1200,
               minExtendedWidth: 220,
-              selectedIndex: secao.index,
-              onDestinationSelected: (i) => ref.read(secaoProvider.notifier).ir(Secao.values[i]),
+              selectedIndex: secoes.contains(secao) ? secoes.indexOf(secao) : 0,
+              onDestinationSelected: (i) => ref.read(secaoProvider.notifier).ir(secoes[i]),
               leading: Padding(
                 padding: const EdgeInsets.fromLTRB(8, 12, 8, 16),
                 child: Column(
@@ -144,7 +152,7 @@ class _CascaState extends ConsumerState<Casca> with WidgetsBindingObserver {
                 ),
               ),
               destinations: [
-                for (final s in Secao.values)
+                for (final s in secoes)
                   NavigationRailDestination(icon: icone(s, false), selectedIcon: icone(s, true), label: Text(s.rotulo)),
               ],
             ),
@@ -155,7 +163,7 @@ class _CascaState extends ConsumerState<Casca> with WidgetsBindingObserver {
       );
     }
 
-    final abas = Secao.values.where((s) => s != Secao.configuracoes).toList();
+    final abas = Secao.values.where((s) => s != Secao.configuracoes && s != Secao.paradas).toList();
     return PopScope(
       canPop: secao == Secao.painel,
       onPopInvokedWithResult: (saiu, _) {
