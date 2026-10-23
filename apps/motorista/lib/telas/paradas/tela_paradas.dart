@@ -302,7 +302,9 @@ class _CartaoSituacaoParadaState extends ConsumerState<CartaoSituacaoParada> {
       );
     }
 
-    final desde = dados.fimDoUltimoDescanso;
+    // Mais de um dia desde o último descanso: foi folga ou não registrou; não conta.
+    final ultimo = dados.fimDoUltimoDescanso;
+    final desde = ultimo != null && agora.difference(ultimo) <= intervaloSemRegistro ? ultimo : null;
     final rodando = desde == null ? null : agora.difference(desde);
     final limite = config.limiteMinutos;
     final passou = rodando != null && limite != null && rodando.inMinutes > limite;
