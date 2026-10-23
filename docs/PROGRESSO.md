@@ -240,7 +240,11 @@ automática, o painel avisa antes do prazo com o botão do PDF.
   Configurações; avisos no Painel (motorista que pediu para sair e acesso da empresa acabando) com o botão
   "Baixar PDF"; com o acesso encerrado, o dono baixa o PDF na própria tela. `flutter test --exclude-tags
   capturas` → 58 testes.
-- **em andamento** — Esteira e aplicação na nuvem.
+- **feito e testado** — Esteiras 841ed68 e 5afb26f aprovadas; banco da nuvem atualizado (`resultado: success`,
+  migrations `20261023120000 paradas` e `20261023140000 exclusao_completa` no Supabase). Conferido na nuvem:
+  10 motivos (descanso = refeição, descanso, pernoite), empresa com paradas desligadas e limite 330, função
+  `exportar_dados_empresa` criada e exclusão com paradas. APKs oficiais (certificado 9c6ec010…22d2): Frota
+  Motorista 0.6.0 e Frota Gestor 0.6.1, entregues ao Evandro.
 
 ## Fase 7 — acabamento e piloto
 
