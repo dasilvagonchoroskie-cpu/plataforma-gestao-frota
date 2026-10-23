@@ -810,6 +810,15 @@ Future<Uint8List> gerarPdfParadas(DadosParadas d, FontesPdf fontes, {DateTime? a
     ));
   }
 
+  if (r.semRegistro.isNotEmpty) {
+    conteudo.add(p.nota(
+      '${r.semRegistro.length == 1 ? 'Um intervalo' : '${r.semRegistro.length} intervalos'} de mais de um dia sem '
+      'descanso registrado (folga ou registro esquecido) não ${r.semRegistro.length == 1 ? 'entra' : 'entram'} na conta: '
+      '${r.semRegistro.map(textoDoIntervalo).join('; ')}.',
+      tamanho: 9.5,
+    ));
+  }
+
   final acima = r.acimaDoLimite;
   if (acima.isNotEmpty) {
     conteudo.add(p.titulo('Acima do limite (${acima.length})'));

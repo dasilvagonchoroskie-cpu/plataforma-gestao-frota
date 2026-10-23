@@ -81,6 +81,8 @@ class LinhaParada extends StatelessWidget {
     final p = parada;
     final descanso = motivos.any((m) => m.codigo == p.motivo && m.contaComoDescanso);
     final descricao = p.descricao ?? '';
+    // Aberta há mais de um dia: quase sempre esqueceu de tocar em "Retomar viagem".
+    final esquecida = p.emAndamento && p.duracao(agora) > intervaloSemRegistro;
     return InkWell(
       onTap: aoTocar,
       child: Padding(
@@ -108,7 +110,7 @@ class LinhaParada extends StatelessWidget {
                     Text(descricao, style: TextStyle(fontSize: 14.5, color: cores.textoFraco)),
                   const SizedBox(height: 2),
                   Text(horarioDaParada(p), style: estiloNumero(15, peso: FontWeight.w500, cor: cores.textoFraco)),
-                  if (descanso || p.ajustado || pendente || (placa ?? '').isNotEmpty)
+                  if (descanso || p.ajustado || pendente || esquecida || (placa ?? '').isNotEmpty)
                     Padding(
                       padding: const EdgeInsets.only(top: 5),
                       child: Wrap(
@@ -119,6 +121,7 @@ class LinhaParada extends StatelessWidget {
                             Text(placaTexto(placa!), style: estiloNumero(13.5, cor: cores.textoFraco)),
                           if (descanso) const Etiqueta('Descanso', atencao: false),
                           if (p.ajustado) const Etiqueta('Horário informado depois'),
+                          if (esquecida) Etiqueta('Aberta há ${duracaoTexto(p.duracao(agora))}: esqueceu de retomar?'),
                           if (pendente) const Etiqueta('Não enviado', atencao: false),
                         ],
                       ),
@@ -213,8 +216,16 @@ class CartaoResumoParadas extends StatelessWidget {
               ),
             ),
         ],
+        if (r.semRegistro.isNotEmpty) ...[
+          const SizedBox(height: 6),
+          Nota(
+            '${r.semRegistro.length == 1 ? 'Um intervalo' : '${r.semRegistro.length} intervalos'} de mais de um dia '
+            'sem descanso registrado (folga ou registro esquecido) não ${r.semRegistro.length == 1 ? 'entra' : 'entram'} '
+            'na conta: ${r.semRegistro.map(textoDoIntervalo).join('; ')}.',
+          ),
+        ],
         const SizedBox(height: 8),
-        Nota(avisoParadas),
+        const Nota(avisoParadas),
       ],
     );
   }

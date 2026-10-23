@@ -129,7 +129,11 @@ String csvParadas(DadosParadas d, {Map<String, String> motoristas = const {}, Da
         motoristas[p.motoristaId] ?? d.motorista, d.placaDe(p.caminhaoId), nomeDoMotivo(p.motivo, d.motivos),
         p.descricao ?? '', dataHoraTexto(p.inicioEm), p.fimEm == null ? 'em andamento' : dataHoraTexto(p.fimEm!),
         duracaoTexto(p.duracao(quando)), p.duracao(quando).inMinutes, descanso.contains(p.motivo) ? 'sim' : 'não',
-        antes[p.inicioEm] == null ? '' : duracaoTexto(antes[p.inicioEm]!.duracao),
+        antes[p.inicioEm] == null
+            ? ''
+            : (antes[p.inicioEm]!.semRegistro
+                ? 'mais de um dia sem registro'
+                : duracaoTexto(antes[p.inicioEm]!.duracao)),
         antes[p.inicioEm] == null ? '' : (antes[p.inicioEm]!.acimaDoLimite ? 'sim' : 'não'),
         p.ajustado ? 'sim' : 'não',
       ],

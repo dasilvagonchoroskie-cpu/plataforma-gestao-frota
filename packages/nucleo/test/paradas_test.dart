@@ -160,6 +160,31 @@ void main() {
       expect(semDescansoDesde(comAberta, config.motivos), isNull);
     });
 
+    test('mais de um dia sem registro (folga): não entra na conta, só no aviso', () {
+      final comFolga = [
+        ...paradas,
+        // Pernoite terminou terça 05:30; o próximo descanso só na sexta.
+        parada('f1', 'refeicao', h(9, 12), h(9, 13)),
+      ];
+      final r2 = resumirParadas(
+        paradas: comFolga, motivos: config.motivos, periodo: semana, limiteMinutos: 330, agora: h(20, 12),
+      );
+      expect(r2.semRegistro, hasLength(1));
+      expect(r2.semRegistro.single.acimaDoLimite, isFalse);
+      expect(duracaoTexto(r2.maior!.duracao), '6h30', reason: 'o maior continua sendo o da segunda');
+      expect(r2.acimaDoLimite, hasLength(2));
+      final csv = csvParadas(DadosParadas(periodo: semana, resumo: r2, motivos: config.motivos), agora: h(20, 12));
+      expect(csv, contains('mais de um dia sem registro'));
+
+      // Hoje, desde o último descanso: até um dia conta; mais que isso, não.
+      final hoje = Periodo(h(10, 0), DateTime(2026, 10, 10, 23, 59, 59));
+      final r3 = resumirParadas(
+        paradas: comFolga, motivos: config.motivos, periodo: hoje, limiteMinutos: 330, agora: h(10, 20),
+      );
+      expect(r3.maior, isNull);
+      expect(r3.semRegistro.single.ateAgora, isTrue);
+    });
+
     test('sem descanso no período: nada para medir', () {
       final soCafe = [parada('a', 'cafe', h(8, 7), h(8, 7, 10))];
       final r3 = resumirParadas(

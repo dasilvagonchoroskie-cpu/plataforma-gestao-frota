@@ -176,6 +176,12 @@ String duracaoTexto(Duration d) {
 /// "5h30" a partir de minutos (o limite da empresa).
 String limiteTexto(int minutos) => duracaoTexto(Duration(minutes: minutos));
 
+/// Intervalo maior que isto não é contado como tempo rodando sem descanso:
+/// quase sempre é folga em casa ou descanso que não foi registrado. Aparece
+/// como "sem registro" para o patrão conferir. Não é número de lei: é um dia,
+/// o mesmo teto do limite que a empresa pode escolher.
+const intervaloSemRegistro = Duration(hours: 24);
+
 /// Tempo entre o fim de um descanso e o começo do seguinte (ou até agora).
 class IntervaloSemDescanso {
   const IntervaloSemDescanso({required this.inicio, required this.fim, this.limiteMinutos, this.ateAgora = false});
@@ -188,7 +194,11 @@ class IntervaloSemDescanso {
   final bool ateAgora;
 
   Duration get duracao => fim.difference(inicio);
-  bool get acimaDoLimite => limiteMinutos != null && duracao.inMinutes > limiteMinutos!;
+
+  /// Mais de um dia sem nenhum descanso registrado (folga ou esquecimento).
+  bool get semRegistro => duracao > intervaloSemRegistro;
+
+  bool get acimaDoLimite => !semRegistro && limiteMinutos != null && duracao.inMinutes > limiteMinutos!;
 }
 
 class ResumoParadas {
@@ -213,13 +223,18 @@ class ResumoParadas {
   /// Algum descanso (refeição, descanso, pernoite) registrado no período.
   final bool temDescanso;
 
+  /// O maior intervalo sem descanso (sem contar os de mais de um dia sem registro).
   IntervaloSemDescanso? get maior {
     IntervaloSemDescanso? r;
     for (final i in intervalos) {
+      if (i.semRegistro) continue;
       if (r == null || i.duracao > r.duracao) r = i;
     }
     return r;
   }
+
+  /// Mais de um dia sem descanso registrado: não entram na conta, só no aviso.
+  List<IntervaloSemDescanso> get semRegistro => intervalos.where((i) => i.semRegistro).toList();
 
   List<IntervaloSemDescanso> get acimaDoLimite => intervalos.where((i) => i.acimaDoLimite).toList();
 }
