@@ -3,7 +3,7 @@
 begin;
 \ir apoio/fixtures.psql
 
-select plan(92);
+select plan(93);
 
 -- Dois motoristas novos, ainda sem empresa.
 insert into fx values
@@ -195,27 +195,31 @@ select is((select count(*)::int from public.uso_caminhao where motorista_id = pg
 select is(pg_temp.como(pg_temp.fx('u_gestor_x'), format(
   'select to_jsonb(exclusao_pedida_em is not null) from public.motoristas where id = %L', pg_temp.fx('mot_a')))::text, 'true',
   'o gestor vê que ele excluiu a conta');
+select is((select coalesce(email, 'sem e-mail') from public.motoristas where id = pg_temp.fx('mot_a'))
+  || ':' || (select count(*) from public.auditoria where tabela = 'motoristas' and registro_id = pg_temp.fx('mot_a')
+             and (antes ? 'email' or depois ? 'email')), 'sem e-mail:0',
+  'o e-mail sai do registro e do histórico');
 
 insert into fx values ('u_a2', '10000000-0000-4000-8000-00000000000a');
 insert into auth.users (id, email, email_confirmed_at) values (pg_temp.fx('u_a2'), 'motorista.a2@teste.com', now());
 select pg_temp.como(pg_temp.fx('u_a2'), $q$select public.completar_cadastro('Motorista A', '529.982.247-25')$q$);
 select is((select cpf from public.perfis where id = pg_temp.fx('u_a2')), '52998224725',
   'o mesmo CPF já cria conta nova na hora');
-select ok(pg_temp.mensagem_como(pg_temp.fx('u_gestor_x'), $q$select public.gerar_convite_motorista('Motorista A', '52998224725')$q$)
-  like 'Este motorista excluiu a conta. O cadastro antigo fica até __/__ para a empresa guardar o PDF.%',
-  'código para quem excluiu a conta: o painel explica o que fazer');
+select ok(pg_temp.como(pg_temp.fx('u_gestor_x'), $q$select public.gerar_convite_motorista('Motorista A', '52998224725')$q$)
+  ->> 'codigo' is not null, 'para quem excluiu a conta, o painel já gera um código novo');
 select is(pg_temp.como(pg_temp.fx('u_a2'), format('select public.pedir_entrada(%L)',
   (select codigo_entrada from public.empresas where id = pg_temp.fx('empresa_x')))) ->> 'ok', 'true',
   'a conta nova pede para entrar na empresa');
-select ok(pg_temp.mensagem_como(pg_temp.fx('u_gestor_x'), format('select public.decidir_entrada(%L, true)',
-  (select id from public.pedidos_entrada where perfil_id = pg_temp.fx('u_a2'))))
-  like 'Este motorista excluiu a conta antiga e o cadastro antigo dele ainda está na empresa (fica até __/__%',
-  'aprovar com o cadastro antigo ainda lá: o painel explica o que fazer');
+select is(pg_temp.como(pg_temp.fx('u_gestor_x'), format('select public.decidir_entrada(%L, true)',
+  (select id from public.pedidos_entrada where perfil_id = pg_temp.fx('u_a2')))) ->> 'status', 'aprovado',
+  'a conta nova entra na hora, sem apagar o cadastro antigo');
+select is((select count(*)::int from public.motoristas where empresa_id = pg_temp.fx('empresa_x') and cpf = '52998224725'), 2,
+  'ela ganha cadastro novo; o antigo fica separado com os lançamentos');
 select is(pg_temp.erro_como(pg_temp.fx('u_gestor_x'), format(
   'update public.motoristas set ativo = true where id = %L', pg_temp.fx('mot_a'))), '23514',
   'cadastro sem login não é religado');
 select is(pg_temp.mensagem_como(pg_temp.fx('u_gestor_x'), format('select public.perfil_para_redefinir(%L)', pg_temp.fx('mot_a'))),
-  'Este motorista excluiu a conta. Não tem acesso para redefinir; se ele voltar, cria uma conta nova.',
+  'Este motorista não tem mais login na empresa (saiu ou excluiu a conta). Se ele voltar, gere um código novo para ele.',
   'nem tem acesso para redefinir');
 
 update public.motoristas set exclusao_pedida_em = now() - interval '16 days' where id = pg_temp.fx('mot_a');
@@ -234,11 +238,8 @@ select public.limpeza_diaria();
 select is((select count(*)::int from public.motoristas where id = pg_temp.fx('mot_a'))
   + (select count(*)::int from public.fretes where id = pg_temp.fx('frete_a')), 0,
   'depois de 15 dias, os lançamentos dele são apagados sozinhos');
-select is((select count(*)::int from public.perfis where id = pg_temp.fx('u_a2')), 1,
-  'e a conta nova continua');
-select is(pg_temp.como(pg_temp.fx('u_gestor_x'), format('select public.decidir_entrada(%L, true)',
-  (select id from public.pedidos_entrada where perfil_id = pg_temp.fx('u_a2')))) ->> 'status', 'aprovado',
-  'sem o cadastro antigo, a conta nova entra na empresa');
+select is((select count(*)::int from public.motoristas where perfil_id = pg_temp.fx('u_a2') and ativo), 1,
+  'e o cadastro novo continua');
 select is((select count(*)::int from public.registro_exclusoes
   where empresa_id = pg_temp.fx('empresa_x') and tipo = 'motorista' and pedido_por = 'limpeza_diaria'), 1,
   'a limpeza deixa o registro de cada exclusão');

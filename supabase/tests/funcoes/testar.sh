@@ -218,7 +218,7 @@ igual "$(curl -s "$A/rest/v1/motoristas?select=perfil_id,exclusao_pedida_em&id=e
 R=$(funcao cadastrar_motorista "" '{"nome":"Motorista Volta Dois","cpf":"52998224725","senha":"senha6544","aparelho":"conv-3"}')
 igual "${R%% *}" "200" "o CPF dele fica livre na hora para uma conta nova"
 R=$(funcao redefinir_acesso "$TD" "{\"motorista_id\":\"$MOT\"}")
-igual "${R%% *} $(echo "${R#* }" | jq -r .mensagem)" "403 Este motorista excluiu a conta. Não tem acesso para redefinir; se ele voltar, cria uma conta nova." "o cadastro antigo não tem acesso para redefinir"
+igual "${R%% *} $(echo "${R#* }" | jq -r .mensagem)" "403 Este motorista não tem mais login na empresa (saiu ou excluiu a conta). Se ele voltar, gere um código novo para ele." "o cadastro antigo não tem acesso para redefinir"
 psql "$DB" -tA -c "select public.bloquear_empresa(e.id, 'Teste encerrado.', 30) from public.empresas e where e.nome = 'Transportes W'" >/dev/null
 igual "$(rpc "$TW" situacao_acesso '{}' | jq -r .empresa.bloqueada)" "true" "a plataforma encerra o acesso de uma empresa"
 igual "$(curl -s "$A/rest/v1/caminhoes?select=id" -H "apikey: $K" -H "Authorization: Bearer $TW" | jq -r length)" "0" "e ela não vê mais nada"
