@@ -128,6 +128,14 @@ Todo lançamento de frete, abastecimento e gasto guarda `motorista_id` e `caminh
 - `viagens` (Baú, Sider): motorista_id, caminhao_id (o cavalo), modalidade, placa_carreta, engate_local, engate_em, desengate_local, desengate_em (vazio = em andamento), entregas_quantidade, entregas_cidades, observacao, extras. Uma viagem por carreta; sem dinheiro do frete.
 - `acertos`: motorista_id, período (dias de Brasília), comissao_centavos e descontos lançados pelo gestor; vales, diesel e gastos somados pelo servidor no fechamento; para_receber = comissão − descontos − vales (se a regra manda) − diesel e gastos (se a regra manda). O motorista vê o acerto fechado.
 
+### Registro de paradas (pedido do dono em 22/10/2026)
+
+- Opcional por empresa: `empresas.paradas_ativas` (desligado por padrão) e `empresas.limite_sem_descanso_minutos` (padrão do banco 330 = 5h30; o dono muda entre 0h30 e 24h). Só o dono altera.
+- `motivos_parada` (catálogo): codigo, nome, conta_como_descanso, ordem, ativo. Começa com café ou pausa curta, refeição, descanso, pernoite, manutenção mecânica, abastecimento, carga, descarga, fiscalização e outro. Só refeição, descanso e pernoite contam como descanso, e isso fica no catálogo, não no código.
+- `paradas`: motorista_id, caminhao_id, motivo, descricao (para "outro"), inicio_em, fim_em (vazio = parado agora), ajustado (o motorista informou o horário depois), criado_no_aparelho_em. Vai pela fila do celular como os outros lançamentos.
+- Intervalo sem descanso: do fim de um descanso até o começo do próximo (e, no período que chega até hoje, desde o último descanso até agora). Acima do limite da empresa fica em destaque. Intervalo de mais de um dia sem descanso registrado (folga ou registro esquecido) não entra na conta: aparece como aviso.
+- É registro interno do motorista; o relatório leva no rodapé "Registro interno feito pelo motorista; não substitui o tacógrafo."
+
 O valor efetivo de um registro é o original mais o último ajuste. Criar views (por exemplo `fretes_efetivos`) que aplicam os ajustes, e marcar na tela quando o valor foi ajustado.
 
 ### Funções e Edge Functions
@@ -174,6 +182,7 @@ Letras grandes, poucos toques, linguagem simples, pensado para quem tem pouca es
 - Resumo e relatório em PDF para compartilhar.
 - Configurações: trocar de caminhão, sincronizar, sobre.
 - Ao lançar, o app mostra o caminhão atual no topo, com botão para trocar (seção 16).
+- Paradas (só se a empresa liga): aba Paradas com "Registrar parada" (motivo; "Parei antes e esqueci de registrar" pede a hora) e "Retomar viagem" (ou "Esqueci de retomar", que pede a hora e marca a parada como ajustada). Parado agora, o cartão aparece também no Resumo. Funciona sem internet.
 - Modalidades: se a empresa tem mais de uma e o motorista não tem, o app pergunta uma vez. No Baú e no Sider a aba Fretes vira Viagens (engatar e desengatar carreta, entregas), o cavalo é fixo (só o gestor troca) e os acertos fechados aparecem no Resumo. Os campos seguem o que o dono ajustou.
 
 ### App e painel do gestor
@@ -190,6 +199,7 @@ Mesmo código, layout se adapta:
 - Configurações: categorias de gasto, gestores, dados da empresa, modalidades de operação (o dono liga e ajusta os campos).
 - Motorista do Baú ou do Sider: abas Viagens e Acertos (fazer o acerto: período, comissão em reais, descontos, PDF).
 - Plataforma: modalidades e campos novos.
+- Paradas (só se a empresa liga): seção Paradas no menu do computador (no celular, pelo cartão do Painel) com cada motorista no período e o maior intervalo sem descanso; aba Paradas na tela do motorista; PDF e planilha por motorista e período. Configurações > Registro de paradas: o dono liga e define o limite.
 - Ver como o motorista vê: o resumo e o relatório iguais ao do app dele.
 
 No computador: menu lateral e tabelas. No celular: navegação inferior e cartões. A lógica é a mesma.

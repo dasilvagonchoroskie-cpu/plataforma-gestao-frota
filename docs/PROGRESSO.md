@@ -1,6 +1,6 @@
 # Progresso — Plataforma de Gestão de Frota
 
-Atualizado em 17/10/2026 pelo Claude Code. "Testado" quer dizer que o comando
+Atualizado em 23/10/2026 pelo Claude Code. "Testado" quer dizer que o comando
 abaixo rodou e passou; o resto está marcado como não testado.
 
 ## Resumo
@@ -189,7 +189,37 @@ viagem (uma por carreta), acerto com comissão e descontos lançados pelo gestor
   com modalidade, troca de modalidade, abas Viagens e Acertos, fazer e corrigir acerto, lançamentos e planilha de
   viagens, painel com viagens, Plataforma > Modalidades e campos. `flutter analyze` sem problemas;
   `flutter test --exclude-tags capturas` → 45 testes.
-- **em andamento** — Esteira (testes no Supabase local, emulador e APKs oficiais) e aplicação na nuvem.
+- **feito e testado** — Esteira do commit 135bede: todos os trabalhos passaram (núcleo, banco, motorista e
+  gestor com APKs oficiais). Banco da nuvem atualizado pela esteira ("Banco - backup diário e atualização na
+  nuvem": `resultado: success`, migration `20261022190000 modalidades` no Supabase). Conferido na nuvem: 5
+  modalidades no catálogo, a empresa com Graneleiro ligado, o motorista em Graneleiro, nenhum frete fora do
+  Graneleiro. APKs 0.5.0 com a assinatura oficial (certificado 9c6ec010…22d2) entregues ao Evandro.
+
+## Registro de paradas — 23/10/2026 (segunda entrega da esteira)
+
+Pedido do Evandro: opcional por empresa (desligado, ninguém vê), motivos, "Registrar parada" e "Retomar
+viagem", horário informado depois fica marcado, sem internet, aba no painel por motorista e período com o maior
+intervalo sem descanso e destaque acima do limite da empresa (padrão 5h30), só refeição, descanso e pernoite
+contam como descanso, relatório com o aviso do tacógrafo, nenhum número da lei no código.
+
+- **feito e testado** — Banco (migration `paradas`): `empresas.paradas_ativas` e
+  `limite_sem_descanso_minutos` (só o dono muda), catálogo `motivos_parada`, tabela `paradas` com RLS,
+  auditoria e sincronização; motivos e limite na situação da conta. Comando: `PGHOST=/tmp PGPORT=54329
+  PGUSER=postgres PGTAP_SQL=… supabase/tests/local/rodar.sh` → `total de verificações que passaram: 393`
+  (teste 10: 24). Teste de ponta a ponta (`supabase/tests/funcoes/testar.sh`) ganhou 4 conferências de paradas
+  (roda na esteira, com o Supabase local completo).
+- **feito e testado** — Núcleo: parada, motivos, configuração, intervalo sem descanso, PDF e planilha com o
+  aviso. `dart analyze` sem problemas; `dart test` → 63 testes.
+- **feito e testado** — Frota Motorista 0.6.0: aba Paradas só com a empresa ligada, registrar (com "parei
+  antes e esqueci"), retomar (com "esqueci de retomar"), corrigir e apagar, cartão no Resumo, sem internet.
+  `flutter analyze` sem problemas; `flutter test --exclude-tags capturas` → 48 testes.
+- **feito e testado** — Frota Gestor 0.6.0: Configurações > Registro de paradas (dono liga e define o
+  limite), seção Paradas no computador e cartão no Painel, aba Paradas na tela do motorista, PDF e planilha.
+  Corrigida também uma linha do Painel no celular que passava da tela (placa do caminhão menor no celular).
+  `flutter analyze` sem problemas; `flutter test --exclude-tags capturas` → 53 testes.
+- **esperando aprovação** — Exclusão de motorista e de empresa apagar também as paradas (junto com viagens,
+  acertos e modalidades).
+- **em andamento** — Esteira e aplicação na nuvem.
 
 ## Fase 7 — acabamento e piloto
 

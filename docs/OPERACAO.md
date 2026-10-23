@@ -90,6 +90,13 @@ botão "Modalidades e campos" (ícone de caminho). Ali dá para:
 
 O dono de cada empresa renomeia, esconde e torna obrigatório em Configurações > Modalidades de operação.
 
+## Registro de paradas
+
+O dono liga em Configurações > Registro de paradas e define o limite sem descanso (horas e minutos). Os apps
+dos motoristas mostram a aba Paradas na próxima conexão. Os motivos ficam na tabela `motivos_parada` (mudar
+nome, ordem ou o que conta como descanso só por migration). O relatório sai em Paradas > motorista > PDF ou
+Planilha, sempre com o aviso de que não substitui o tacógrafo.
+
 ## Mudar plano, limite ou suspender
 
 Só pelo SQL Editor (o dono da empresa não muda isso):

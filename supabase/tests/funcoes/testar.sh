@@ -172,6 +172,17 @@ MOTC=$(rpc "$TC" situacao_acesso '{}' | jq -r .motorista.id)
 igual "$(rpc "$TD" definir_modalidade_motorista "{\"p_motorista_id\":\"$MOTC\",\"p_modalidade\":\"bau\"}" | jq -r .modalidade)" "bau" "o dono passa o motorista para o Baú"
 igual "$(rpc "$TC" situacao_acesso '{}' | jq -r '.motorista.modalidade + ":" + (.empresa.modalidades | length | tostring)')" "bau:2" "o app do motorista recebe a modalidade e as duas ligadas"
 
+# Paradas: desligadas por padrão; o dono liga pelo painel (como o app faz) e o celular manda a parada
+EMPX=$(rpc "$TD" situacao_acesso '{}' | jq -r .empresa.id)
+igual "$(rpc "$TC" situacao_acesso '{}' | jq -r '.empresa.paradas_ativas | tostring')" "false" "registro de paradas começa desligado"
+curl -s -X PATCH "$A/rest/v1/empresas?id=eq.$EMPX" -H "apikey: $K" -H "Authorization: Bearer $TD" \
+  -H "Content-Type: application/json" -d '{"paradas_ativas":true,"limite_sem_descanso_minutos":300}' >/dev/null
+igual "$(rpc "$TC" situacao_acesso '{}' | jq -r '(.empresa.paradas_ativas | tostring) + ":" + (.empresa.limite_sem_descanso_minutos | tostring) + ":" + (.empresa.motivos_parada | length | tostring)')" "true:300:10" "o dono liga as paradas e o app recebe o limite e os motivos"
+PAR=$(cat /proc/sys/kernel/random/uuid)
+R=$(rpc "$TC" sincronizar_lote "{\"p_lote\":{\"itens\":[{\"tabela\":\"paradas\",\"dados\":{\"id\":\"$PAR\",\"motivo\":\"refeicao\",\"inicio_em\":\"2026-10-10T15:00:00Z\",\"fim_em\":\"2026-10-10T16:00:00Z\"}}]}}")
+igual "$(echo "$R" | jq -r '.aceitos | length')" "1" "o celular manda a parada pela fila"
+igual "$(curl -s "$A/rest/v1/paradas?select=motivo,ajustado&id=eq.$PAR" -H "apikey: $K" -H "Authorization: Bearer $TD" | jq -r '.[0].motivo + ":" + (.[0].ajustado | tostring)')" "refeicao:false" "o painel lê a parada do motorista"
+
 # Recuperar o acesso com o código de recuperação
 REC=$(rpc "$TC" gerar_codigo_recuperacao '{}' | jq -r .)
 [ ${#REC} -eq 14 ] && ok "o motorista gera o código de recuperação" || falha "gerar_codigo_recuperacao" "$REC"

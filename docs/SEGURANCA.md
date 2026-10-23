@@ -51,6 +51,13 @@ limitado), **Baixa** (defesa em profundidade).
   empresa bloqueada não vê nada). O app não grava direto nelas: viagens pela sincronização, o resto por
   funções que conferem dono, gestor, motorista ou super administrador (teste 09).
 
+### Paradas (23/10/2026)
+
+- A tabela `paradas` nasce com RLS (motorista vê as próprias; dono e gestor, as da empresa) e entra na
+  conferência geral do teste 07. O app do motorista só grava pela sincronização (teste 10).
+- Ligar e mudar o limite: permissão só nas duas colunas novas de `empresas`, e a política existente deixa só o
+  dono alterar. O catálogo `motivos_parada` não tem dado de empresa; todos leem, ninguém do app altera.
+
 ## Como a segurança está montada
 
 - **Isolamento:** RLS em todas as tabelas; funções de permissão negam tudo para empresa bloqueada, com

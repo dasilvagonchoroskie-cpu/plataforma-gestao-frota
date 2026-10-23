@@ -259,3 +259,25 @@ Decisões tomadas na construção (confirmar no piloto):
   data e hora, sim ou não e cidade; o tipo não muda depois; campo desativado some dos formulários e o que já
   foi anotado fica guardado. Os campos de fábrica não mudam pela Plataforma.
 
+## Registro de paradas (22/10/2026, pedido do usuário)
+
+Decisões tomadas na construção (confirmar no piloto):
+
+- **Limite:** o padrão de 5h30 fica só no banco (valor padrão da coluna). O dono escolhe entre 0h30 e 24h00
+  (faixa de segurança do banco, não é número de lei).
+- **Intervalo sem descanso:** do fim de um descanso (refeição, descanso ou pernoite, conforme o catálogo) até o
+  começo do próximo. No período que chega até hoje, conta também desde o último descanso até agora. Café,
+  abastecimento, fiscalização etc. não interrompem o intervalo.
+- **Mais de um dia sem descanso registrado** não entra na conta nem no destaque: quase sempre é folga em casa
+  ou registro esquecido. Aparece como aviso para o patrão conferir. Confirmar com o Evandro se prefere outro
+  jeito (por exemplo, um motivo "folga").
+- **Parada nova com outra aberta:** a aberta termina na hora em que a nova começa.
+- **Horário informado depois:** "Parei antes e esqueci de registrar", "Esqueci de retomar" ou mudar o horário
+  na parada marcam a parada como ajustada (o patrão vê a etiqueta). Mudar só o motivo não marca.
+- **Parada aberta há mais de um dia** ganha a etiqueta "esqueceu de retomar?".
+- **Desligar as paradas** esconde a aba; o que já foi registrado fica guardado e volta a aparecer se ligar.
+- **No celular do gestor** a seção Paradas não ocupa aba embaixo (já são cinco); abre pelo cartão "Paradas" do
+  Painel e pela aba Paradas da tela do motorista.
+- **Exclusão (esperando a aprovação do Evandro):** as paradas entram junto na extensão da exclusão de motorista
+  e de empresa. Até a aprovação, excluir um motorista que tem paradas dá erro e nada é apagado. Antes de ligar a
+  limpeza automática "valendo", essa aprovação precisa entrar.
