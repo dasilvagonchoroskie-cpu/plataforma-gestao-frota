@@ -6,6 +6,7 @@ import 'package:pdf/widgets.dart' as pw;
 import '../formato.dart';
 import '../modalidades.dart';
 import '../modelos.dart';
+import '../paradas.dart';
 import '../placa.dart';
 import '../regras/ajustes.dart';
 import '../regras/dados_relatorio.dart';
@@ -71,9 +72,11 @@ String nomeDoArquivoPdf(DadosRelatorio d) {
 }
 
 class _Pdf {
-  _Pdf(this.f, this.d);
+  _Pdf(this.f, [this.d]);
   final FontesPdf f;
-  final DadosRelatorio d;
+
+  /// Sem dados (relatório de paradas), não há conta de caminhão.
+  final DadosRelatorio? d;
 
   pw.TextStyle t(double tamanho, {PdfColor cor = _tintaEscura, bool negrito = false, bool numero = false}) =>
       pw.TextStyle(
@@ -85,7 +88,8 @@ class _Pdf {
 
   /// " | ABC1D23" quando o relatório tem mais de um caminhão.
   String placaDaLinha(String caminhaoId) {
-    if (!d.variosCaminhoes) return '';
+    final d = this.d;
+    if (d == null || !d.variosCaminhoes) return '';
     final p = d.placasPorCaminhao[caminhaoId];
     return p == null || p.isEmpty ? '' : '   ${placaTexto(p)}';
   }
@@ -741,4 +745,150 @@ List<pw.Widget> _avisoAjustes(_Pdf p, DadosRelatorio d) {
     p.nota('* Valores marcados foram corrigidos pelo gestor. As contas acima já usam o valor corrigido; o '
         'lançamento original do motorista continua guardado no histórico.', cor: _tintaLaranja, tamanho: 9),
   ];
+}
+
+// ----------------------------------------------------------------- paradas
+
+/// Relatório de paradas de um motorista no período. Leva no pé de cada
+/// página que é registro interno e não substitui o tacógrafo.
+Future<Uint8List> gerarPdfParadas(DadosParadas d, FontesPdf fontes, {DateTime? agora}) async {
+  final p = _Pdf(fontes);
+  final r = d.resumo;
+  final quando = agora ?? DateTime.now();
+  final doc = pw.Document(title: d.empresa.isEmpty ? nomeDoProduto : d.empresa, author: nomeDoProduto);
+  var marca = d.empresa.isEmpty ? 'Gestão de Frota' : d.empresa;
+  if (marca.length > 28) marca = '${marca.substring(0, 27)}…';
+
+  final conteudo = <pw.Widget>[
+    pw.Row(children: [
+      pw.Container(
+        padding: const pw.EdgeInsets.fromLTRB(10, 5, 10, 5),
+        decoration: const pw.BoxDecoration(
+          color: _verdePlaca,
+          borderRadius: pw.BorderRadius.all(pw.Radius.circular(5)),
+        ),
+        child: pw.Text(marca, style: p.t(16, cor: PdfColors.white, negrito: true, numero: true)),
+      ),
+      pw.SizedBox(width: 12),
+      pw.Expanded(child: pw.Text('Relatório de paradas', style: p.t(12.5, cor: _tintaCinza))),
+    ]),
+    pw.SizedBox(height: 10),
+    pw.Container(
+      width: double.infinity,
+      color: _fundoCaixa,
+      padding: const pw.EdgeInsets.fromLTRB(12, 8, 12, 10),
+      child: pw.Row(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
+        pw.Expanded(flex: 5, child: _campoCaixa(p, 'Período', '${dataTexto(d.periodo.inicio)}  a  ${dataTexto(d.periodo.fim)}')),
+        if (d.motorista.isNotEmpty) pw.Expanded(flex: 5, child: _campoCaixa(p, 'Motorista', d.motorista)),
+      ]),
+    ),
+    pw.SizedBox(height: 4),
+    p.nota('Gerado em ${dataHoraTexto(quando)}', tamanho: 9),
+    p.titulo('Resumo do período'),
+    p.valor('Paradas registradas', '${r.paradas.length}'),
+    p.valor('Tempo parado', duracaoTexto(r.tempoParado)),
+    p.valor('Tempo de descanso (refeição, descanso e pernoite)', duracaoTexto(r.tempoDescanso)),
+    if (r.limiteMinutos != null) p.valor('Limite sem descanso da empresa', limiteTexto(r.limiteMinutos!)),
+  ];
+
+  final maior = r.maior;
+  if (maior == null) {
+    conteudo.add(p.nota(
+      r.temDescanso
+          ? 'Não há intervalo sem descanso para medir neste período.'
+          : 'Nenhum descanso registrado neste período; não dá para medir o intervalo sem descanso.',
+      tamanho: 10.5,
+    ));
+  } else {
+    final acima = maior.acimaDoLimite;
+    conteudo.add(p.bloco(
+      acima ? 'MAIOR INTERVALO SEM DESCANSO (ACIMA DO LIMITE)' : 'MAIOR INTERVALO SEM DESCANSO',
+      duracaoTexto(maior.duracao),
+      textoDoIntervalo(maior),
+      cor: acima ? _tintaVermelha : _tintaVerde,
+      fundo: acima ? _fundoVermelho : _fundoVerde,
+    ));
+  }
+
+  final acima = r.acimaDoLimite;
+  if (acima.isNotEmpty) {
+    conteudo.add(p.titulo('Acima do limite (${acima.length})'));
+    for (final i in acima) {
+      conteudo.add(p.item(textoDoIntervalo(i), duracaoTexto(i.duracao)));
+    }
+  }
+
+  conteudo.add(p.titulo('Paradas (${r.paradas.length})'));
+  if (r.paradas.isEmpty) {
+    conteudo.add(p.nota('Nenhuma parada registrada neste período.', tamanho: 10.5));
+  } else {
+    pw.Widget cel(String texto, {bool negrito = false, PdfColor cor = _tintaEscura, bool direita = false}) => pw.Padding(
+          padding: const pw.EdgeInsets.fromLTRB(4, 3, 4, 3),
+          child: pw.Text(texto,
+              style: p.t(9.5, negrito: negrito, cor: cor, numero: !negrito),
+              textAlign: direita ? pw.TextAlign.right : pw.TextAlign.left),
+        );
+    final descanso = {for (final m in d.motivos) if (m.contaComoDescanso) m.codigo};
+    final variosCaminhoes = {for (final x in r.paradas) x.caminhaoId}.length > 1;
+    conteudo.add(pw.Table(
+      columnWidths: const {
+        0: pw.FlexColumnWidth(1.6),
+        1: pw.FlexColumnWidth(3.4),
+        2: pw.FlexColumnWidth(1.2),
+        3: pw.FlexColumnWidth(1.6),
+        4: pw.FlexColumnWidth(1.3),
+      },
+      border: const pw.TableBorder(horizontalInside: pw.BorderSide(color: _fundoCaixa, width: 0.8)),
+      children: [
+        pw.TableRow(
+          decoration: const pw.BoxDecoration(color: _fundoCaixa),
+          children: [
+            cel('Dia', negrito: true),
+            cel('Motivo', negrito: true),
+            cel('Início', negrito: true),
+            cel('Fim', negrito: true),
+            cel('Duração', negrito: true, direita: true),
+          ],
+        ),
+        for (final x in r.paradas)
+          pw.TableRow(children: [
+            cel('${dataTexto(x.inicioEm)} ${diaSemana(x.inicioEm)}'),
+            cel([
+              nomeDoMotivo(x.motivo, d.motivos),
+              if (x.descricao != null && x.descricao!.isNotEmpty) x.descricao!,
+              if (descanso.contains(x.motivo)) '(descanso)',
+              if (x.ajustado) '(horário informado depois)',
+              if (variosCaminhoes && d.placaDe(x.caminhaoId).isNotEmpty) d.placaDe(x.caminhaoId),
+            ].join('  ')),
+            cel(horaTexto(x.inicioEm)),
+            cel(x.fimEm == null
+                ? 'em andamento'
+                : (dataTexto(x.fimEm!) == dataTexto(x.inicioEm)
+                    ? horaTexto(x.fimEm!)
+                    : '${diaMes(x.fimEm!)} ${horaTexto(x.fimEm!)}')),
+            cel(duracaoTexto(x.duracao(quando)), direita: true),
+          ]),
+      ],
+    ));
+  }
+
+  final rodape = d.empresa.isEmpty ? nomeDoProduto : '${d.empresa}  |  $nomeDoProduto';
+  doc.addPage(
+    pw.MultiPage(
+      pageFormat: PdfPageFormat.a4,
+      margin: const pw.EdgeInsets.fromLTRB(40, 36, 40, 36),
+      theme: pw.ThemeData.withFont(base: fontes.normal, bold: fontes.negrito),
+      footer: (ctx) => pw.Container(
+        margin: const pw.EdgeInsets.only(top: 10),
+        child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.stretch, children: [
+          pw.Text(avisoParadas, style: p.t(9, cor: _tintaLaranja, negrito: true)),
+          pw.SizedBox(height: 2),
+          pw.Text('$rodape  |  página ${ctx.pageNumber} de ${ctx.pagesCount}',
+              style: p.t(8.5, cor: _tintaCinza), textAlign: pw.TextAlign.right),
+        ]),
+      ),
+      build: (ctx) => conteudo,
+    ),
+  );
+  return doc.save();
 }

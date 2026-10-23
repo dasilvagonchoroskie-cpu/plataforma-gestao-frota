@@ -8,6 +8,7 @@ export 'src/email.dart';
 export 'src/formato.dart';
 export 'src/modalidades.dart';
 export 'src/modelos.dart';
+export 'src/paradas.dart';
 export 'src/placa.dart';
 export 'src/regras/ajustes.dart';
 export 'src/regras/dados_relatorio.dart';

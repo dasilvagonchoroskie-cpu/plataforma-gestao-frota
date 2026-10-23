@@ -1,6 +1,7 @@
 import '../formato.dart';
 import '../modalidades.dart';
 import '../modelos.dart';
+import '../paradas.dart';
 import '../placa.dart';
 import '../regras/ajustes.dart';
 import '../regras/media_diesel.dart';
@@ -110,5 +111,29 @@ String csvViagens(List<Viagem> lista,
         v.desengateLocal, v.entregasQuantidade, v.entregasCidades.join(', '), v.observacao ?? '',
         for (final k in extras) textoDoExtra(modalidade!.campo(k), v.extras[k]),
       ],
+  ]);
+}
+
+/// Paradas do período, uma por linha, com o tempo sem descanso que veio antes
+/// de cada descanso. A última linha é o aviso de que não substitui o tacógrafo.
+String csvParadas(DadosParadas d, {Map<String, String> motoristas = const {}, DateTime? agora}) {
+  final quando = agora ?? DateTime.now();
+  final descanso = {for (final m in d.motivos) if (m.contaComoDescanso) m.codigo};
+  final antes = {for (final i in d.resumo.intervalos) if (!i.ateAgora) i.fim: i};
+  return gerarCsv([
+    'Motorista', 'Caminhão', 'Motivo', 'Descrição', 'Início', 'Fim', 'Duração', 'Duração (min)', 'Conta como descanso',
+    'Sem descanso antes', 'Acima do limite', 'Horário informado depois',
+  ], [
+    for (final p in d.resumo.paradas)
+      [
+        motoristas[p.motoristaId] ?? d.motorista, d.placaDe(p.caminhaoId), nomeDoMotivo(p.motivo, d.motivos),
+        p.descricao ?? '', dataHoraTexto(p.inicioEm), p.fimEm == null ? 'em andamento' : dataHoraTexto(p.fimEm!),
+        duracaoTexto(p.duracao(quando)), p.duracao(quando).inMinutes, descanso.contains(p.motivo) ? 'sim' : 'não',
+        antes[p.inicioEm] == null ? '' : duracaoTexto(antes[p.inicioEm]!.duracao),
+        antes[p.inicioEm] == null ? '' : (antes[p.inicioEm]!.acimaDoLimite ? 'sim' : 'não'),
+        p.ajustado ? 'sim' : 'não',
+      ],
+    <Object?>[],
+    <Object?>[avisoParadas],
   ]);
 }
