@@ -166,12 +166,12 @@ void main() {
     expect(find.text('Vales'), findsWidgets);
   });
 
-  testWidgets('ligado: registrar parada, ver no Resumo e retomar a viagem', (tester) async {
+  testWidgets('ligado: registrar parada, ver no Início e retomar a viagem', (tester) async {
     final s = servidorComCadastros()..paradasAtivas = true;
     final a = await celularDe(s);
     await abrirApp(tester, a, s);
-    await tester.tap(find.widgetWithText(NavigationDestination, 'Paradas'));
-    await tester.pumpAndSettle();
+    expect(find.text('Registrar parada e retomar viagem'), findsOneWidget, reason: 'o botão Paradas no Início');
+    await tocar(tester, find.text('Paradas'));
     expect(find.text('Nenhuma parada registrada'), findsOneWidget);
     expect(find.text('Rodando'), findsOneWidget);
 
@@ -184,16 +184,16 @@ void main() {
     expect(find.text('Retomar viagem'), findsWidgets);
     expect(find.text('Não enviado'), findsOneWidget, reason: 'sem internet fica no celular');
 
-    // No Resumo também dá para retomar.
-    await tester.tap(find.widgetWithText(NavigationDestination, 'Resumo'));
+    // No Início também dá para retomar.
+    tester.state<NavigatorState>(find.byType(Navigator).first).pop();
     await tester.pumpAndSettle();
     expect(find.text('Parado: Refeição'), findsOneWidget);
+    expect(find.text('parado'), findsOneWidget, reason: 'o botão Paradas mostra que está parado');
     await tocar(tester, find.widgetWithText(FilledButton, 'Retomar viagem'));
     expect(find.textContaining('Boa viagem! A parada durou'), findsOneWidget);
     expect(find.text('Parado: Refeição'), findsNothing);
 
-    await tester.tap(find.widgetWithText(NavigationDestination, 'Paradas'));
-    await tester.pumpAndSettle();
+    await tocar(tester, find.text('Paradas'));
     expect(find.text('Hoje'), findsOneWidget);
     expect(find.text('Refeição'), findsOneWidget);
     expect(find.text('Descanso'), findsOneWidget, reason: 'refeição conta como descanso');
@@ -204,8 +204,7 @@ void main() {
     final s = servidorComCadastros()..paradasAtivas = true;
     final a = await celularDe(s);
     await abrirApp(tester, a, s);
-    await tester.tap(find.widgetWithText(NavigationDestination, 'Paradas'));
-    await tester.pumpAndSettle();
+    await tocar(tester, find.text('Paradas'));
     await tocar(tester, find.text('Registrar parada'));
     await tocar(tester, find.text('Outro'));
     expect(find.text('Qual foi o motivo?'), findsOneWidget);

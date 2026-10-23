@@ -7,24 +7,27 @@ import 'package:visual/visual.dart';
 import 'acesso/acesso.dart';
 import 'componentes/comuns.dart';
 import 'dados/dados.dart';
+import 'dados/aparencia.dart';
 import 'telas/acesso/telas_acesso.dart';
 import 'telas/caminhao/tela_caminhao.dart';
 import 'telas/casca.dart';
 import 'telas/inicio/tela_escolher_modalidade.dart';
 
-class AplicativoMotorista extends StatelessWidget {
+class AplicativoMotorista extends ConsumerWidget {
   const AplicativoMotorista({super.key, this.inicio});
 
   /// Tela inicial forçada (testes).
   final Widget? inicio;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return MaterialApp(
       title: 'Frota Motorista',
       debugShowCheckedModeBanner: false,
       theme: temaClaro,
       darkTheme: temaEscuro,
+      // Escuro como o cartaz; claro ou igual ao aparelho em Configurações.
+      themeMode: ref.watch(aparenciaProvider).modo,
       locale: const Locale('pt', 'BR'),
       supportedLocales: const [Locale('pt', 'BR')],
       localizationsDelegates: const [

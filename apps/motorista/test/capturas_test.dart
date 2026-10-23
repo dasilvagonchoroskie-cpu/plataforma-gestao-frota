@@ -13,7 +13,11 @@ import 'package:motorista/telas/acesso/telas_acesso.dart';
 import 'package:motorista/telas/caminhao/tela_caminhao.dart';
 import 'package:motorista/telas/casca.dart';
 import 'package:motorista/telas/fretes/detalhe_frete.dart';
+import 'package:motorista/telas/diesel/tela_diesel.dart';
 import 'package:motorista/telas/fretes/form_frete.dart';
+import 'package:motorista/telas/fretes/tela_fretes.dart';
+import 'package:motorista/telas/gastos/tela_gastos.dart';
+import 'package:motorista/telas/paradas/tela_paradas.dart';
 import 'package:nucleo/nucleo.dart';
 import 'package:visual/visual.dart';
 
@@ -30,6 +34,7 @@ void main() {
     String nome,
     Widget tela, {
     bool escuro = false,
+    bool claro = false,
     Future<void> Function(ArmazenamentoMemoria a)? preparar,
     DateTime? agora,
   }) async {
@@ -39,6 +44,8 @@ void main() {
     final a = await celularComAmostra();
     final s = servidorComCadastros()..online = false;
     if (preparar != null) await preparar(a);
+    // O app abre escuro (como o cartaz); o claro é escolhido em Configurações.
+    if (claro) await a.gravarEstado('tema', 'claro');
     debugDisableShadows = false;
     try {
       await tester.pumpWidget(ProviderScope(
@@ -60,12 +67,15 @@ void main() {
     }
   }
 
-  testWidgets('01 resumo', (t) => capturar(t, '01_resumo', const Casca()));
-  testWidgets('02 fretes', (t) => capturar(t, '02_fretes', const Casca(abaInicial: 1)));
+  testWidgets('01 inicio', (t) => capturar(t, '01_inicio', const Casca()));
+  testWidgets('01b lancamentos', (t) => capturar(t, '01b_lancamentos', const Casca(abaInicial: 1)));
+  testWidgets('01c resumo', (t) => capturar(t, '01c_resumo', const Casca(abaInicial: 2)));
+  testWidgets('01d claro', (t) => capturar(t, '01d_inicio_claro', const Casca(), claro: true));
+  testWidgets('02 fretes', (t) => capturar(t, '02_fretes', const TelaFretes()));
   testWidgets('03 detalhe', (t) => capturar(t, '03_frete_detalhe', const DetalheFrete(idFrete: 'f1')));
   testWidgets('04 formulario', (t) => capturar(t, '04_frete_novo', const FormFrete()));
-  testWidgets('05 diesel', (t) => capturar(t, '05_diesel', const Casca(abaInicial: 2)));
-  testWidgets('06 gastos', (t) => capturar(t, '06_gastos', const Casca(abaInicial: 3)));
+  testWidgets('05 diesel', (t) => capturar(t, '05_diesel', const TelaDiesel()));
+  testWidgets('06 gastos', (t) => capturar(t, '06_gastos', const TelaGastos()));
   testWidgets('07 trocar caminhao', (t) => capturar(t, '07_trocar_caminhao', const TelaTrocarCaminhao()));
   testWidgets('08 boas vindas', (t) => capturar(t, '08_boas_vindas', const TelaBoasVindas()));
   testWidgets('09 entrar', (t) => capturar(t, '09_entrar', const TelaEntrar()));
@@ -73,7 +83,7 @@ void main() {
   testWidgets('11 frete ajustado', (t) => capturar(t, '11_frete_ajustado', const DetalheFrete(idFrete: 'f2')));
   testWidgets(
     '12 paradas',
-    (t) => capturar(t, '12_paradas', const Casca(abaInicial: 5), preparar: comParadas, agora: hojeAs(14, 10)),
+    (t) => capturar(t, '12_paradas', const TelaParadas(), preparar: comParadas, agora: hojeAs(14, 10)),
   );
 }
 

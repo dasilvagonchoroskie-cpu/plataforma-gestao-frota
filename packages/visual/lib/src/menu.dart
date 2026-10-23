@@ -33,6 +33,28 @@ class IconeCategoria extends StatelessWidget {
   }
 }
 
+/// A marca do app no topo (o quadrado verde com o caminhão, como no cartaz).
+class MarcaApp extends StatelessWidget {
+  const MarcaApp({super.key, this.icone = Icons.local_shipping, this.tamanho = 42});
+
+  final IconData icone;
+  final double tamanho;
+
+  @override
+  Widget build(BuildContext context) {
+    final escuro = Theme.of(context).brightness == Brightness.dark;
+    return Container(
+      width: tamanho,
+      height: tamanho,
+      decoration: BoxDecoration(
+        color: escuro ? Paleta.verdeLimao : Paleta.verdePlaca,
+        borderRadius: BorderRadius.circular(tamanho * 0.26),
+      ),
+      child: Icon(icone, size: tamanho * 0.6, color: escuro ? Paleta.marinho : Colors.white),
+    );
+  }
+}
+
 /// Botão grande do Início do motorista: ícone colorido, nome, uma linha do
 /// que tem ali e a seta.
 class ItemMenu extends StatelessWidget {

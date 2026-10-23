@@ -103,7 +103,7 @@ void main() {
     await abrirApp(tester, await celularDe(s, comAmostra: true), s);
     expect(find.text('Como você trabalha?'), findsNothing);
     expect(find.text('Fretes'), findsOneWidget);
-    expect(find.text('Você tem para receber'), findsOneWidget);
+    expect(find.text('O que você quer ver?'), findsOneWidget);
   });
 
   testWidgets('Baú: engata e desengata a carreta, e o cavalo é fixo', (tester) async {
@@ -114,7 +114,7 @@ void main() {
     expect(find.text('Trocar'), findsNothing, reason: 'no Baú só o patrão troca o cavalo');
     expect(find.text('Fretes'), findsNothing);
 
-    await tester.tap(find.widgetWithText(NavigationDestination, 'Viagens'));
+    await tester.tap(find.text('Viagens'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Engatar carreta'));
     await tester.pumpAndSettle();
@@ -193,6 +193,10 @@ void main() {
       ).paraMapa(),
     ]);
     await abrirApp(tester, a, s);
+    expect(find.text('Acertos'), findsOneWidget, reason: 'no Início, o botão dos acertos');
+    expect(find.text('Último: R\$ 1.200,00 (${DateTime(hoje.year, hoje.month, 1).day.toString().padLeft(2, '0')}/${hoje.month.toString().padLeft(2, '0')}/${hoje.year} a 15/${hoje.month.toString().padLeft(2, '0')}/${hoje.year})'), findsOneWidget);
+    await tester.tap(find.widgetWithText(NavigationDestination, 'Resumo'));
+    await tester.pumpAndSettle();
     expect(find.text('Entregas'), findsOneWidget);
     expect(find.text('Acertos fechados'), findsOneWidget);
     await tocar(tester, find.text('R\$ 1.200,00'));

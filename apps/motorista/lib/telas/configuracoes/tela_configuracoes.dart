@@ -6,6 +6,7 @@ import 'package:visual/visual.dart';
 import '../../acesso/acesso.dart';
 import '../../componentes/comuns.dart';
 import '../../config.dart';
+import '../../dados/aparencia.dart';
 import '../../dados/sincronizador.dart';
 import '../../dados/dados.dart';
 import '../acertos/tela_acertos.dart';
@@ -63,6 +64,15 @@ class TelaConfiguracoes extends ConsumerWidget {
               style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w600),
             ),
             subtitle: Text(d.info.empresaNome.isEmpty ? 'Empresa' : d.info.empresaNome),
+          ),
+          const Divider(),
+          const Padding(
+            padding: EdgeInsets.fromLTRB(20, 10, 20, 0),
+            child: Text('Aparência', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
+          ),
+          EscolhaTema(
+            valor: ref.watch(aparenciaProvider),
+            aoMudar: ref.read(aparenciaProvider.notifier).escolher,
           ),
           const Divider(),
           if (d.porViagem && c != null)

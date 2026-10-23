@@ -40,9 +40,11 @@ Future<ArmazenamentoMemoria> abrir(WidgetTester tester, {ArmazenamentoMemoria? a
 }
 
 void main() {
-  testWidgets('celular já aprovado abre direto no resumo, mesmo sem internet', (tester) async {
+  testWidgets('celular já aprovado abre direto no Início, mesmo sem internet', (tester) async {
     await abrir(tester);
-    expect(find.text('Você tem para receber'), findsOneWidget);
+    expect(find.text('O que você quer ver?'), findsOneWidget);
+    expect(find.text('Fretes'), findsOneWidget);
+    expect(find.textContaining('Para receber em'), findsOneWidget);
     expect(find.text('Lançando neste caminhão'), findsOneWidget);
     expect(find.textContaining('aguardando internet'), findsOneWidget);
   });
@@ -197,14 +199,14 @@ void main() {
     final s = servidorComCadastros()..emailConfirmadoNaNuvem = null;
     await abrir(tester, s: s);
     expect(find.text('Cadastre o seu e-mail'), findsOneWidget);
-    expect(find.text('Você tem para receber'), findsNothing);
+    expect(find.text('O que você quer ver?'), findsNothing);
     s.online = true;
     await tester.enterText(find.byType(TextField), 'Joao@Gmail.com');
     await tester.tap(find.text('Mandar o link de confirmação'));
     await tester.pumpAndSettle();
     expect(s.emailsCadastrados, ['joao@gmail.com']);
-    expect(find.text('Você tem para receber'), findsOneWidget);
-    expect(find.text('Confirme o seu e-mail'), findsOneWidget, reason: 'o Resumo lembra de confirmar');
+    expect(find.text('O que você quer ver?'), findsOneWidget);
+    expect(find.text('Confirme o seu e-mail'), findsOneWidget, reason: 'o Início lembra de confirmar');
   });
 
   testWidgets('sem internet: o e-mail fica para depois', (tester) async {
@@ -215,7 +217,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('Fazer depois (sem internet agora)'));
     await tester.pumpAndSettle();
-    expect(find.text('Você tem para receber'), findsOneWidget);
+    expect(find.text('O que você quer ver?'), findsOneWidget);
   });
 
   testWidgets('aviso no Resumo até confirmar: mandar o link de novo', (tester) async {
@@ -356,7 +358,7 @@ void main() {
     await abrir(tester, a: armazenamento, s: s);
     expect(find.text('Acesso encerrado'), findsOneWidget);
     expect(find.text('Motivo: O período de teste terminou.'), findsOneWidget);
-    expect(find.text('Você tem para receber'), findsNothing);
+    expect(find.text('O que você quer ver?'), findsNothing);
   });
 
   testWidgets('excluir a minha conta pede para digitar EXCLUIR', (tester) async {

@@ -4,21 +4,16 @@ import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../componentes/comuns.dart';
 import '../dados/sincronizador.dart';
 
-import 'diesel/tela_diesel.dart';
-import 'fretes/tela_fretes.dart';
-import 'gastos/tela_gastos.dart';
+import 'inicio/tela_inicio.dart';
 import 'inicio/tela_resumo.dart';
-import 'paradas/tela_paradas.dart';
-import 'vales/tela_vales.dart';
-import 'viagens/tela_viagens.dart';
+import 'lancamentos/tela_lancamentos.dart';
 
 /// Desligado nos testes de tela (sem internet nem sensor de rede).
 final sincronizarSozinhoProvider = Provider<bool>((ref) => true);
 
-/// As abas de baixo (cinco; seis quando a empresa usa o registro de paradas). Também cuida de mandar a fila para a nuvem: ao
+/// As três abas de baixo (Início, Lançamentos e Resumo). Também cuida de mandar a fila para a nuvem: ao
 /// abrir, quando a internet volta, de tempos em tempos e ao voltar para o app.
 class Casca extends ConsumerStatefulWidget {
   const Casca({super.key, this.abaInicial = 0});
@@ -63,20 +58,14 @@ class _CascaState extends ConsumerState<Casca> with WidgetsBindingObserver {
 
   @override
   Widget build(BuildContext context) {
-    // Baú e Sider: a segunda aba é Viagens (por carreta) no lugar de Fretes.
-    final dados = assistirDados(ref);
-    final porViagem = dados.porViagem;
-    // Paradas: só quando a empresa liga (quem não usa nem vê a aba).
-    final comParadas = dados.paradasAtivas;
+    // Como no cartaz: Início (botões grandes), Lançamentos (tudo numa lista)
+    // e Resumo. Fretes ou viagens, diesel, gastos, vales e paradas abrem pelo
+    // Início.
     final telas = [
+      TelaInicio(irParaResumo: () => setState(() => _aba = 2)),
+      const TelaLancamentos(),
       const TelaResumo(),
-      if (porViagem) const TelaViagens() else const TelaFretes(),
-      const TelaDiesel(),
-      const TelaGastos(),
-      const TelaVales(),
-      if (comParadas) const TelaParadas(),
     ];
-    // A empresa desligou as paradas com a aba aberta: volta para o Resumo.
     final aba = _aba < telas.length ? _aba : 0;
     return PopScope(
       canPop: aba == 0,
@@ -88,45 +77,18 @@ class _CascaState extends ConsumerState<Casca> with WidgetsBindingObserver {
         bottomNavigationBar: NavigationBar(
           selectedIndex: aba,
           onDestinationSelected: (i) => setState(() => _aba = i),
-          destinations: [
-            const NavigationDestination(
-              icon: Icon(Icons.signpost_outlined),
-              selectedIcon: Icon(Icons.signpost),
+          destinations: const [
+            NavigationDestination(icon: Icon(Icons.home_outlined), selectedIcon: Icon(Icons.home), label: 'Início'),
+            NavigationDestination(
+              icon: Icon(Icons.format_list_bulleted),
+              selectedIcon: Icon(Icons.view_list),
+              label: 'Lançamentos',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.insights_outlined),
+              selectedIcon: Icon(Icons.insights),
               label: 'Resumo',
             ),
-            if (porViagem)
-              const NavigationDestination(
-                icon: Icon(Icons.route_outlined),
-                selectedIcon: Icon(Icons.route),
-                label: 'Viagens',
-              )
-            else
-              const NavigationDestination(
-                icon: Icon(Icons.local_shipping_outlined),
-                selectedIcon: Icon(Icons.local_shipping),
-                label: 'Fretes',
-              ),
-            const NavigationDestination(
-              icon: Icon(Icons.local_gas_station_outlined),
-              selectedIcon: Icon(Icons.local_gas_station),
-              label: 'Diesel',
-            ),
-            const NavigationDestination(
-              icon: Icon(Icons.receipt_long_outlined),
-              selectedIcon: Icon(Icons.receipt_long),
-              label: 'Gastos',
-            ),
-            const NavigationDestination(
-              icon: Icon(Icons.payments_outlined),
-              selectedIcon: Icon(Icons.payments),
-              label: 'Vales',
-            ),
-            if (comParadas)
-              const NavigationDestination(
-                icon: Icon(Icons.pause_circle_outline),
-                selectedIcon: Icon(Icons.pause_circle),
-                label: 'Paradas',
-              ),
           ],
         ),
       ),
