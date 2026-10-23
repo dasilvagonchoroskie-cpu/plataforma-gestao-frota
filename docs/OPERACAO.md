@@ -90,6 +90,14 @@ botão "Modalidades e campos" (ícone de caminho). Ali dá para:
 
 O dono de cada empresa renomeia, esconde e torna obrigatório em Configurações > Modalidades de operação.
 
+## PDF com todos os dados e exclusão
+
+- A qualquer hora, o dono baixa em Configurações > "Baixar todos os dados da empresa (PDF)"; de um motorista,
+  na aba Cadastro dele > "Baixar tudo dele (PDF)".
+- Excluir motorista ou empresa pelo painel gera antes esse PDF (regra do dono). Sem o PDF, não exclui.
+- Com o acesso encerrado, o dono entra no painel e baixa o PDF na tela "Acesso encerrado".
+- Antes de excluir uma empresa pela Plataforma, peça ao dono para baixar o PDF.
+
 ## Registro de paradas
 
 O dono liga em Configurações > Registro de paradas e define o limite sem descanso (horas e minutos). Os apps

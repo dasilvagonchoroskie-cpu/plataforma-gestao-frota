@@ -178,8 +178,8 @@ viagem (uma por carreta), acerto com comissão e descontos lançados pelo gestor
   viagens, campos efetivos na situação da conta, ações do dono, do gestor e da Plataforma, exclusão estendida às
   tabelas novas (a extensão da exclusão espera aprovação, abaixo). Comando: `PGHOST=/tmp PGPORT=54329 PGUSER=postgres PGTAP_SQL=… supabase/tests/local/rodar.sh`
   → `total de verificações que passaram: 369` (teste 09: 63).
-- **esperando aprovação** — Exclusão de motorista e de empresa apagar também viagens, acertos e modalidades
-  (regra do dono: função que apaga dados só entra aprovada). Até lá, excluir quem tem viagem dá erro sem apagar nada.
+- **aprovado e feito em 23/10** — Exclusão de motorista e de empresa apagar também viagens, acertos e
+  modalidades (ver "Exclusão completa com o PDF antes").
 - **feito e testado** — Núcleo: modelos de modalidade, viagem e acerto, PDF do acerto e das viagens, planilha
   de viagens. `dart analyze` sem problemas; `dart test` → 49 testes.
 - **feito e testado** — Frota Motorista 0.5.0: escolha da modalidade, aba Viagens (engatar, anotar entregas,
@@ -217,8 +217,29 @@ contam como descanso, relatório com o aviso do tacógrafo, nenhum número da le
   limite), seção Paradas no computador e cartão no Painel, aba Paradas na tela do motorista, PDF e planilha.
   Corrigida também uma linha do Painel no celular que passava da tela (placa do caminhão menor no celular).
   `flutter analyze` sem problemas; `flutter test --exclude-tags capturas` → 53 testes.
-- **esperando aprovação** — Exclusão de motorista e de empresa apagar também as paradas (junto com viagens,
-  acertos e modalidades).
+- **corrigido** — A primeira esteira das paradas (44d01b0) reprovou no teste de ponta a ponta: com a parada
+  nova, a exclusão antiga do motorista dava erro (faltava a exclusão completa, que ainda esperava aprovação).
+  Os APKs e o painel web 0.6.0 foram publicados mesmo assim, antes do banco da nuvem; o painel ficou sem abrir
+  até a correção chegar. Corrigido: a esteira só publica o painel depois de o banco passar, e o painel abre
+  mesmo se a nuvem ainda não tiver as tabelas novas (paradas e motivos ficam vazios).
+
+## Exclusão completa com o PDF antes — 23/10/2026
+
+Aprovação do Evandro (23/10, no chat): a exclusão de motorista e de empresa apaga também viagens, acertos,
+paradas e as modalidades da empresa, **sempre com o PDF de todos os dados gerado antes**; na exclusão
+automática, o painel avisa antes do prazo com o botão do PDF.
+
+- **feito e testado** — Banco (migration `exclusao_completa`, com a linha `aprovado-por`): exclusão estendida e
+  `exportar_dados_empresa()` (o dono baixa tudo mesmo com o acesso encerrado). `rodar.sh` →
+  `total de verificações que passaram: 412` (teste 11: 19). `conferir_aprovacao.py` → `sem aprovação para
+  apagar dados: 0`.
+- **feito e testado** — Núcleo: PDF com todos os dados (capa, caminhões, cada motorista com cadastro, relatório
+  de todo o histórico, acertos e paradas). `dart test` → 65 testes.
+- **feito e testado** — Frota Gestor 0.6.1: excluir motorista e excluir empresa passam antes pelo PDF (sem o
+  PDF, não exclui); "Baixar tudo dele (PDF)" no motorista; "Baixar todos os dados da empresa (PDF)" em
+  Configurações; avisos no Painel (motorista que pediu para sair e acesso da empresa acabando) com o botão
+  "Baixar PDF"; com o acesso encerrado, o dono baixa o PDF na própria tela. `flutter test --exclude-tags
+  capturas` → 58 testes.
 - **em andamento** — Esteira e aplicação na nuvem.
 
 ## Fase 7 — acabamento e piloto

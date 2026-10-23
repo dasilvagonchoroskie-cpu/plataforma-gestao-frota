@@ -51,6 +51,12 @@ limitado), **Baixa** (defesa em profundidade).
   empresa bloqueada não vê nada). O app não grava direto nelas: viagens pela sincronização, o resto por
   funções que conferem dono, gestor, motorista ou super administrador (teste 09).
 
+### Exclusão completa e exportação (23/10/2026)
+
+- A exclusão estendida (viagens, acertos, paradas, modalidades) entrou com a linha `aprovado-por` do dono
+  (teste 11). `exportar_dados_empresa()` só responde ao dono da própria empresa (gestor, motorista, sem
+  empresa e outra empresa: recusado), só lê, e funciona com o acesso encerrado até a exclusão.
+
 ### Paradas (23/10/2026)
 
 - A tabela `paradas` nasce com RLS (motorista vê as próprias; dono e gestor, as da empresa) e entra na

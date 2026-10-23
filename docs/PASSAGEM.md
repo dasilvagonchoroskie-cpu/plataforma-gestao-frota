@@ -251,10 +251,8 @@ Decisões tomadas na construção (confirmar no piloto):
 - **Motorista sem modalidade** (empresa com mais de uma): o app pede a escolha antes de abrir (precisa de
   internet). O gestor também pode definir pelo painel.
 - **Empresa nova** começa só com Graneleiro; o dono liga as outras.
-- **Exclusão de dados (esperando a aprovação do Evandro):** as funções de exclusão já aprovadas (motorista e
-  empresa) precisam apagar também viagens, acertos e as modalidades da empresa. Pela regra do dono, isso só
-  entra com a linha `aprovado-por` na migration. Enquanto não entra, excluir um motorista que tem viagem ou
-  acerto dá erro e nada é apagado (os outros continuam sendo excluídos normalmente).
+- **Exclusão de dados:** aprovada pelo Evandro em 23/10/2026, com o PDF de todos os dados antes (ver
+  "Exclusão completa com o PDF antes").
 - **Campos novos da Plataforma:** até 20 por modalidade, tipos texto, número, número inteiro, dinheiro, data,
   data e hora, sim ou não e cidade; o tipo não muda depois; campo desativado some dos formulários e o que já
   foi anotado fica guardado. Os campos de fábrica não mudam pela Plataforma.
@@ -278,6 +276,20 @@ Decisões tomadas na construção (confirmar no piloto):
 - **Desligar as paradas** esconde a aba; o que já foi registrado fica guardado e volta a aparecer se ligar.
 - **No celular do gestor** a seção Paradas não ocupa aba embaixo (já são cinco); abre pelo cartão "Paradas" do
   Painel e pela aba Paradas da tela do motorista.
-- **Exclusão (esperando a aprovação do Evandro):** as paradas entram junto na extensão da exclusão de motorista
-  e de empresa. Até a aprovação, excluir um motorista que tem paradas dá erro e nada é apagado. Antes de ligar a
-  limpeza automática "valendo", essa aprovação precisa entrar.
+- **Exclusão:** aprovada em 23/10/2026 (ver "Exclusão completa com o PDF antes"); as paradas vão junto.
+
+## Exclusão completa com o PDF antes (23/10/2026, aprovado pelo usuário)
+
+- **Aprovado no chat:** exclusão de motorista e de empresa apaga também viagens, acertos, paradas e as
+  modalidades da empresa, sempre com o PDF de todos os dados gerado antes. Exclusão automática: aviso no painel
+  com o botão "Baixar PDF" (nada fica guardado no servidor).
+- **O PDF é gerado no app do gestor** (o servidor não tem como saber se a pessoa guardou o arquivo). Pelo
+  painel, a exclusão só segue depois de o PDF ser gerado e entregue ao "compartilhar" ou ao download.
+- **Exclusões automáticas** (motorista que pediu para sair, 15 dias; empresa com o acesso encerrado): o
+  Painel avisa (motorista) e, nos últimos 7 dias de acesso, avisa a empresa; com o acesso encerrado, o dono
+  baixa o PDF na tela "Acesso encerrado" até a data da exclusão (função `exportar_dados_empresa`).
+- **Exclusão pela Plataforma** (super administrador): não tem como gerar o PDF da empresa (a Plataforma não lê
+  os dados). Antes de excluir pela Plataforma, pedir ao dono para baixar o PDF (ele consegue mesmo bloqueado).
+- **Ordem da esteira:** o painel web vai ao ar alguns minutos antes de o banco da nuvem ser atualizado. Por
+  isso tabela nova entra no painel como opcional (abre sem ela) e a esteira só publica depois de o banco passar
+  nos testes.
