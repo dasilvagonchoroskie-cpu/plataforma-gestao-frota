@@ -1,14 +1,42 @@
 import 'package:flutter/material.dart';
 
 /// Cores tiradas da estrada: o verde das placas de sinalizacao, o amarelo
-/// da faixa, o cinza do asfalto e do concreto.
+/// da faixa, o cinza do asfalto e do concreto. No escuro, o azul-marinho e o
+/// verde-limão do cartaz da plataforma (23/10/2026).
 class Paleta {
   static const verdePlaca = Color(0xFF0B5D3B);
-  static const verdePlacaNoite = Color(0xFF0F6E47);
+  static const verdePlacaNoite = Color(0xFF14874A);
   static const amareloFaixa = Color(0xFFF2B300);
   static const asfalto = Color(0xFF1E2427);
   static const concreto = Color(0xFFF1F2EE);
   static const vermelhoPlaca = Color(0xFF9E2A22);
+
+  // Tema escuro (o do cartaz)
+  static const marinho = Color(0xFF0A1628);
+  static const marinhoFundo = Color(0xFF071121);
+  static const marinhoCartao = Color(0xFF0F2036);
+  static const verdeLimao = Color(0xFF3DDC6E);
+}
+
+/// Uma cor para cada parte (ícones coloridos do cartaz): a mais viva no
+/// escuro, a mais fechada no claro (para ler bem sobre o branco).
+enum Categoria {
+  fretes(Color(0xFF4ADE80), Color(0xFF15803D)),
+  viagens(Color(0xFF38BDF8), Color(0xFF0369A1)),
+  diesel(Color(0xFFFBBF24), Color(0xFFB45309)),
+  gastos(Color(0xFFFB7185), Color(0xFFBE123C)),
+  vales(Color(0xFFA78BFA), Color(0xFF6D28D9)),
+  paradas(Color(0xFFFB923C), Color(0xFFC2410C)),
+  resumo(Color(0xFF2DD4BF), Color(0xFF0F766E)),
+  comissao(Color(0xFFF472B6), Color(0xFFBE185D)),
+  receber(Color(0xFF60A5FA), Color(0xFF1D4ED8)),
+  neutro(Color(0xFF9DB0C8), Color(0xFF5B6560));
+
+  const Categoria(this.escuro, this.claro);
+  final Color escuro;
+  final Color claro;
+
+  Color de(BuildContext context) => Theme.of(context).brightness == Brightness.dark ? escuro : claro;
 }
 
 /// Cores com significado (positivo, negativo, atencao) e da placa.
@@ -51,13 +79,13 @@ class CoresApp extends ThemeExtension<CoresApp> {
   static const escuro = CoresApp(
     placa: Paleta.verdePlacaNoite,
     placaTexto: Colors.white,
-    positivo: Color(0xFF5CD69A),
-    negativo: Color(0xFFFF8A80),
-    atencao: Color(0xFFFFD25E),
-    atencaoFundo: Color(0xFF3A2F0E),
-    textoFraco: Color(0xFF9AA59F),
-    divisor: Color(0xFF2B322F),
-    campoFundo: Color(0xFF1B211E),
+    positivo: Color(0xFF4ADE80),
+    negativo: Color(0xFFFF7B7B),
+    atencao: Color(0xFFFFCB57),
+    atencaoFundo: Color(0xFF33290D),
+    textoFraco: Color(0xFF9DB0C8),
+    divisor: Color(0xFF1D3552),
+    campoFundo: Color(0xFF0D1C30),
   );
 
   @override
@@ -122,18 +150,20 @@ TextStyle estiloNumero(double tamanho, {FontWeight peso = FontWeight.w600, Color
 ThemeData _base(Brightness brilho) {
   final escuro = brilho == Brightness.dark;
   final cores = escuro ? CoresApp.escuro : CoresApp.claro;
-  final fundo = escuro ? const Color(0xFF111513) : Paleta.concreto;
-  final superficie = escuro ? const Color(0xFF181D1B) : Colors.white;
-  final texto = escuro ? const Color(0xFFE6EAE7) : Paleta.asfalto;
-  final primaria = escuro ? const Color(0xFF5CD69A) : Paleta.verdePlaca;
+  final fundo = escuro ? Paleta.marinho : Paleta.concreto;
+  final superficie = escuro ? Paleta.marinhoCartao : Colors.white;
+  final texto = escuro ? const Color(0xFFEAF1FB) : Paleta.asfalto;
+  final primaria = escuro ? Paleta.verdeLimao : Paleta.verdePlaca;
+  // Barras de navegação (menu do lado e abas de baixo): mais fundas no escuro.
+  final barra = escuro ? Paleta.marinhoFundo : Colors.white;
 
   final esquema = ColorScheme(
     brightness: brilho,
     primary: primaria,
-    onPrimary: escuro ? const Color(0xFF00391F) : Colors.white,
-    primaryContainer: escuro ? const Color(0xFF0F6E47) : const Color(0xFFD3EBDD),
-    onPrimaryContainer: escuro ? Colors.white : const Color(0xFF06331F),
-    secondary: escuro ? const Color(0xFFFFD25E) : const Color(0xFF7A5200),
+    onPrimary: escuro ? const Color(0xFF04220F) : Colors.white,
+    primaryContainer: escuro ? const Color(0xFF164D30) : const Color(0xFFD3EBDD),
+    onPrimaryContainer: escuro ? const Color(0xFFC9F7D8) : const Color(0xFF06331F),
+    secondary: escuro ? const Color(0xFFFFC845) : const Color(0xFF7A5200),
     onSecondary: escuro ? const Color(0xFF2A1F00) : Colors.white,
     secondaryContainer: cores.atencaoFundo,
     onSecondaryContainer: cores.atencao,
@@ -144,10 +174,10 @@ ThemeData _base(Brightness brilho) {
     onSurfaceVariant: cores.textoFraco,
     surfaceContainerLowest: superficie,
     surfaceContainerLow: superficie,
-    surfaceContainer: escuro ? const Color(0xFF1D2320) : const Color(0xFFF7F8F5),
-    surfaceContainerHigh: escuro ? const Color(0xFF222926) : const Color(0xFFEDEFEA),
-    surfaceContainerHighest: escuro ? const Color(0xFF29302D) : const Color(0xFFE6E9E3),
-    outline: escuro ? const Color(0xFF4A534F) : const Color(0xFFB9BEB6),
+    surfaceContainer: escuro ? const Color(0xFF13283F) : const Color(0xFFF7F8F5),
+    surfaceContainerHigh: escuro ? const Color(0xFF183150) : const Color(0xFFEDEFEA),
+    surfaceContainerHighest: escuro ? const Color(0xFF1D3A5E) : const Color(0xFFE6E9E3),
+    outline: escuro ? const Color(0xFF2C4A6E) : const Color(0xFFB9BEB6),
     outlineVariant: cores.divisor,
   );
 
@@ -190,8 +220,30 @@ ThemeData _base(Brightness brilho) {
       centerTitle: false,
       titleTextStyle: TextStyle(fontFamily: fonteTexto, fontSize: 22, fontWeight: FontWeight.w600, color: texto),
     ),
+    navigationRailTheme: NavigationRailThemeData(
+      backgroundColor: barra,
+      indicatorColor: esquema.primaryContainer,
+      selectedIconTheme: IconThemeData(color: escuro ? Paleta.verdeLimao : esquema.onPrimaryContainer),
+      unselectedIconTheme: IconThemeData(color: cores.textoFraco),
+      selectedLabelTextStyle: TextStyle(
+        fontFamily: fonteTexto,
+        fontSize: 14.5,
+        fontWeight: FontWeight.w700,
+        color: escuro ? Paleta.verdeLimao : texto,
+      ),
+      unselectedLabelTextStyle: TextStyle(fontFamily: fonteTexto, fontSize: 14.5, color: cores.textoFraco),
+    ),
+    cardTheme: CardThemeData(
+      color: superficie,
+      surfaceTintColor: Colors.transparent,
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(14),
+        side: BorderSide(color: cores.divisor),
+      ),
+    ),
     navigationBarTheme: NavigationBarThemeData(
-      backgroundColor: superficie,
+      backgroundColor: barra,
       surfaceTintColor: Colors.transparent,
       indicatorColor: esquema.primaryContainer,
       height: 70,
@@ -205,7 +257,9 @@ ThemeData _base(Brightness brilho) {
       ),
       iconTheme: WidgetStateProperty.resolveWith(
         (s) => IconThemeData(
-          color: s.contains(WidgetState.selected) ? esquema.onPrimaryContainer : cores.textoFraco,
+          color: s.contains(WidgetState.selected)
+              ? (escuro ? Paleta.verdeLimao : esquema.onPrimaryContainer)
+              : cores.textoFraco,
         ),
       ),
     ),
@@ -245,8 +299,8 @@ ThemeData _base(Brightness brilho) {
       ),
     ),
     floatingActionButtonTheme: FloatingActionButtonThemeData(
-      backgroundColor: escuro ? Paleta.verdePlacaNoite : Paleta.verdePlaca,
-      foregroundColor: Colors.white,
+      backgroundColor: escuro ? Paleta.verdeLimao : Paleta.verdePlaca,
+      foregroundColor: escuro ? const Color(0xFF04220F) : Colors.white,
       extendedTextStyle: const TextStyle(fontFamily: fonteTexto, fontSize: 16.5, fontWeight: FontWeight.w600),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
     ),
@@ -282,7 +336,7 @@ ThemeData _base(Brightness brilho) {
     ),
     snackBarTheme: SnackBarThemeData(
       behavior: SnackBarBehavior.floating,
-      backgroundColor: escuro ? const Color(0xFFE6EAE7) : Paleta.asfalto,
+      backgroundColor: escuro ? const Color(0xFFEAF1FB) : Paleta.asfalto,
       contentTextStyle: TextStyle(
         fontFamily: fonteTexto,
         fontSize: 15.5,
@@ -292,7 +346,7 @@ ThemeData _base(Brightness brilho) {
     switchTheme: SwitchThemeData(
       thumbColor: WidgetStateProperty.resolveWith((s) => s.contains(WidgetState.selected) ? Colors.white : null),
       trackColor: WidgetStateProperty.resolveWith(
-        (s) => s.contains(WidgetState.selected) ? (escuro ? Paleta.verdePlacaNoite : Paleta.verdePlaca) : null,
+        (s) => s.contains(WidgetState.selected) ? (escuro ? const Color(0xFF1FA85A) : Paleta.verdePlaca) : null,
       ),
     ),
   );

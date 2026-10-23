@@ -5,10 +5,12 @@ import 'package:visual/visual.dart';
 
 import '../../componentes/arquivo_dados.dart';
 import '../../componentes/comuns.dart';
+import '../../componentes/itens.dart';
 import '../../dados/equipe.dart';
 import '../../dados/provedores.dart';
 import '../caminhoes/detalhe_caminhao.dart';
 import '../casca.dart';
+import '../lancamentos/detalhe_viagem.dart';
 import '../motoristas/detalhe_motorista.dart';
 
 /// Painel: os números do período e a lista de motoristas com o último envio.
@@ -67,6 +69,7 @@ class TelaPainel extends ConsumerWidget {
                     detalhe: '${plural(r.quantidadeFretes, 'frete', 'fretes')} · ${escolha.descricao}',
                     icone: Icons.trending_up,
                     destaque: true,
+                    categoria: Categoria.fretes,
                   ),
                   CartaoNumero(
                     rotulo: 'Diesel',
@@ -75,12 +78,14 @@ class TelaPainel extends ConsumerWidget {
                         ? '${umaCasa(litros)} L · ${media.media == null ? 'média ainda sem tanque cheio' : '${umaCasa(media.media!)} km/L'}'
                         : 'Nenhuma abastecida',
                     icone: Icons.local_gas_station_outlined,
+                    categoria: Categoria.diesel,
                   ),
                   CartaoNumero(
                     rotulo: 'Outros gastos',
                     valor: reais(r.totalGastos),
                     detalhe: plural(d.gastos.length, 'gasto', 'gastos'),
                     icone: Icons.receipt_long_outlined,
+                    categoria: Categoria.gastos,
                   ),
                   CartaoNumero(
                     rotulo: 'Comissões',
@@ -89,12 +94,14 @@ class TelaPainel extends ConsumerWidget {
                         ? 'Parte dos motoristas'
                         : 'Média de ${percentualTexto(r.totalBaseComissao > 0 ? r.comissaoDoCaminhao / r.totalBaseComissao * 100 : 0)}%',
                     icone: Icons.handshake_outlined,
+                    categoria: Categoria.comissao,
                   ),
                   CartaoNumero(
                     rotulo: r.sobraDoCaminhao >= 0 ? 'Resultado' : 'Resultado (faltou)',
                     valor: reais(r.sobraDoCaminhao),
                     detalhe: 'Frete − diesel − gastos − comissões',
                     icone: Icons.savings_outlined,
+                    categoria: Categoria.resumo,
                     cor: r.sobraDoCaminhao >= 0 ? cores.positivo : cores.negativo,
                   ),
                   CartaoNumero(
@@ -102,12 +109,14 @@ class TelaPainel extends ConsumerWidget {
                     valor: reais(r.totalVale),
                     detalhe: plural(d.vales.length, 'vale', 'vales'),
                     icone: Icons.payments_outlined,
+                    categoria: Categoria.vales,
                   ),
                   CartaoNumero(
                     rotulo: 'A pagar aos motoristas',
                     valor: reais(r.liquido),
                     detalhe: e.regras.valeDescontaDoLiquido ? 'Comissões menos vales' : 'Comissões',
                     icone: Icons.account_balance_wallet_outlined,
+                    categoria: Categoria.receber,
                   ),
                   CartaoNumero(
                     rotulo: 'Saldo a receber',
@@ -116,6 +125,7 @@ class TelaPainel extends ConsumerWidget {
                         ? 'Nenhum frete esperando saldo'
                         : '${plural(r.fretesEmAberto, 'frete', 'fretes')} sem pagamento',
                     icone: Icons.hourglass_bottom,
+                    categoria: Categoria.viagens,
                     cor: r.fretesEmAberto > 0 ? cores.atencao : null,
                   ),
                   if (e.paradasAtivas)
@@ -126,12 +136,20 @@ class TelaPainel extends ConsumerWidget {
                           ? 'Nenhum intervalo sem descanso acima do limite'
                           : 'Acima do limite: ${acimaDoLimite.join(', ')}',
                       icone: Icons.pause_circle_outline,
+                      categoria: Categoria.paradas,
                       cor: acimaDoLimite.isEmpty ? null : cores.negativo,
                       aoTocar: () => ref.read(secaoProvider.notifier).ir(Secao.paradas),
                     ),
                 ],
               ),
             ),
+            if (e.ultimosLancamentos().isNotEmpty) ...[
+              const Padding(padding: EdgeInsets.symmetric(horizontal: 16), child: TituloSecao('Últimos lançamentos')),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: _UltimosLancamentos(itens: e.ultimosLancamentos()),
+              ),
+            ],
             const Padding(padding: EdgeInsets.symmetric(horizontal: 16), child: TituloSecao('Motoristas')),
             if (linhas.isEmpty)
               Padding(
@@ -396,6 +414,119 @@ class _LinhaCaminhaoPainel extends ConsumerWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// "Últimos lançamentos" (como no cartaz): data, motorista, tipo e valor. No
+/// computador vira tabela; no celular, linhas compactas.
+class _UltimosLancamentos extends ConsumerWidget {
+  const _UltimosLancamentos({required this.itens});
+  final List<LancamentoRecente> itens;
+
+  static (String, IconData, Categoria) _tipo(TipoLancamento t) => switch (t) {
+    TipoLancamento.frete => ('Frete', Icons.local_shipping_outlined, Categoria.fretes),
+    TipoLancamento.viagem => ('Viagem', Icons.route_outlined, Categoria.viagens),
+    TipoLancamento.diesel => ('Diesel', Icons.local_gas_station_outlined, Categoria.diesel),
+    TipoLancamento.gasto => ('Gasto', Icons.receipt_long_outlined, Categoria.gastos),
+    TipoLancamento.vale => ('Vale', Icons.payments_outlined, Categoria.vales),
+  };
+
+  void _abrir(BuildContext context, LancamentoRecente l) {
+    if (l.tipo == TipoLancamento.viagem) {
+      Navigator.push(context, MaterialPageRoute(builder: (_) => TelaDetalheViagem(id: l.id)));
+      return;
+    }
+    abrirLancamento(context, switch (l.tipo) {
+      TipoLancamento.frete => 'fretes',
+      TipoLancamento.diesel => 'abastecimentos',
+      TipoLancamento.gasto => 'gastos_viagem',
+      _ => 'vales',
+    }, l.id);
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final e = assistirEquipe(ref);
+    final cores = context.cores;
+    final largo = telaLarga(context);
+    final cabecalho = TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: cores.textoFraco);
+    return Card(
+      margin: EdgeInsets.zero,
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        children: [
+          if (largo)
+            Container(
+              color: Theme.of(context).colorScheme.surfaceContainer,
+              padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
+              child: Row(
+                children: [
+                  SizedBox(width: 110, child: Text('Data', style: cabecalho)),
+                  Expanded(flex: 3, child: Text('Motorista', style: cabecalho)),
+                  Expanded(flex: 3, child: Text('Tipo', style: cabecalho)),
+                  Expanded(flex: 2, child: Text('Valor', style: cabecalho, textAlign: TextAlign.right)),
+                ],
+              ),
+            ),
+          for (var i = 0; i < itens.length; i++) ...[
+            if (i > 0) const Divider(height: 1),
+            () {
+              final l = itens[i];
+              final (nome, icone, cat) = _tipo(l.tipo);
+              final valor = l.valorCentavos == null ? '—' : reais(l.valorCentavos!);
+              final quem = e.motorista(l.motoristaId)?.nome ?? '';
+              return InkWell(
+                onTap: () => _abrir(context, l),
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
+                  child: largo
+                      ? Row(
+                          children: [
+                            SizedBox(width: 110, child: Text(dataTexto(l.data), style: estiloNumero(15, peso: FontWeight.w500))),
+                            Expanded(flex: 3, child: Text(quem, maxLines: 1, overflow: TextOverflow.ellipsis)),
+                            Expanded(
+                              flex: 3,
+                              child: Row(
+                                children: [
+                                  IconeCategoria(icone, cat, tamanho: 28),
+                                  const SizedBox(width: 8),
+                                  Flexible(
+                                    child: Text('$nome  ·  ${l.descricao}', maxLines: 1, overflow: TextOverflow.ellipsis),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            Expanded(flex: 2, child: Text(valor, textAlign: TextAlign.right, style: estiloNumero(16))),
+                          ],
+                        )
+                      : Row(
+                          children: [
+                            IconeCategoria(icone, cat, tamanho: 36),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text('$nome  ·  ${l.descricao}',
+                                      maxLines: 1, overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(fontSize: 15.5, fontWeight: FontWeight.w600)),
+                                  Text('${dataTexto(l.data)}  ·  $quem',
+                                      maxLines: 1, overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(fontSize: 13.5, color: cores.textoFraco)),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Text(valor, style: estiloNumero(16)),
+                          ],
+                        ),
+                ),
+              );
+            }(),
+          ],
+        ],
       ),
     );
   }

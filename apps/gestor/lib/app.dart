@@ -6,24 +6,27 @@ import 'package:visual/visual.dart';
 
 import 'dados/link_email.dart';
 import 'dados/provedores.dart';
+import 'dados/aparencia.dart';
 import 'servidor/servidor.dart';
 import 'telas/acesso/telas_acesso.dart';
 import 'telas/casca.dart';
 import 'telas/plataforma/tela_plataforma.dart';
 
-class AplicativoGestor extends StatelessWidget {
+class AplicativoGestor extends ConsumerWidget {
   const AplicativoGestor({super.key, this.inicio});
 
   /// Tela inicial forçada (testes).
   final Widget? inicio;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return MaterialApp(
       title: 'Frota Gestor',
       debugShowCheckedModeBanner: false,
       theme: temaClaro,
       darkTheme: temaEscuro,
+      // Escuro como o cartaz; claro ou igual ao aparelho em Configurações.
+      themeMode: ref.watch(aparenciaProvider).modo,
       locale: const Locale('pt', 'BR'),
       supportedLocales: const [Locale('pt', 'BR')],
       localizationsDelegates: const [

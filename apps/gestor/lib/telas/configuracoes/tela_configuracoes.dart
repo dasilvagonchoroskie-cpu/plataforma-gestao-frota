@@ -7,6 +7,7 @@ import 'package:visual/visual.dart';
 import '../../componentes/arquivo_dados.dart';
 import '../../componentes/comuns.dart';
 import '../../config.dart';
+import '../../dados/aparencia.dart';
 import '../../dados/equipe.dart';
 import '../../dados/modelos.dart';
 import '../../dados/provedores.dart';
@@ -105,6 +106,11 @@ class TelaConfiguracoes extends ConsumerWidget {
               padding: EdgeInsets.fromLTRB(20, 0, 20, 4),
               child: Nota('Só o dono muda os dados, as regras, as modalidades e as paradas da empresa.'),
             ),
+          const Padding(padding: EdgeInsets.symmetric(horizontal: 16), child: TituloSecao('Aparência')),
+          EscolhaTema(
+            valor: ref.watch(aparenciaProvider),
+            aoMudar: ref.read(aparenciaProvider.notifier).escolher,
+          ),
           const Padding(padding: EdgeInsets.symmetric(horizontal: 16), child: TituloSecao('Cadastros')),
           ListTile(
             leading: const Icon(Icons.category_outlined),

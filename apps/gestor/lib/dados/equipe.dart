@@ -249,6 +249,41 @@ class Equipe {
   bool get souDono => eu.dono;
   Regras get regras => Regras.daEmpresa(empresa.configuracao);
 
+  // ----------------------------------------------------- últimos lançamentos
+
+  /// Os lançamentos mais recentes de todos os motoristas (pela data do lançamento).
+  List<LancamentoRecente> ultimosLancamentos({int quantos = 8}) {
+    final todos = <LancamentoRecente>[
+      for (final f in fretes)
+        LancamentoRecente(
+          tipo: TipoLancamento.frete, id: f.id, data: f.dataCarga, motoristaId: f.motoristaId,
+          descricao: '${f.origem} – ${f.destino}', valorCentavos: f.freteRealCentavos,
+        ),
+      for (final v in viagens)
+        LancamentoRecente(
+          tipo: TipoLancamento.viagem, id: v.id, data: v.engateEm, motoristaId: v.motoristaId,
+          descricao: v.engateLocal.isEmpty ? 'Viagem' : v.engateLocal,
+        ),
+      for (final a in abastecimentos)
+        if (!a.pontoDePartida)
+          LancamentoRecente(
+            tipo: TipoLancamento.diesel, id: a.id, data: a.data, motoristaId: a.motoristaId,
+            descricao: a.cidade.isEmpty ? 'Diesel' : a.cidade, valorCentavos: a.valorCentavos,
+          ),
+      for (final g in gastos)
+        LancamentoRecente(
+          tipo: TipoLancamento.gasto, id: g.id, data: g.data, motoristaId: g.motoristaId,
+          descricao: g.categoriaNome, valorCentavos: g.valorCentavos,
+        ),
+      for (final v in vales)
+        LancamentoRecente(
+          tipo: TipoLancamento.vale, id: v.id, data: v.data, motoristaId: v.motoristaId,
+          descricao: (v.observacao ?? '').trim().isEmpty ? 'Vale' : v.observacao!.trim(), valorCentavos: v.valorCentavos,
+        ),
+    ]..sort((a, b) => b.data.compareTo(a.data));
+    return todos.take(quantos).toList();
+  }
+
   // ------------------------------------------------------ arquivo de dados
 
   /// Todos os dados de um motorista (ou da empresa toda, sem [motoristaId])
@@ -633,6 +668,29 @@ class Equipe {
     }
     return r;
   }
+}
+
+/// Tipo de cada linha de "Últimos lançamentos" do painel.
+enum TipoLancamento { frete, viagem, diesel, gasto, vale }
+
+class LancamentoRecente {
+  const LancamentoRecente({
+    required this.tipo,
+    required this.id,
+    required this.data,
+    required this.motoristaId,
+    required this.descricao,
+    this.valorCentavos,
+  });
+
+  final TipoLancamento tipo;
+  final String id;
+  final DateTime data;
+  final String motoristaId;
+  final String descricao;
+
+  /// Nulo na viagem (Baú não tem dinheiro do frete).
+  final int? valorCentavos;
 }
 
 /// O motorista que pede para excluir a conta tem os dados apagados depois

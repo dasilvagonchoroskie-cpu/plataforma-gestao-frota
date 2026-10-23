@@ -15,6 +15,7 @@ class AppFalhaAoAbrir extends StatelessWidget {
         debugShowCheckedModeBanner: false,
         theme: temaClaro,
         darkTheme: temaEscuro,
+        themeMode: ThemeMode.dark,
         home: Scaffold(
           body: SafeArea(
             child: ListView(

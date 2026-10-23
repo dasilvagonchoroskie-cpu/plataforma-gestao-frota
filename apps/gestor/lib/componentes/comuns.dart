@@ -127,12 +127,16 @@ class CartaoNumero extends StatelessWidget {
     this.cor,
     this.destaque = false,
     this.aoTocar,
+    this.categoria = Categoria.neutro,
   });
 
   final String rotulo;
   final String valor;
   final String? detalhe;
   final IconData? icone;
+
+  /// Cor do ícone (um círculo colorido para cada número, como no cartaz).
+  final Categoria categoria;
   final Color? cor;
   final bool destaque;
   final VoidCallback? aoTocar;
@@ -163,8 +167,16 @@ class CartaoNumero extends StatelessWidget {
               Row(
                 children: [
                   if (icone != null) ...[
-                    Icon(icone, size: 18, color: texto ?? cores.textoFraco),
-                    const SizedBox(width: 6),
+                    if (destaque)
+                      Container(
+                        width: 34,
+                        height: 34,
+                        decoration: BoxDecoration(shape: BoxShape.circle, color: Colors.white.withValues(alpha: 0.18)),
+                        child: Icon(icone, size: 19, color: texto),
+                      )
+                    else
+                      IconeCategoria(icone!, categoria, tamanho: 34),
+                    const SizedBox(width: 10),
                   ],
                   Expanded(
                     child: Text(
