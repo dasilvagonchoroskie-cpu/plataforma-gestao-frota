@@ -57,6 +57,13 @@ limitado), **Baixa** (defesa em profundidade).
   (teste 11). `exportar_dados_empresa()` só responde ao dono da própria empresa (gestor, motorista, sem
   empresa e outra empresa: recusado), só lê, e funciona com o acesso encerrado até a exclusão.
 
+### Excluir a conta libera o CPF (23/10/2026)
+
+- A mudança na exclusão da própria conta entrou com a linha `aprovado-por` do dono. O login sai na hora
+  (`expurgar_perfil`); o cadastro sem login não volta a ficar ativo (regra no banco
+  `motoristas_ativo_tem_login_ck`, teste 06) e não tem acesso para redefinir. Mensagens de erro claras para
+  código, aprovação e redefinição (teste 06 e teste das funções).
+
 ### Paradas (23/10/2026)
 
 - A tabela `paradas` nasce com RLS (motorista vê as próprias; dono e gestor, as da empresa) e entra na

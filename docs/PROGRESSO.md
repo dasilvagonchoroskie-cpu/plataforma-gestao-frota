@@ -263,6 +263,27 @@ inicial do motorista com botões grandes e ícones dos apps iguais aos do cartaz
 - **feito e testado** — Esteira do commit a7952f2 aprovada; APKs oficiais 0.7.0 (certificado 9c6ec010…22d2)
   entregues ao Evandro; painel web publicado com o visual novo.
 
+## Excluir a conta libera o CPF na hora — 23/10/2026
+
+Problema relatado pelo Evandro: depois de excluir a conta de motorista, o CPF continuava "já cadastrado".
+Escolha dele: "Liberar o CPF na hora" (vale como aprovação; linha `aprovado-por` na migration).
+
+- **feito e testado** — Banco (migration `20261023180000_excluir_conta_libera_cpf`): o login e o CPF saem na
+  hora; o cadastro sem login e os lançamentos ficam 15 dias com a empresa e a limpeza diária apaga depois;
+  cadastro sem login não é religado; avisos claros no código, na aprovação e no redefinir acesso; o uso do
+  caminhão fica sem o login de quem registrou. `rodar.sh` → `total de verificações que passaram: 422` (teste
+  06: 92). `conferir_aprovacao.py` → `sem aprovação para apagar dados: 0`. Teste à parte: quem já tinha pedido
+  a exclusão (com caminhão registrado por ele) teve o login apagado na atualização.
+- **feito e testado** — Função `cadastrar_motorista`: mensagem nova para CPF que já tem conta (sem citar o
+  código de recuperação, que saiu dos apps). Publicada na nuvem (versão 4).
+- **feito e testado** — Frota Motorista 0.7.1 (texto da exclusão e recado com a data) → `flutter test
+  --exclude-tags capturas` 50 testes; Frota Gestor 0.7.1 (aviso "excluiu a conta", sem religar nem redefinir)
+  → 59 testes; `flutter analyze` sem problemas nos dois.
+- **feito e testado** — Primeira subida à nuvem (bd58bae) parou sem gravar nada: o motorista tinha registrado
+  o próprio caminhão. Corrigido em 4507fb5. Esteira e banco da nuvem aprovados (`success`); conferido na
+  nuvem: migration `20261023180000` aplicada, nenhum login preso, CPF do Evandro livre, cadastro antigo sem
+  login até 07/11/2026. APKs oficiais 0.7.1 (certificado 9c6ec010…22d2) entregues.
+
 ## Fase 7 — acabamento e piloto
 
 - **em andamento** — SMTP próprio (Brevo, configuração no painel do Supabase pelo dono).

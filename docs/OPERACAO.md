@@ -75,7 +75,10 @@ depois, se ninguém liberar. A limpeza roda todo dia às 03:20 (horário de Bras
 (`frota-limpeza-diaria`); para rodar na hora: `select public.limpeza_diaria();`.
 
 O dono também pode excluir a conta da empresa e todos os dados pelo app (Configurações > Excluir a conta
-da empresa), mesmo com o acesso encerrado. O motorista exclui a própria conta em Configurações.
+da empresa), mesmo com o acesso encerrado. O motorista exclui a própria conta em Configurações: o login e
+o CPF saem na hora (ele pode criar conta nova com o mesmo CPF) e os lançamentos ficam 15 dias com a empresa.
+Se ele voltar para a mesma empresa antes disso, o gestor usa "Excluir motorista e dados" no cadastro antigo
+(o PDF vem antes) e depois aprova a conta nova.
 
 ## Modalidades e campos (Plataforma)
 

@@ -111,8 +111,9 @@ configurar SMTP e modelos no painel do Supabase, então o acesso do piloto passo
   pessoa física, marca Fortaleza Digital Security) trata em nome dela (e controla os dados de conta e acesso). Dados no Supabase em São Paulo (sa-east-1).
 - **Exclusão:** o dono exclui a empresa e todos os dados (digitando o nome da empresa), mesmo com o
   acesso encerrado; a gestão exclui um motorista e os lançamentos dele (digitando EXCLUIR) — a conta dele
-  fica sem empresa; o motorista exclui a própria conta (sem empresa: na hora; com empresa: o acesso fecha
-  na hora e tudo é apagado em 15 dias, prazo para a empresa guardar o que a lei exige). A auditoria não
+  fica sem empresa; o motorista exclui a própria conta (sem empresa: tudo na hora; com empresa: o login e o
+  CPF saem na hora e os lançamentos ficam 15 dias com a empresa, prazo para guardar o que a lei exige — regra
+  de 23/10/2026). A auditoria não
   guarda cópia do que foi excluído. Da empresa excluída fica só uma linha "Empresa excluída", sem dados.
 - **Controle da plataforma:** `bloquear_empresa`, `liberar_empresa` (com prazo de teste),
   `excluir_empresa_plataforma`, `empresas_da_plataforma` e `limpeza_diaria` — só pelo SQL Editor
@@ -302,3 +303,23 @@ Decisões tomadas na construção (confirmar no piloto):
   abrem pelos botões do Início (cada um com o botão de novo lançamento) e pelo "Lançar".
 - **Lançamentos** do motorista: tudo numa lista (fretes, viagens, diesel, gastos e vales), do mais novo para o
   mais velho; as paradas ficam só na tela delas.
+
+## Excluir a conta libera o CPF na hora (23/10/2026, aprovado pelo usuário)
+
+- **Problema relatado:** o motorista que excluía a conta ficava 15 dias com o CPF preso; criar conta nova com o
+  mesmo CPF era recusado. **Escolha do Evandro:** "Liberar o CPF na hora" (vale como aprovação da mudança na
+  função de exclusão; linha `aprovado-por` na migration `20261023180000_excluir_conta_libera_cpf`).
+- **Como ficou:** o login (conta, CPF e e-mail) é apagado na hora. O cadastro do motorista na empresa fica sem
+  login, marcado com a data (`motoristas.exclusao_pedida_em`), com os lançamentos, por 15 dias; depois a limpeza
+  diária apaga. Cadastro sem login não pode ser religado nem ter o acesso redefinido. Quem já tinha pedido a
+  exclusão antes desta mudança teve o login apagado na atualização (o prazo continua contando do pedido).
+  O uso do caminhão registrado pela própria pessoa fica sem "quem registrou" (`uso_caminhao.registrado_por`
+  agora pode ficar vazio); o uso continua ligado ao motorista e ao caminhão.
+- **Decisão provisória (perguntar ao Evandro se quiser diferente):** se a pessoa volta com conta nova para a
+  MESMA empresa dentro dos 15 dias, o painel avisa para usar antes "Excluir motorista e dados" (com o PDF) no
+  cadastro antigo. Alternativa não feita: ligar o cadastro antigo (com o histórico) à conta nova.
+- **Mesmo e-mail do dono numa conta de motorista: não dá.** O login (Supabase Auth) é um por e-mail. O dono que
+  também dirige usa outro e-mail na conta de motorista (escolha do Evandro em 23/10/2026).
+- **Pendência de texto:** os Termos de Uso ainda falam em "código de recuperação", que saiu dos apps em
+  22/10/2026. Mudar o texto pede versão nova dos termos (todos aceitam de novo) — decidir com o Evandro.
+
