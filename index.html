@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <!-- O endereço base é trocado pelo valor de --base-href na hora do build. -->
+  <base href="/plataforma-gestao-frota/">
+
+  <meta charset="UTF-8">
+  <meta content="IE=Edge" http-equiv="X-UA-Compatible">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Painel do gestor e do dono da Plataforma de Gestão de Frota.">
+  <meta name="theme-color" content="#0B5D3B">
+  <meta name="robots" content="noindex">
+
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <meta name="apple-mobile-web-app-title" content="Frota Gestor">
+  <link rel="apple-touch-icon" href="icons/Icon-192.png">
+  <link rel="icon" type="image/png" href="favicon.png"/>
+
+  <title>Frota Gestor</title>
+  <link rel="manifest" href="manifest.json">
+  <style>
+    html, body { margin: 0; height: 100%; background: #F1F2EE; }
+    #carregando {
+      position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center;
+      justify-content: center; font-family: Arial, sans-serif; color: #1E2427; gap: 16px;
+    }
+    #carregando .placa {
+      background: #0B5D3B; color: #fff; border: 3px solid #fff; outline: 2px solid #0B5D3B;
+      border-radius: 10px; padding: 14px 26px; font-size: 22px; font-weight: bold; letter-spacing: .5px;
+    }
+    @media (prefers-color-scheme: dark) {
+      html, body { background: #15191B; }
+      #carregando { color: #E8EAE6; }
+    }
+  </style>
+</head>
+<body>
+  <div id="carregando">
+    <div class="placa">Frota Gestor</div>
+    <div>Abrindo o painel...</div>
+  </div>
+  <script src="flutter_bootstrap.js" async></script>
+</body>
+</html>
