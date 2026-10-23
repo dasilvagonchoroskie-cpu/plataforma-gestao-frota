@@ -3,6 +3,7 @@
 /// As contas existem só aqui; o banco guarda os dados e não repete fórmulas.
 library;
 
+export 'src/arquivo_dados.dart';
 export 'src/cpf.dart';
 export 'src/email.dart';
 export 'src/formato.dart';

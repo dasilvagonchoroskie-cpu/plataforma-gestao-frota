@@ -5,6 +5,7 @@ import 'package:pdf/widgets.dart' as pw;
 
 import '../formato.dart';
 import '../modalidades.dart';
+import '../arquivo_dados.dart';
 import '../modelos.dart';
 import '../paradas.dart';
 import '../placa.dart';
@@ -156,9 +157,30 @@ class _Pdf {
 Future<Uint8List> gerarPdf(DadosRelatorio d, FontesPdf fontes, {DateTime? agora}) async {
   final p = _Pdf(fontes, d);
   final doc = pw.Document(title: d.empresa.isEmpty ? nomeDoProduto : d.empresa, author: nomeDoProduto);
-  final conteudo = <pw.Widget>[];
+  final conteudo = _conteudoRelatorio(p, d, agora ?? DateTime.now());
 
-  conteudo.addAll(_cabecalho(p, d, agora ?? DateTime.now()));
+  final rodape = d.empresa.isEmpty ? nomeDoProduto : '${d.empresa}  |  $nomeDoProduto';
+  doc.addPage(
+    pw.MultiPage(
+      pageFormat: PdfPageFormat.a4,
+      margin: const pw.EdgeInsets.fromLTRB(40, 36, 40, 36),
+      maxPages: 200,
+      theme: pw.ThemeData.withFont(base: fontes.normal, bold: fontes.negrito),
+      footer: (ctx) => pw.Container(
+        alignment: pw.Alignment.centerRight,
+        margin: const pw.EdgeInsets.only(top: 10),
+        child: pw.Text('$rodape  |  página ${ctx.pageNumber} de ${ctx.pagesCount}', style: p.t(8.5, cor: _tintaCinza)),
+      ),
+      build: (ctx) => conteudo,
+    ),
+  );
+  return doc.save();
+}
+
+/// O relatório (cabeçalho e seções), para o PDF dele ou para o arquivo de dados.
+List<pw.Widget> _conteudoRelatorio(_Pdf p, DadosRelatorio d, DateTime agora) {
+  final conteudo = <pw.Widget>[];
+  conteudo.addAll(_cabecalho(p, d, agora));
   switch (d.conteudo) {
     case ConteudoRelatorio.tudo:
       if (d.porViagem) {
@@ -192,22 +214,7 @@ Future<Uint8List> gerarPdf(DadosRelatorio d, FontesPdf fontes, {DateTime? agora}
   }
   conteudo.addAll(_ajustesKm(p, d.ajustes));
   conteudo.addAll(_avisoAjustes(p, d));
-
-  final rodape = d.empresa.isEmpty ? nomeDoProduto : '${d.empresa}  |  $nomeDoProduto';
-  doc.addPage(
-    pw.MultiPage(
-      pageFormat: PdfPageFormat.a4,
-      margin: const pw.EdgeInsets.fromLTRB(40, 36, 40, 36),
-      theme: pw.ThemeData.withFont(base: fontes.normal, bold: fontes.negrito),
-      footer: (ctx) => pw.Container(
-        alignment: pw.Alignment.centerRight,
-        margin: const pw.EdgeInsets.only(top: 10),
-        child: pw.Text('$rodape  |  página ${ctx.pageNumber} de ${ctx.pagesCount}', style: p.t(8.5, cor: _tintaCinza)),
-      ),
-      build: (ctx) => conteudo,
-    ),
-  );
-  return doc.save();
+  return conteudo;
 }
 
 List<pw.Widget> _cabecalho(_Pdf p, DadosRelatorio d, DateTime agora) {
@@ -753,9 +760,36 @@ List<pw.Widget> _avisoAjustes(_Pdf p, DadosRelatorio d) {
 /// página que é registro interno e não substitui o tacógrafo.
 Future<Uint8List> gerarPdfParadas(DadosParadas d, FontesPdf fontes, {DateTime? agora}) async {
   final p = _Pdf(fontes);
-  final r = d.resumo;
   final quando = agora ?? DateTime.now();
   final doc = pw.Document(title: d.empresa.isEmpty ? nomeDoProduto : d.empresa, author: nomeDoProduto);
+  final conteudo = _conteudoParadas(p, d, quando);
+
+  final rodape = d.empresa.isEmpty ? nomeDoProduto : '${d.empresa}  |  $nomeDoProduto';
+  doc.addPage(
+    pw.MultiPage(
+      pageFormat: PdfPageFormat.a4,
+      margin: const pw.EdgeInsets.fromLTRB(40, 36, 40, 36),
+      maxPages: 200,
+      theme: pw.ThemeData.withFont(base: fontes.normal, bold: fontes.negrito),
+      footer: (ctx) => pw.Container(
+        margin: const pw.EdgeInsets.only(top: 10),
+        child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.stretch, children: [
+          pw.Text(avisoParadas, style: p.t(9, cor: _tintaLaranja, negrito: true)),
+          pw.SizedBox(height: 2),
+          pw.Text('$rodape  |  página ${ctx.pageNumber} de ${ctx.pagesCount}',
+              style: p.t(8.5, cor: _tintaCinza), textAlign: pw.TextAlign.right),
+        ]),
+      ),
+      build: (ctx) => conteudo,
+    ),
+  );
+  return doc.save();
+}
+
+/// As paradas (cabeçalho, resumo, acima do limite e a lista), para o PDF
+/// delas ou para o arquivo de dados.
+List<pw.Widget> _conteudoParadas(_Pdf p, DadosParadas d, DateTime quando, {bool avisoNoFim = false}) {
+  final r = d.resumo;
   var marca = d.empresa.isEmpty ? 'Gestão de Frota' : d.empresa;
   if (marca.length > 28) marca = '${marca.substring(0, 27)}…';
 
@@ -881,23 +915,126 @@ Future<Uint8List> gerarPdfParadas(DadosParadas d, FontesPdf fontes, {DateTime? a
     ));
   }
 
-  final rodape = d.empresa.isEmpty ? nomeDoProduto : '${d.empresa}  |  $nomeDoProduto';
+  // No arquivo de dados o rodapé é outro: o aviso vai no fim das paradas.
+  if (avisoNoFim) conteudo.add(p.nota(avisoParadas, cor: _tintaLaranja, tamanho: 9.5));
+  return conteudo;
+}
+
+// ---------------------------------------------------------- arquivo de dados
+
+/// Todos os dados (da empresa ou de um motorista) num PDF só, para a empresa
+/// guardar antes da exclusão: caminhões e, para cada motorista, o cadastro, o
+/// relatório de todo o período, os acertos e as paradas.
+Future<Uint8List> gerarPdfArquivo(DadosArquivo d, FontesPdf fontes, {DateTime? agora}) async {
+  final quando = agora ?? DateTime.now();
+  final p = _Pdf(fontes);
+  final doc = pw.Document(title: 'Arquivo de dados - ${d.empresa}', author: nomeDoProduto);
+  var marca = d.empresa.isEmpty ? 'Gestão de Frota' : d.empresa;
+  if (marca.length > 28) marca = '${marca.substring(0, 27)}…';
+
+  final conteudo = <pw.Widget>[
+    pw.Row(children: [
+      pw.Container(
+        padding: const pw.EdgeInsets.fromLTRB(10, 5, 10, 5),
+        decoration: const pw.BoxDecoration(
+          color: _verdePlaca,
+          borderRadius: pw.BorderRadius.all(pw.Radius.circular(5)),
+        ),
+        child: pw.Text(marca, style: p.t(16, cor: PdfColors.white, negrito: true, numero: true)),
+      ),
+      pw.SizedBox(width: 12),
+      pw.Expanded(
+        child: pw.Text(d.daEmpresaToda ? 'Arquivo de todos os dados da empresa' : 'Arquivo de todos os dados do motorista',
+            style: p.t(12.5, cor: _tintaCinza)),
+      ),
+    ]),
+    pw.SizedBox(height: 12),
+    p.bloco(
+      'GUARDE ESTE ARQUIVO',
+      d.daEmpresaToda ? d.empresa : (d.motoristas.isEmpty ? '' : d.motoristas.first.nome),
+      'Gerado em ${dataHoraTexto(quando)}, antes da exclusão. Depois de excluídos, os dados não podem ser recuperados.',
+      cor: _tintaLaranja,
+      fundo: _fundoAmarelo,
+    ),
+    if (d.daEmpresaToda) p.valor('Caminhões', '${d.caminhoes.length}'),
+    p.valor('Motoristas', '${d.motoristas.length}'),
+    for (final m in d.motoristas)
+      p.item('${m.nome}${m.ativo ? '' : ' (desligado)'}', _semNada(m) ? 'sem lançamentos' : m.relatorio.periodo.texto),
+  ];
+
+  if (d.caminhoes.isNotEmpty) {
+    conteudo.add(p.titulo('Caminhões (${d.caminhoes.length})'));
+    for (final c in d.caminhoes) {
+      conteudo.add(p.item(
+        [
+          placaTexto(c.placa),
+          if ((c.numeroFrota ?? '').isNotEmpty) 'frota ${c.numeroFrota}',
+          if (c.modelo.isNotEmpty) c.modelo,
+          if (c.ano != null) '${c.ano}',
+        ].join('  ·  '),
+        c.ativo ? (c.confirmado ? 'em uso' : 'para conferir') : 'fora de uso',
+      ));
+    }
+  }
+
+  for (final m in d.motoristas) {
+    final pm = _Pdf(fontes, m.relatorio);
+    conteudo.add(pw.NewPage());
+    conteudo.add(p.titulo('Motorista: ${m.nome}'));
+    if (m.cpf.isNotEmpty) conteudo.add(p.item('CPF', m.cpf));
+    if (m.email.isNotEmpty) conteudo.add(p.item('E-mail', m.email));
+    if (m.modalidade.isNotEmpty) conteudo.add(p.item('Modalidade', m.modalidade));
+    conteudo.add(p.item('Situação', m.ativo ? 'ativo' : 'desligado'));
+    conteudo.add(pw.SizedBox(height: 10));
+    if (m.relatorio.vazio) {
+      conteudo.add(p.nota('Nenhum frete, viagem, abastecida, gasto ou vale registrado.', tamanho: 10.5));
+    } else {
+      conteudo.addAll(_conteudoRelatorio(pm, m.relatorio, quando));
+    }
+    if (m.acertos.isNotEmpty) conteudo.addAll(_acertosDoArquivo(p, m.acertos));
+    final paradas = m.paradas;
+    if (paradas != null && paradas.resumo.paradas.isNotEmpty) {
+      conteudo.add(pw.NewPage());
+      conteudo.addAll(_conteudoParadas(p, paradas, quando, avisoNoFim: true));
+    }
+  }
+
+  final rodape = 'Arquivo de dados  |  ${d.empresa.isEmpty ? nomeDoProduto : '${d.empresa}  |  $nomeDoProduto'}';
   doc.addPage(
     pw.MultiPage(
       pageFormat: PdfPageFormat.a4,
       margin: const pw.EdgeInsets.fromLTRB(40, 36, 40, 36),
+      maxPages: 2000,
       theme: pw.ThemeData.withFont(base: fontes.normal, bold: fontes.negrito),
       footer: (ctx) => pw.Container(
+        alignment: pw.Alignment.centerRight,
         margin: const pw.EdgeInsets.only(top: 10),
-        child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.stretch, children: [
-          pw.Text(avisoParadas, style: p.t(9, cor: _tintaLaranja, negrito: true)),
-          pw.SizedBox(height: 2),
-          pw.Text('$rodape  |  página ${ctx.pageNumber} de ${ctx.pagesCount}',
-              style: p.t(8.5, cor: _tintaCinza), textAlign: pw.TextAlign.right),
-        ]),
+        child: pw.Text('$rodape  |  página ${ctx.pageNumber} de ${ctx.pagesCount}', style: p.t(8.5, cor: _tintaCinza)),
       ),
       build: (ctx) => conteudo,
     ),
   );
   return doc.save();
+}
+
+bool _semNada(MotoristaNoArquivo m) =>
+    m.relatorio.vazio && m.acertos.isEmpty && (m.paradas?.resumo.paradas.isEmpty ?? true);
+
+List<pw.Widget> _acertosDoArquivo(_Pdf p, List<Acerto> acertos) {
+  final w = <pw.Widget>[p.titulo('Acertos fechados (${acertos.length})')];
+  for (final a in acertos) {
+    w.add(p.valor(a.periodoTexto, reais(a.paraReceberCentavos)));
+    w.add(p.item('Comissão', reais(a.comissaoCentavos)));
+    for (final x in a.descontos) {
+      w.add(p.item('Desconto: ${x.descricao}', '- ${reais(x.valorCentavos)}'));
+    }
+    if (a.descontaVales && a.valesCentavos > 0) w.add(p.item('Vales', '- ${reais(a.valesCentavos)}'));
+    if (a.descontaGastos && (a.dieselCentavos + a.gastosCentavos) > 0) {
+      w.add(p.item('Diesel e gastos', '- ${reais(a.dieselCentavos + a.gastosCentavos)}'));
+    }
+    w.add(p.item('Viagens no período', '${a.quantidadeViagens}'));
+    if ((a.observacao ?? '').isNotEmpty) w.add(p.item('Observação', a.observacao!));
+    if (a.fechadoEm != null) w.add(p.item('Fechado em', dataHoraTexto(a.fechadoEm!)));
+  }
+  return w;
 }
