@@ -16,9 +16,9 @@ dependencies:
   visual:
     path: ../../packages/visual
   flutter_riverpod: 3.4.3
-  go_router: 18.1.0
+  go_router: 18.1.1
   supabase_flutter: 2.18.3
-  drift: 2.35.2
+  drift: 2.35.3
   drift_flutter: 0.3.1
   path_provider: 2.1.6
   path: 1.9.1
@@ -30,8 +30,8 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: 6.0.0
-  drift_dev: 2.35.1
-  build_runner: 2.16.2
+  drift_dev: 2.35.2
+  build_runner: 2.17.1
 
 flutter:
   uses-material-design: true
