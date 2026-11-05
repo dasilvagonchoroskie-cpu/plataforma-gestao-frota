@@ -68,6 +68,9 @@ class Frete {
     this.saldoCentavos = 0,
     this.percentualComissao = 13,
     this.comissaoSobreBruto = false,
+    this.comissaoComPedagio = false,
+    this.freteCheio = false,
+    this.valorFreteCheioCentavos = 0,
     this.pedagioCentavos = 0,
     this.pesoDescargaKg = 0,
     this.descontoQuebraCentavos = 0,
@@ -101,7 +104,17 @@ class Frete {
   final int adiantamentoCentavos;
   final int saldoCentavos;
   final double percentualComissao;
+
+  /// A comissão é sobre o frete cheio, antes dos descontos (peso x tonelada
+  /// ou o valor fechado). Falso: sobre o que caiu na conta.
   final bool comissaoSobreBruto;
+
+  /// O pedágio (cartão ou tag) entra na conta da comissão.
+  final bool comissaoComPedagio;
+
+  /// Frete com valor fechado (frete cheio), no lugar de peso x tonelada.
+  final bool freteCheio;
+  final int valorFreteCheioCentavos;
   final int pedagioCentavos;
   final double pesoDescargaKg;
   final int descontoQuebraCentavos;
@@ -117,16 +130,29 @@ class Frete {
   /// O que caiu na conta: adiantamento + saldo.
   int get freteRealCentavos => adiantamentoCentavos + saldoCentavos;
 
-  /// Peso x valor da tonelada (carta frete).
-  double get valorContratadoCentavos => (pesoCargaKg / 1000.0) * valorToneladaCentavos;
+  /// Frete cheio (valor fechado) ou peso x valor da tonelada (carta frete).
+  double get valorContratadoCentavos =>
+      freteCheio ? valorFreteCheioCentavos.toDouble() : (pesoCargaKg / 1000.0) * valorToneladaCentavos;
 
-  /// Sobre o que a comissão é calculada.
-  double get baseComissaoCentavos {
+  /// O frete sobre o qual a comissão é calculada, sem o pedágio: o frete
+  /// cheio (peso descarregado x tonelada, ou o valor fechado) ou o que caiu na
+  /// conta.
+  double get baseFreteDaComissaoCentavos {
     if (comissaoSobreBruto) {
+      if (freteCheio) return valorFreteCheioCentavos.toDouble();
       final peso = pesoDescargaKg > 0 ? pesoDescargaKg : pesoCargaKg;
       return (peso / 1000.0) * valorToneladaCentavos;
     }
     return freteRealCentavos.toDouble();
+  }
+
+  /// Sobre o que a comissão é calculada (com o pedágio, se o combinado manda).
+  double get baseComissaoCentavos => baseFreteDaComissaoCentavos + (comissaoComPedagio ? pedagioCentavos : 0);
+
+  /// Como a base foi montada, para mostrar ao lado da comissão.
+  String get explicacaoDaBase {
+    final frete = comissaoSobreBruto ? 'frete cheio' : 'o que caiu na conta';
+    return comissaoComPedagio && pedagioCentavos > 0 ? '$frete + pedágio' : frete;
   }
 
   /// A parte do motorista neste frete.
@@ -167,6 +193,9 @@ class Frete {
     int? saldoCentavos,
     double? percentualComissao,
     bool? comissaoSobreBruto,
+    bool? comissaoComPedagio,
+    bool? freteCheio,
+    int? valorFreteCheioCentavos,
     int? pedagioCentavos,
     double? pesoDescargaKg,
     int? descontoQuebraCentavos,
@@ -191,6 +220,9 @@ class Frete {
         saldoCentavos: saldoCentavos ?? this.saldoCentavos,
         percentualComissao: percentualComissao ?? this.percentualComissao,
         comissaoSobreBruto: comissaoSobreBruto ?? this.comissaoSobreBruto,
+        comissaoComPedagio: comissaoComPedagio ?? this.comissaoComPedagio,
+        freteCheio: freteCheio ?? this.freteCheio,
+        valorFreteCheioCentavos: valorFreteCheioCentavos ?? this.valorFreteCheioCentavos,
         pedagioCentavos: pedagioCentavos ?? this.pedagioCentavos,
         pesoDescargaKg: pesoDescargaKg ?? this.pesoDescargaKg,
         descontoQuebraCentavos: descontoQuebraCentavos ?? this.descontoQuebraCentavos,
@@ -215,6 +247,9 @@ class Frete {
         'saldo_centavos': saldoCentavos,
         'percentual_comissao': percentualComissao,
         'comissao_sobre_bruto': comissaoSobreBruto,
+        'comissao_com_pedagio': comissaoComPedagio,
+        'frete_cheio': freteCheio,
+        'valor_frete_cheio_centavos': valorFreteCheioCentavos,
         'pedagio_centavos': pedagioCentavos,
         'peso_descarga_kg': pesoDescargaKg,
         'desconto_quebra_centavos': descontoQuebraCentavos,
@@ -239,6 +274,12 @@ class Frete {
         saldoCentavos: lerInt(m['saldo_centavos']),
         percentualComissao: lerDouble(m['percentual_comissao'], 13),
         comissaoSobreBruto: lerBool(m['comissao_sobre_bruto']),
+        // Antes de 05/11/2026, "Frete + pedágio" era o próprio comissao_sobre_bruto.
+        comissaoComPedagio: m.containsKey('comissao_com_pedagio')
+            ? lerBool(m['comissao_com_pedagio'])
+            : lerBool(m['comissao_sobre_bruto']),
+        freteCheio: lerBool(m['frete_cheio']),
+        valorFreteCheioCentavos: lerInt(m['valor_frete_cheio_centavos']),
         pedagioCentavos: lerInt(m['pedagio_centavos']),
         pesoDescargaKg: lerDouble(m['peso_descarga_kg']),
         descontoQuebraCentavos: lerInt(m['desconto_quebra_centavos']),
@@ -784,29 +825,83 @@ class ConfiguracaoEmpresa {
   const ConfiguracaoEmpresa({
     this.percentualComissaoPadrao = 13,
     this.comissaoSobreBrutoPadrao = false,
+    this.comissaoComPedagioPadrao = false,
+    this.salarioFixoCentavos = 0,
     this.gastosDescontamDoLiquido = false,
     this.valeDescontaDoLiquido = true,
   });
 
+  /// Comissão (% de cada frete). Zero: o motorista não ganha comissão.
   final double percentualComissaoPadrao;
+
+  /// A comissão é sobre o frete cheio (antes dos descontos) ou sobre o que
+  /// caiu na conta.
   final bool comissaoSobreBrutoPadrao;
+
+  /// O pedágio (cartão ou tag) entra na comissão.
+  final bool comissaoComPedagioPadrao;
+
+  /// Salário fixo por mês (zero: não tem).
+  final int salarioFixoCentavos;
   final bool gastosDescontamDoLiquido;
   final bool valeDescontaDoLiquido;
 
+  FormaDeGanhar get formaDeGanhar => FormaDeGanhar.de(salarioFixoCentavos, percentualComissaoPadrao);
+
   factory ConfiguracaoEmpresa.deMapa(Map<String, Object?>? m) {
     if (m == null) return const ConfiguracaoEmpresa();
+    final bruto = lerBool(m['comissao_sobre_bruto_padrao']);
     return ConfiguracaoEmpresa(
       percentualComissaoPadrao: lerDouble(m['percentual_comissao_padrao'], 13),
-      comissaoSobreBrutoPadrao: lerBool(m['comissao_sobre_bruto_padrao']),
+      comissaoSobreBrutoPadrao: bruto,
+      // Antes de 05/11/2026, "Frete + pedágio" era o próprio comissao_sobre_bruto_padrao.
+      comissaoComPedagioPadrao:
+          m.containsKey('comissao_com_pedagio_padrao') ? lerBool(m['comissao_com_pedagio_padrao']) : bruto,
+      salarioFixoCentavos: lerInt(m['salario_fixo_centavos']),
       gastosDescontamDoLiquido: lerBool(m['gastos_descontam_do_liquido']),
       valeDescontaDoLiquido: lerBool(m['vale_desconta_do_liquido'], true),
+    );
+  }
+
+  /// O combinado de um motorista: o que o gestor mudou só para ele (campos
+  /// do cadastro dele) e, no resto, o padrão da empresa.
+  ConfiguracaoEmpresa doMotorista(Map<String, Object?>? motorista) {
+    final m = motorista ?? const <String, Object?>{};
+    return ConfiguracaoEmpresa(
+      percentualComissaoPadrao:
+          m['percentual_comissao'] == null ? percentualComissaoPadrao : lerDouble(m['percentual_comissao']),
+      comissaoSobreBrutoPadrao:
+          m['comissao_sobre_bruto'] == null ? comissaoSobreBrutoPadrao : lerBool(m['comissao_sobre_bruto']),
+      comissaoComPedagioPadrao:
+          m['comissao_com_pedagio'] == null ? comissaoComPedagioPadrao : lerBool(m['comissao_com_pedagio']),
+      salarioFixoCentavos: m['salario_fixo_centavos'] == null ? salarioFixoCentavos : lerInt(m['salario_fixo_centavos']),
+      gastosDescontamDoLiquido: gastosDescontamDoLiquido,
+      valeDescontaDoLiquido: valeDescontaDoLiquido,
     );
   }
 
   Map<String, Object?> paraMapa() => {
         'percentual_comissao_padrao': percentualComissaoPadrao,
         'comissao_sobre_bruto_padrao': comissaoSobreBrutoPadrao,
+        'comissao_com_pedagio_padrao': comissaoComPedagioPadrao,
+        'salario_fixo_centavos': salarioFixoCentavos,
         'gastos_descontam_do_liquido': gastosDescontamDoLiquido,
         'vale_desconta_do_liquido': valeDescontaDoLiquido,
       };
+}
+
+/// Como o motorista ganha (o que o patrão combinou com ele).
+enum FormaDeGanhar {
+  comissao('Comissão', '% de cada frete'),
+  fixo('Salário fixo', 'Um valor por mês'),
+  fixoMaisComissao('Fixo + %', 'Um valor por mês mais % dos fretes dele no mês');
+
+  const FormaDeGanhar(this.rotulo, this.explicacao);
+  final String rotulo;
+  final String explicacao;
+
+  static FormaDeGanhar de(int fixoCentavos, double percentual) {
+    if (fixoCentavos <= 0) return comissao;
+    return percentual > 0 ? fixoMaisComissao : fixo;
+  }
 }

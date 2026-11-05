@@ -35,7 +35,7 @@ String csvFretes(List<Frete> fretes, {Map<String, String> motoristas = const {},
     'Data da carga', 'Motorista', 'Caminhão', 'Origem', 'Destino', 'Embarcador', 'Peso carga (kg)',
     'Peso descarga (kg)', 'Valor da tonelada (R\$)', 'Contratado (R\$)', 'Adiantamento (R\$)', 'Saldo (R\$)',
     'Frete real (R\$)', 'Pedágio (R\$)', 'Desconto quebra (R\$)', 'Comissão (%)', 'Base da comissão (R\$)',
-    'Comissão do motorista (R\$)', 'Corrigido pelo gestor',
+    'A comissão é sobre', 'Comissão do motorista (R\$)', 'Corrigido pelo gestor',
   ], [
     for (final f in ordenados)
       [
@@ -44,7 +44,7 @@ String csvFretes(List<Frete> fretes, {Map<String, String> motoristas = const {},
         _reaisCsv(f.valorToneladaCentavos), _reaisCsv(f.valorContratadoCentavos), _reaisCsv(f.adiantamentoCentavos),
         _reaisCsv(f.saldoCentavos), _reaisCsv(f.freteRealCentavos), _reaisCsv(f.pedagioCentavos),
         _reaisCsv(f.descontoQuebraCentavos), percentualTexto(f.percentualComissao),
-        _reaisCsv(f.baseComissaoCentavos), _reaisCsv(f.minhaParteCentavos),
+        _reaisCsv(f.baseComissaoCentavos), f.explicacaoDaBase, _reaisCsv(f.minhaParteCentavos),
         f.camposAjustados.map(nomeDoCampo).join(', '),
       ],
   ]);

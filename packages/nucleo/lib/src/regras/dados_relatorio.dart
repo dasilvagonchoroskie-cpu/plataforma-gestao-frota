@@ -113,6 +113,10 @@ DadosRelatorio montarDados({
   bool porViagem = false,
   Acerto? acerto,
   Modalidade? modalidade,
+
+  /// Salário fixo por mês dos motoristas do relatório (soma, quando é a
+  /// empresa toda). Entra proporcional aos dias do período.
+  int salarioFixoMensalCentavos = 0,
 }) {
   bool vivo(DateTime? apagado) => apagado == null;
   final fretesP = soEsteFrete != null
@@ -132,6 +136,9 @@ DadosRelatorio montarDados({
     gastos: gastosP.map((g) => g.valorCentavos).toList(),
     gastosDinheiro: [for (final g in gastosP) if (g.emDinheiro) g.valorCentavos],
     vales: valesP.map((v) => v.valorCentavos).toList(),
+    // Baú e Sider: o fixo entra no acerto do gestor; o relatório de uma
+    // viagem só não leva o fixo do mês.
+    salarioFixo: porViagem || soEsteFrete != null ? 0 : salarioFixoNoPeriodo(salarioFixoMensalCentavos, periodo),
     regras: regras,
   );
 

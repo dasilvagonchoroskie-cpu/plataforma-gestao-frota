@@ -336,6 +336,10 @@ List<pw.Widget> _resumo(_Pdf p, DadosRelatorio d) {
     linhaComissao = '${percentualTexto(r.percentualMedio)}% sobre ${reais(r.totalBaseComissao)}';
   }
   w.add(p.nota(linhaComissao, recuo: 8, cor: r.percentuaisDiferentes ? _tintaLaranja : _tintaCinza));
+  if (r.salarioFixo > 0) {
+    w.add(p.valor('Salário fixo', reais(r.salarioFixo)));
+    w.add(p.nota('Combinado por mês. Num pedaço do mês, entra a parte dos dias.', recuo: 8));
+  }
   w.add(p.valor('Total gasto', reais(r.totalGastoGeral)));
   w.add(p.nota('Diesel ${reais(r.totalAbastecimento)}   |   Outros gastos ${reais(r.totalGastos)}', recuo: 8, abaixo: 1));
   if (r.totalGastosDinheiro > 0) {
@@ -357,7 +361,8 @@ List<pw.Widget> _resumo(_Pdf p, DadosRelatorio d) {
     w.add(p.valor('( + ) Gastos pagos em dinheiro', reais(r.devolvidoDoVale)));
     w.add(p.nota('Pagos com o dinheiro do vale: abatem do vale e voltam para o motorista.', recuo: 8));
   }
-  final conta = StringBuffer('Comissão ${reais(r.comissao)}');
+  final conta = StringBuffer(r.comissao == 0 && r.salarioFixo > 0 ? 'Salário fixo ${reais(r.salarioFixo)}' : 'Comissão ${reais(r.comissao)}');
+  if (r.salarioFixo > 0 && r.comissao != 0) conta.write('  mais salário fixo ${reais(r.salarioFixo)}');
   if (regras.gastosDescontamDoLiquido) conta.write('  menos gastos na nota ${reais(r.descontoGastos)}');
   if (regras.valeDescontaDoLiquido) conta.write('  menos vale ${reais(r.totalVale)}');
   if (r.devolvidoDoVale > 0) conta.write('  mais gastos pagos em dinheiro ${reais(r.devolvidoDoVale)}');
@@ -376,7 +381,7 @@ List<pw.Widget> _contaDoCaminhao(_Pdf p, DadosRelatorio d) {
   ];
   if (r.totalContratado > 0) {
     w.add(p.valor('Frete contratado', reais(r.totalContratado)));
-    w.add(p.nota('Peso vezes o valor da tonelada, conforme a carta-frete', recuo: 8));
+    w.add(p.nota('Peso vezes o valor da tonelada, ou o frete cheio, conforme a carta-frete', recuo: 8));
     w.add(p.valor('( - ) Desconto da transportadora', reais(r.totalDescontoDoFrete)));
     w.add(p.nota(
       'INSS, SEST/SENAT, seguro, quebra, vale-pedágio e o que mais a transportadora tiver retido. A conta é '
@@ -403,6 +408,9 @@ List<pw.Widget> _contaDoCaminhao(_Pdf p, DadosRelatorio d) {
   w.add(p.valor('( - ) Comissão do motorista', reais(r.comissaoDoCaminhao)));
   w.add(p.nota('Quem paga a comissão é o frete. Por isso ela entra como despesa do caminhão, no mesmo peso do diesel.',
       recuo: 8));
+  if (r.salarioFixo > 0) {
+    w.add(p.valor('( - ) Salário fixo do motorista', reais(r.salarioFixo)));
+  }
   if (r.totalPedagio > 0) {
     w.add(p.nota(
       'O pedágio de ${reais(r.totalPedagio)} NÃO entra nesta subtração: foi pago no cartão ou tag da empresa, esse '
@@ -423,7 +431,7 @@ List<pw.Widget> _contaDoCaminhao(_Pdf p, DadosRelatorio d) {
     ));
   }
   final contaTexto = '${reais(r.totalFretes)} - ${dinheiro(r.totalAbastecimento)} - ${dinheiro(r.totalGastos)} - '
-      '${dinheiro(r.comissaoDoCaminhao)}';
+      '${dinheiro(r.comissaoDoCaminhao)}${r.salarioFixo > 0 ? ' - ${dinheiro(r.salarioFixo)}' : ''}';
   w.add(p.bloco(
     positivo
         ? (d.variosCaminhoes ? 'SOBROU PARA OS CAMINHÕES' : 'SOBROU PARA O CAMINHÃO')
@@ -654,9 +662,10 @@ List<pw.Widget> _fretes(_Pdf p, List<Frete> lista, Modalidade? modalidade) {
       abaixo: 1,
     ));
     linhas.add(p.nota(
-      'Frete real ${reais(f.freteRealCentavos)}   Comissão ${percentualTexto(f.percentualComissao)}% sobre '
-      '${reais(f.baseComissaoCentavos)} = ${reais(f.minhaParteCentavos)}'
-      '${f.pedagioCentavos > 0 && f.comissaoSobreBruto ? ' (com pedágio)' : ''}',
+      '${f.freteCheio ? 'Frete cheio ${reais(f.valorFreteCheioCentavos)}   ' : ''}'
+      'Frete real ${reais(f.freteRealCentavos)}'
+      '${f.percentualComissao > 0 ? '   Comissão ${percentualTexto(f.percentualComissao)}% sobre '
+          '${reais(f.baseComissaoCentavos)} (${f.explicacaoDaBase}) = ${reais(f.minhaParteCentavos)}' : ''}',
       recuo: 8,
       tamanho: 10,
       cor: _tintaVerde,
