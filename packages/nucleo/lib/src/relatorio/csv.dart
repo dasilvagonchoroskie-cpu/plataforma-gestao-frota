@@ -73,11 +73,12 @@ String csvAbastecimentos(List<Abastecimento> lista, List<Abastecimento> todas,
 
 String csvGastos(List<Gasto> lista, {Map<String, String> motoristas = const {}, Map<String, String> placas = const {}}) {
   final ordenados = List<Gasto>.from(lista)..sort((a, b) => a.data.compareTo(b.data));
-  return gerarCsv(['Data', 'Motorista', 'Caminhão', 'Categoria', 'Valor (R\$)', 'Observação', 'Corrigido pelo gestor'], [
+  return gerarCsv(
+      ['Data', 'Motorista', 'Caminhão', 'Categoria', 'Valor (R\$)', 'Pago em', 'Observação', 'Corrigido pelo gestor'], [
     for (final g in ordenados)
       [
         dataTexto(g.data), motoristas[g.motoristaId] ?? '', placaTexto(placas[g.caminhaoId] ?? ''), g.categoriaNome,
-        _reaisCsv(g.valorCentavos), g.observacao ?? '', g.camposAjustados.map(nomeDoCampo).join(', '),
+        _reaisCsv(g.valorCentavos), g.formaPagamento.curto, g.observacao ?? '', g.camposAjustados.map(nomeDoCampo).join(', '),
       ],
   ]);
 }

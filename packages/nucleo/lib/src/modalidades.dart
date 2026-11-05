@@ -462,6 +462,7 @@ class Acerto {
     this.valesCentavos = 0,
     this.dieselCentavos = 0,
     this.gastosCentavos = 0,
+    this.gastosDinheiroCentavos = 0,
     this.descontaVales = true,
     this.descontaGastos = false,
     this.paraReceberCentavos = 0,
@@ -481,6 +482,9 @@ class Acerto {
   final int valesCentavos;
   final int dieselCentavos;
   final int gastosCentavos;
+
+  /// Dos [gastosCentavos], os pagos em dinheiro (com o vale).
+  final int gastosDinheiroCentavos;
   final bool descontaVales;
   final bool descontaGastos;
   final int paraReceberCentavos;
@@ -511,6 +515,7 @@ class Acerto {
         valesCentavos: lerInt(m['vales_centavos']),
         dieselCentavos: lerInt(m['diesel_centavos']),
         gastosCentavos: lerInt(m['gastos_centavos']),
+        gastosDinheiroCentavos: lerInt(m['gastos_dinheiro_centavos']),
         descontaVales: lerBool(m['desconta_vales'], true),
         descontaGastos: lerBool(m['desconta_gastos']),
         paraReceberCentavos: lerInt(m['para_receber_centavos']),
@@ -531,6 +536,7 @@ class Acerto {
         'vales_centavos': valesCentavos,
         'diesel_centavos': dieselCentavos,
         'gastos_centavos': gastosCentavos,
+        'gastos_dinheiro_centavos': gastosDinheiroCentavos,
         'desconta_vales': descontaVales,
         'desconta_gastos': descontaGastos,
         'para_receber_centavos': paraReceberCentavos,
@@ -541,19 +547,24 @@ class Acerto {
       };
 }
 
-/// A mesma conta do servidor (fechar_acerto): comissão menos descontos menos
-/// vales (se a regra manda) menos diesel e gastos (se a regra manda).
+/// A mesma conta do servidor (para_receber_acerto): comissão menos descontos
+/// menos vales (se a regra manda; os gastos pagos em dinheiro abatem do vale
+/// quando a empresa paga os gastos) menos diesel e gastos na nota (se os
+/// gastos são do motorista).
 int calcularParaReceber({
   required int comissaoCentavos,
   required List<DescontoAcerto> descontos,
   required int valesCentavos,
   required int dieselCentavos,
   required int gastosCentavos,
+  int gastosDinheiroCentavos = 0,
   required Regras regras,
 }) {
   var r = comissaoCentavos - descontos.fold<int>(0, (s, d) => s + d.valorCentavos);
-  if (regras.valeDescontaDoLiquido) r -= valesCentavos;
-  if (regras.gastosDescontamDoLiquido) r -= dieselCentavos + gastosCentavos;
+  if (regras.valeDescontaDoLiquido) {
+    r -= valesCentavos - (regras.gastosDescontamDoLiquido ? 0 : gastosDinheiroCentavos);
+  }
+  if (regras.gastosDescontamDoLiquido) r -= dieselCentavos + gastosCentavos - gastosDinheiroCentavos;
   return r;
 }
 
@@ -562,8 +573,12 @@ String contaDoAcerto(Acerto a) {
   final b = StringBuffer('Comissão ${reais(a.comissaoCentavos)}');
   if (a.totalDescontosCentavos > 0) b.write('  menos descontos ${reais(a.totalDescontosCentavos)}');
   if (a.descontaVales && a.valesCentavos > 0) b.write('  menos vales ${reais(a.valesCentavos)}');
-  if (a.descontaGastos && a.dieselCentavos + a.gastosCentavos > 0) {
-    b.write('  menos diesel e gastos ${reais(a.dieselCentavos + a.gastosCentavos)}');
+  if (a.descontaVales && !a.descontaGastos && a.gastosDinheiroCentavos > 0) {
+    b.write('  mais gastos pagos em dinheiro ${reais(a.gastosDinheiroCentavos)}');
+  }
+  final gastosNaConta = a.dieselCentavos + a.gastosCentavos - a.gastosDinheiroCentavos;
+  if (a.descontaGastos && gastosNaConta > 0) {
+    b.write('  menos diesel e gastos na nota ${reais(gastosNaConta)}');
   }
   return b.toString();
 }

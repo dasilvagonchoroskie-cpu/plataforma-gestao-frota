@@ -39,6 +39,9 @@ class ResultadoResumo {
     required this.totalGastos,
     required this.totalGastoGeral,
     required this.totalVale,
+    this.totalGastosDinheiro = 0,
+    this.devolvidoDoVale = 0,
+    this.descontoGastos = 0,
     required this.liquido,
     required this.totalQuebraCalculada,
     required this.totalQuebraKg,
@@ -68,6 +71,18 @@ class ResultadoResumo {
   final double totalGastoGeral;
   final double totalVale;
 
+  /// Gastos que o motorista pagou em dinheiro (com o vale). Estão dentro de
+  /// [totalGastos].
+  final double totalGastosDinheiro;
+
+  /// Gastos em dinheiro que voltam para o motorista: o vale desconta e a
+  /// empresa paga os gastos (o que passa do vale também volta).
+  final double devolvidoDoVale;
+
+  /// Diesel e gastos na nota que descontam (quando os gastos são do
+  /// motorista). Os pagos em dinheiro já saíram do vale.
+  final double descontoGastos;
+
   /// O que o motorista tem para receber.
   final double liquido;
   final double totalQuebraCalculada;
@@ -96,6 +111,9 @@ ResultadoResumo calcularResumo({
   required List<int> abastecimentos,
   required List<int> gastos,
   required List<int> vales,
+
+  /// Os gastos de [gastos] que foram pagos em dinheiro (com o vale).
+  List<int> gastosDinheiro = const [],
   Regras regras = const Regras(),
 }) {
   final totalFretes = _soma(fretes, (Frete f) => f.freteRealCentavos);
@@ -106,6 +124,7 @@ ResultadoResumo calcularResumo({
   final totalGastos = _soma(gastos, (int v) => v);
   final totalGastoGeral = totalAbastecimento + totalGastos;
   final totalVale = _soma(vales, (int v) => v);
+  final totalGastosDinheiro = _soma(gastosDinheiro, (int v) => v);
   final totalQuebraCalculada = _soma(fretes, (Frete f) => f.valorQuebraIntegralCentavos);
   final totalQuebraKg = _soma(fretes, (Frete f) => f.quebraKg ?? 0);
 
@@ -124,7 +143,12 @@ ResultadoResumo calcularResumo({
       (totalBaseComissao > 0 && regras.freteRealEhValorCheio) ? (comissao / totalBaseComissao) * 100 : 0.0;
   final percentuaisDiferentes = fretes.map((f) => f.percentualComissao).toSet().length > 1;
 
-  var liquido = regras.gastosDescontamDoLiquido ? comissao - totalGastoGeral : comissao;
+  // Mesma conta do acerto no servidor (para_receber_acerto): gasto pago em
+  // dinheiro abate do vale; gasto na nota a empresa paga direto.
+  final devolvidoDoVale =
+      regras.valeDescontaDoLiquido && !regras.gastosDescontamDoLiquido ? totalGastosDinheiro : 0.0;
+  final descontoGastos = regras.gastosDescontamDoLiquido ? totalGastoGeral - totalGastosDinheiro : 0.0;
+  var liquido = comissao - descontoGastos + devolvidoDoVale;
   if (regras.valeDescontaDoLiquido) liquido -= totalVale;
 
   return ResultadoResumo(
@@ -140,6 +164,9 @@ ResultadoResumo calcularResumo({
     totalGastos: totalGastos,
     totalGastoGeral: totalGastoGeral,
     totalVale: totalVale,
+    totalGastosDinheiro: totalGastosDinheiro,
+    devolvidoDoVale: devolvidoDoVale,
+    descontoGastos: descontoGastos,
     liquido: liquido,
     totalQuebraCalculada: totalQuebraCalculada,
     totalQuebraKg: totalQuebraKg,

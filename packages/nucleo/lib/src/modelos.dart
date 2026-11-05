@@ -416,6 +416,26 @@ class AjusteKm {
       );
 }
 
+/// Como o motorista pagou o gasto.
+enum FormaPagamento {
+  /// Com o dinheiro do vale: abate do vale no acerto.
+  dinheiro('dinheiro', 'Paguei em dinheiro', 'Dinheiro'),
+
+  /// Assinou a nota: a empresa paga direto.
+  nota('nota', 'Assinei a nota', 'Nota');
+
+  const FormaPagamento(this.codigo, this.rotulo, this.curto);
+  final String codigo;
+
+  /// Como aparece para o motorista escolher.
+  final String rotulo;
+
+  /// Como aparece nas listas e no PDF.
+  final String curto;
+
+  static FormaPagamento doCodigo(String? c) => c == 'dinheiro' ? dinheiro : nota;
+}
+
 class Gasto {
   const Gasto({
     required this.id,
@@ -427,6 +447,7 @@ class Gasto {
     this.categoriaNome = '',
     this.freteId,
     this.observacao,
+    this.formaPagamento = FormaPagamento.nota,
     this.empresaId,
     this.criadoNoAparelhoEm,
     this.atualizadoEm,
@@ -446,12 +467,19 @@ class Gasto {
   final String categoriaNome;
   final int valorCentavos;
   final String? observacao;
+
+  /// Dinheiro (do vale) ou nota assinada (a empresa paga). Gasto antigo,
+  /// lançado antes desta escolha, conta como nota.
+  final FormaPagamento formaPagamento;
   final DateTime? criadoNoAparelhoEm;
   final DateTime? atualizadoEm;
   final DateTime? apagadoEm;
   final List<String> camposAjustados;
 
   bool get ajustado => camposAjustados.isNotEmpty;
+
+  /// Pago com o dinheiro do vale: abate do vale no acerto.
+  bool get emDinheiro => formaPagamento == FormaPagamento.dinheiro;
 
   /// Atalho com o nome do Meu Frete.
   String get categoria => categoriaNome;
@@ -467,6 +495,7 @@ class Gasto {
         categoriaNome: nome,
         valorCentavos: valorCentavos,
         observacao: observacao,
+        formaPagamento: formaPagamento,
         criadoNoAparelhoEm: criadoNoAparelhoEm,
         atualizadoEm: atualizadoEm,
         apagadoEm: apagadoEm,
@@ -480,6 +509,7 @@ class Gasto {
     String? categoriaNome,
     int? valorCentavos,
     String? observacao,
+    FormaPagamento? formaPagamento,
     DateTime? apagadoEm,
   }) =>
       Gasto(
@@ -493,6 +523,7 @@ class Gasto {
         categoriaNome: categoriaNome ?? this.categoriaNome,
         valorCentavos: valorCentavos ?? this.valorCentavos,
         observacao: observacao ?? this.observacao,
+        formaPagamento: formaPagamento ?? this.formaPagamento,
         criadoNoAparelhoEm: criadoNoAparelhoEm,
         atualizadoEm: atualizadoEm,
         apagadoEm: apagadoEm ?? this.apagadoEm,
@@ -509,6 +540,7 @@ class Gasto {
         'categoria_id': categoriaId,
         'valor_centavos': valorCentavos,
         if (observacao != null && observacao!.isNotEmpty) 'observacao': observacao,
+        'forma_pagamento': formaPagamento.codigo,
         if (criadoNoAparelhoEm != null) 'criado_no_aparelho_em': dataIso(criadoNoAparelhoEm!),
         if (apagadoEm != null) 'apagado_em': dataIso(apagadoEm!),
       };
@@ -524,6 +556,7 @@ class Gasto {
         categoriaNome: categoriaNome,
         valorCentavos: lerInt(m['valor_centavos']),
         observacao: lerTextoOuNulo(m['observacao']),
+        formaPagamento: FormaPagamento.doCodigo(lerTextoOuNulo(m['forma_pagamento'])),
         criadoNoAparelhoEm: lerDataOuNula(m['criado_no_aparelho_em']),
         atualizadoEm: lerDataOuNula(m['atualizado_em']),
         apagadoEm: lerDataOuNula(m['apagado_em']),

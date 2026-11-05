@@ -47,6 +47,7 @@ const nomesDosCampos = <String, String>{
   'tanque_cheio': 'tanque cheio',
   'categoria_id': 'categoria',
   'observacao': 'observação',
+  'forma_pagamento': 'forma de pagamento',
 };
 
 String nomeDoCampo(String campo) => nomesDosCampos[campo] ?? campo;

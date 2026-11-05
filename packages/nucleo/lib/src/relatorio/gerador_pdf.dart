@@ -338,9 +338,13 @@ List<pw.Widget> _resumo(_Pdf p, DadosRelatorio d) {
   w.add(p.nota(linhaComissao, recuo: 8, cor: r.percentuaisDiferentes ? _tintaLaranja : _tintaCinza));
   w.add(p.valor('Total gasto', reais(r.totalGastoGeral)));
   w.add(p.nota('Diesel ${reais(r.totalAbastecimento)}   |   Outros gastos ${reais(r.totalGastos)}', recuo: 8, abaixo: 1));
+  if (r.totalGastosDinheiro > 0) {
+    w.add(p.nota('Dos outros gastos, ${reais(r.totalGastosDinheiro)} pagos em dinheiro (com o vale) e '
+        '${reais(r.totalGastos - r.totalGastosDinheiro)} na nota.', recuo: 8, abaixo: 1));
+  }
   w.add(p.nota(
     regras.gastosDescontamDoLiquido
-        ? 'Pago pelo motorista. Desconta do líquido.'
+        ? 'Pago pelo motorista. Desconta do líquido (o que foi pago em dinheiro já saiu do vale).'
         : 'Pago pela empresa. Não desconta do líquido do motorista.',
     recuo: 8,
   ));
@@ -349,9 +353,14 @@ List<pw.Widget> _resumo(_Pdf p, DadosRelatorio d) {
     regras.valeDescontaDoLiquido ? 'Já adiantado ao motorista. Desconta do líquido.' : 'Só histórico. Não desconta do líquido.',
     recuo: 8,
   ));
+  if (r.devolvidoDoVale > 0) {
+    w.add(p.valor('( + ) Gastos pagos em dinheiro', reais(r.devolvidoDoVale)));
+    w.add(p.nota('Pagos com o dinheiro do vale: abatem do vale e voltam para o motorista.', recuo: 8));
+  }
   final conta = StringBuffer('Comissão ${reais(r.comissao)}');
-  if (regras.gastosDescontamDoLiquido) conta.write('  menos gastos ${reais(r.totalGastoGeral)}');
+  if (regras.gastosDescontamDoLiquido) conta.write('  menos gastos na nota ${reais(r.descontoGastos)}');
   if (regras.valeDescontaDoLiquido) conta.write('  menos vale ${reais(r.totalVale)}');
+  if (r.devolvidoDoVale > 0) conta.write('  mais gastos pagos em dinheiro ${reais(r.devolvidoDoVale)}');
   w.add(p.bloco('VALOR LÍQUIDO A RECEBER', reais(r.liquido), conta.toString(),
       cor: r.liquido < 0 ? _tintaVermelha : _tintaVerde, fundo: r.liquido < 0 ? _fundoVermelho : _fundoVerde));
   if (regras.freteRealEhValorCheio) w.addAll(_contaDoCaminhao(p, d));
@@ -530,6 +539,10 @@ List<pw.Widget> _resumoViagens(_Pdf p, DadosRelatorio d) {
   if (a == null) {
     w.add(p.valor('Total gasto', reais(r.totalGastoGeral)));
     w.add(p.nota('Diesel ${reais(r.totalAbastecimento)}   |   Outros gastos ${reais(r.totalGastos)}', recuo: 8, abaixo: 1));
+    if (r.totalGastosDinheiro > 0) {
+      w.add(p.nota('Dos outros gastos, ${reais(r.totalGastosDinheiro)} pagos em dinheiro (com o vale).',
+          recuo: 8, abaixo: 1));
+    }
     w.add(p.nota(
       regras.gastosDescontamDoLiquido
           ? 'Pago pelo motorista. Desconta do acerto.'
@@ -553,8 +566,16 @@ List<pw.Widget> _resumoViagens(_Pdf p, DadosRelatorio d) {
   w.add(p.valor(a.descontaVales ? '( - ) Vales' : 'Vales', reais(a.valesCentavos)));
   w.add(p.nota(a.descontaVales ? 'Já adiantado ao motorista. Desconta do acerto.' : 'Só histórico. Não desconta do acerto.',
       recuo: 8));
+  if (a.descontaVales && !a.descontaGastos && a.gastosDinheiroCentavos > 0) {
+    w.add(p.valor('( + ) Gastos pagos em dinheiro', reais(a.gastosDinheiroCentavos)));
+    w.add(p.nota('Pagos com o dinheiro do vale: abatem do vale e voltam para o motorista.', recuo: 8));
+  }
   w.add(p.valor(a.descontaGastos ? '( - ) Diesel e gastos' : 'Diesel e gastos', reais(a.dieselCentavos + a.gastosCentavos)));
   w.add(p.nota('Diesel ${reais(a.dieselCentavos)}   |   Outros gastos ${reais(a.gastosCentavos)}', recuo: 8, abaixo: 1));
+  if (a.gastosDinheiroCentavos > 0) {
+    w.add(p.nota('Dos outros gastos, ${reais(a.gastosDinheiroCentavos)} pagos em dinheiro (com o vale).',
+        recuo: 8, abaixo: 1));
+  }
   w.add(p.nota(
     a.descontaGastos ? 'Pago pelo motorista. Desconta do acerto.' : 'Pago pela empresa. Não desconta do acerto.',
     recuo: 8,
@@ -712,10 +733,15 @@ List<pw.Widget> _gastos(_Pdf p, List<Gasto> lista, double total) {
     final obs = (g.observacao ?? '').trim();
     w.add(p.item(
         '${dataTexto(g.data)}   ${g.categoriaNome}${obs.isEmpty ? '' : ' ($obs)'}${p.placaDaLinha(g.caminhaoId)}'
-        '${g.ajustado ? '   *corrigido' : ''}',
+        '   ${g.emDinheiro ? 'dinheiro' : 'nota'}${g.ajustado ? '   *corrigido' : ''}',
         reais(g.valorCentavos)));
   }
   w.add(p.valor('Total de gastos', reais(total)));
+  final emDinheiro = lista.where((g) => g.emDinheiro).fold<int>(0, (s, g) => s + g.valorCentavos);
+  if (emDinheiro > 0) {
+    w.add(p.nota('Pagos em dinheiro (com o vale) ${reais(emDinheiro)}   |   na nota ${reais(total - emDinheiro)}',
+        recuo: 8));
+  }
   return w;
 }
 

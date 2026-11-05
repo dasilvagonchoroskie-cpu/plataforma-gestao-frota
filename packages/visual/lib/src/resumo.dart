@@ -70,22 +70,7 @@ class CorpoResumo extends StatelessWidget {
           corValor: cores.positivo,
           corDetalhe: r.percentuaisDiferentes ? cores.atencao : null,
         ),
-        LinhaValor(
-          rotulo: 'Diesel e gastos',
-          valor: regras.gastosDescontamDoLiquido ? '$menos ${reais(r.totalGastoGeral)}' : reais(r.totalGastoGeral),
-          detalhe: regras.gastosDescontamDoLiquido
-              ? 'Saem do seu bolso, então descontam'
-              : 'A empresa paga, não descontam do seu líquido',
-          corValor: regras.gastosDescontamDoLiquido ? cores.negativo : cores.textoFraco,
-        ),
-        LinhaValor(
-          rotulo: 'Vales',
-          valor: regras.valeDescontaDoLiquido ? '$menos ${reais(r.totalVale)}' : reais(r.totalVale),
-          detalhe: regras.valeDescontaDoLiquido
-              ? 'Você já recebeu adiantado, então desconta'
-              : 'Só histórico, não mexe no líquido',
-          corValor: regras.valeDescontaDoLiquido ? cores.negativo : cores.textoFraco,
-        ),
+        LinhaGastosEVales(resultado: r, regras: regras),
         if (d.vazio) ...[
           const SizedBox(height: 16),
           Aviso(icone: Icons.edit_note, titulo: 'Nada lançado em $descricao', texto: textoVazio),
@@ -209,22 +194,7 @@ class CorpoResumoViagens extends StatelessWidget {
           valor: '$entregas',
           detalhe: cidades == 0 ? null : plural(cidades, 'cidade', 'cidades'),
         ),
-        LinhaValor(
-          rotulo: 'Diesel e gastos',
-          valor: regras.gastosDescontamDoLiquido ? '$menos ${reais(r.totalGastoGeral)}' : reais(r.totalGastoGeral),
-          detalhe: regras.gastosDescontamDoLiquido
-              ? 'Saem do seu bolso, então descontam no acerto'
-              : 'A empresa paga, não descontam do seu acerto',
-          corValor: regras.gastosDescontamDoLiquido ? cores.negativo : cores.textoFraco,
-        ),
-        LinhaValor(
-          rotulo: 'Vales',
-          valor: regras.valeDescontaDoLiquido ? '$menos ${reais(r.totalVale)}' : reais(r.totalVale),
-          detalhe: regras.valeDescontaDoLiquido
-              ? 'Você já recebeu adiantado, então desconta no acerto'
-              : 'Só histórico, não mexe no acerto',
-          corValor: regras.valeDescontaDoLiquido ? cores.negativo : cores.textoFraco,
-        ),
+        LinhaGastosEVales(resultado: r, regras: regras, noAcerto: true),
         const SizedBox(height: 4),
         Nota('A comissão sai no acerto que ${empresaNome.isEmpty ? 'a empresa' : 'a $empresaNome'} fecha. '
             'Os acertos fechados aparecem aqui.'),
@@ -264,3 +234,58 @@ class CorpoResumoViagens extends StatelessWidget {
     );
   }
 }
+
+/// As linhas "Diesel e gastos", "Vales" e, quando tem, "Gastos pagos em
+/// dinheiro": o que o motorista pagou com o dinheiro do vale abate do vale.
+class LinhaGastosEVales extends StatelessWidget {
+  const LinhaGastosEVales({super.key, required this.resultado, required this.regras, this.noAcerto = false});
+
+  final ResultadoResumo resultado;
+  final Regras regras;
+
+  /// Baú e Sider: a conta sai no acerto do gestor.
+  final bool noAcerto;
+
+  @override
+  Widget build(BuildContext context) {
+    final r = resultado;
+    final cores = context.cores;
+    final onde = noAcerto ? 'acerto' : 'líquido';
+    final dinheiro = r.totalGastosDinheiro;
+    final String detalheGastos;
+    if (regras.gastosDescontamDoLiquido) {
+      detalheGastos = dinheiro > 0
+          ? 'Saem do seu bolso. Os ${reais(dinheiro)} pagos em dinheiro já saíram do vale'
+          : 'Saem do seu bolso, então descontam${noAcerto ? ' no acerto' : ''}';
+    } else {
+      detalheGastos = 'A empresa paga, não descontam do seu $onde';
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        LinhaValor(
+          rotulo: 'Diesel e gastos',
+          valor: regras.gastosDescontamDoLiquido ? '$menos ${reais(r.descontoGastos)}' : reais(r.totalGastoGeral),
+          detalhe: detalheGastos,
+          corValor: regras.gastosDescontamDoLiquido ? cores.negativo : cores.textoFraco,
+        ),
+        LinhaValor(
+          rotulo: 'Vales',
+          valor: regras.valeDescontaDoLiquido ? '$menos ${reais(r.totalVale)}' : reais(r.totalVale),
+          detalhe: regras.valeDescontaDoLiquido
+              ? 'Você já recebeu adiantado, então desconta${noAcerto ? ' no acerto' : ''}'
+              : 'Só histórico, não mexe no $onde',
+          corValor: regras.valeDescontaDoLiquido ? cores.negativo : cores.textoFraco,
+        ),
+        if (r.devolvidoDoVale > 0)
+          LinhaValor(
+            rotulo: 'Gastos pagos em dinheiro',
+            valor: '+ ${reais(r.devolvidoDoVale)}',
+            detalhe: 'Você pagou com o dinheiro do vale, então voltam para você',
+            corValor: cores.positivo,
+          ),
+      ],
+    );
+  }
+}
+

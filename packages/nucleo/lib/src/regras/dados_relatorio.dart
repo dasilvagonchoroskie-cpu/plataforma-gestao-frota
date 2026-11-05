@@ -130,6 +130,7 @@ DadosRelatorio montarDados({
     fretes: fretesP,
     abastecimentos: abastP.map((a) => a.valorCentavos).toList(),
     gastos: gastosP.map((g) => g.valorCentavos).toList(),
+    gastosDinheiro: [for (final g in gastosP) if (g.emDinheiro) g.valorCentavos],
     vales: valesP.map((v) => v.valorCentavos).toList(),
     regras: regras,
   );
