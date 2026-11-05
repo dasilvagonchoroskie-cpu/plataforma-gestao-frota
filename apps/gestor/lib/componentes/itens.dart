@@ -213,7 +213,10 @@ class ItemGasto extends StatelessWidget {
       titulo: g.categoriaNome,
       subtitulo: g.observacao,
       quem: _quem(equipe, g.motoristaId, g.caminhaoId),
-      marcas: [if (g.ajustado) _corrigido],
+      marcas: [
+        if (g.emDinheiro) const Etiqueta('Pago em dinheiro', atencao: false),
+        if (g.ajustado) _corrigido,
+      ],
       valor: reais(g.valorCentavos),
       aoTocar: () => abrirLancamento(context, 'gastos_viagem', g.id),
     );

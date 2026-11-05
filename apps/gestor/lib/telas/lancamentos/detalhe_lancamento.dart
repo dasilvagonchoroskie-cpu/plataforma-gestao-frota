@@ -43,6 +43,8 @@ String textoDoCampo(String campo, TipoAjuste tipo, Object? v, Equipe e) {
       return p.isEmpty ? '—' : placaTexto(p);
     case TipoAjuste.categoria:
       return e.nomeCategoria(v.toString());
+    case TipoAjuste.formaPagamento:
+      return v.toString() == 'dinheiro' ? 'Pago em dinheiro (do vale)' : 'Nota assinada';
   }
 }
 
@@ -232,7 +234,7 @@ class _FormAjusteState extends ConsumerState<FormAjuste> {
   void initState() {
     super.initState();
     final v = widget.atual;
-    _data = v == null ? DateTime.now() : lerData(v).toLocal();
+    _data = v == null || widget.tipo != TipoAjuste.data ? DateTime.now() : lerData(v).toLocal();
     _logico = lerBool(v);
     _escolha = v?.toString();
     switch (widget.tipo) {
@@ -275,6 +277,7 @@ class _FormAjusteState extends ConsumerState<FormAjuste> {
         return DateTime(_data.year, _data.month, _data.day, orig.hour, orig.minute).toUtc().toIso8601String();
       case TipoAjuste.caminhao:
       case TipoAjuste.categoria:
+      case TipoAjuste.formaPagamento:
         return _escolha;
     }
   }
@@ -358,6 +361,14 @@ class _FormAjusteState extends ConsumerState<FormAjuste> {
           valor: _escolha,
           largura: double.infinity,
           itens: {for (final c in e.categorias) c.id: c.nome},
+          aoMudar: (v) => setState(() => _escolha = v),
+        );
+      case TipoAjuste.formaPagamento:
+        return Escolha<String>(
+          rotulo: 'Como foi pago',
+          valor: _escolha,
+          largura: double.infinity,
+          itens: const {'dinheiro': 'Pago em dinheiro (do vale)', 'nota': 'Nota assinada (a empresa paga)'},
           aoMudar: (v) => setState(() => _escolha = v),
         );
     }

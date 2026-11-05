@@ -265,7 +265,7 @@ class AcessoAutorizado {
 
 /// Tipo de valor de cada campo que o gestor pode corrigir (igual à função
 /// campo_ajustavel_tipo do banco).
-enum TipoAjuste { texto, data, centavos, numero, percentual, logico, caminhao, categoria }
+enum TipoAjuste { texto, data, centavos, numero, percentual, logico, caminhao, categoria, formaPagamento }
 
 const camposAjustaveis = <String, Map<String, TipoAjuste>>{
   'fretes': {
@@ -299,6 +299,7 @@ const camposAjustaveis = <String, Map<String, TipoAjuste>>{
     'caminhao_id': TipoAjuste.caminhao,
     'categoria_id': TipoAjuste.categoria,
     'valor_centavos': TipoAjuste.centavos,
+    'forma_pagamento': TipoAjuste.formaPagamento,
     'observacao': TipoAjuste.texto,
   },
   'vales': {'data': TipoAjuste.data, 'valor_centavos': TipoAjuste.centavos, 'observacao': TipoAjuste.texto},

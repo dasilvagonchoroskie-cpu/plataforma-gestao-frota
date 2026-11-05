@@ -23,12 +23,16 @@ class ContaDoAcerto {
     vales = l.vales.where((v) => dentro(v.data)).fold(0, (s, v) => s + v.valorCentavos);
     diesel = l.abastecimentos.where((a) => !a.pontoDePartida && dentro(a.data)).fold(0, (s, a) => s + a.valorCentavos);
     gastos = l.gastos.where((g) => dentro(g.data)).fold(0, (s, g) => s + g.valorCentavos);
+    gastosDinheiro = l.gastos.where((g) => g.emDinheiro && dentro(g.data)).fold(0, (s, g) => s + g.valorCentavos);
   }
 
   late final List<Viagem> viagens;
   late final int vales;
   late final int diesel;
   late final int gastos;
+
+  /// Dos [gastos], os pagos em dinheiro (com o vale).
+  late final int gastosDinheiro;
 }
 
 /// O gestor fecha (ou corrige) o acerto do motorista do Baú ou do Sider:
@@ -165,6 +169,7 @@ class _TelaFazerAcertoState extends ConsumerState<TelaFazerAcerto> {
       valesCentavos: conta.vales,
       dieselCentavos: conta.diesel,
       gastosCentavos: conta.gastos,
+      gastosDinheiroCentavos: conta.gastosDinheiro,
       regras: regras,
     );
 
@@ -274,14 +279,21 @@ class _TelaFazerAcertoState extends ConsumerState<TelaFazerAcerto> {
                   valor: regras.valeDescontaDoLiquido ? '$menos ${reais(conta.vales)}' : reais(conta.vales),
                   detalhe: regras.valeDescontaDoLiquido ? 'Desconta do acerto' : 'Só histórico (regra da empresa)',
                 ),
+                if (regras.valeDescontaDoLiquido && !regras.gastosDescontamDoLiquido && conta.gastosDinheiro > 0)
+                  LinhaValor(
+                    rotulo: 'Gastos pagos em dinheiro',
+                    valor: '+ ${reais(conta.gastosDinheiro)}',
+                    detalhe: 'Pagos com o dinheiro do vale: abatem do vale e voltam para o motorista',
+                  ),
                 LinhaValor(
                   rotulo: 'Diesel e gastos',
                   valor: regras.gastosDescontamDoLiquido
-                      ? '$menos ${reais(conta.diesel + conta.gastos)}'
+                      ? '$menos ${reais(conta.diesel + conta.gastos - conta.gastosDinheiro)}'
                       : reais(conta.diesel + conta.gastos),
                   detalhe:
-                      'Diesel ${reais(conta.diesel)}  ·  gastos ${reais(conta.gastos)}  ·  '
-                      '${regras.gastosDescontamDoLiquido ? 'descontam (regra da empresa)' : 'a empresa paga'}',
+                      'Diesel ${reais(conta.diesel)}  ·  gastos ${reais(conta.gastos)}'
+                      '${conta.gastosDinheiro > 0 ? ' (${reais(conta.gastosDinheiro)} em dinheiro)' : ''}  ·  '
+                      '${regras.gastosDescontamDoLiquido ? 'descontam os na nota (regra da empresa)' : 'a empresa paga'}',
                 ),
                 const SizedBox(height: 10),
                 Placa(
@@ -358,12 +370,20 @@ class TelaAcertoFechado extends ConsumerWidget {
                   rotulo: 'Vales',
                   valor: a.descontaVales ? '$menos ${reais(a.valesCentavos)}' : reais(a.valesCentavos),
                 ),
+                if (a.descontaVales && !a.descontaGastos && a.gastosDinheiroCentavos > 0)
+                  LinhaValor(
+                    rotulo: 'Gastos pagos em dinheiro',
+                    valor: '+ ${reais(a.gastosDinheiroCentavos)}',
+                    detalhe: 'Pagos com o dinheiro do vale: abatem do vale',
+                    corValor: cores.positivo,
+                  ),
                 LinhaValor(
                   rotulo: 'Diesel e gastos',
                   valor: a.descontaGastos
-                      ? '$menos ${reais(a.dieselCentavos + a.gastosCentavos)}'
+                      ? '$menos ${reais(a.dieselCentavos + a.gastosCentavos - a.gastosDinheiroCentavos)}'
                       : reais(a.dieselCentavos + a.gastosCentavos),
-                  detalhe: 'Diesel ${reais(a.dieselCentavos)}  ·  gastos ${reais(a.gastosCentavos)}',
+                  detalhe: 'Diesel ${reais(a.dieselCentavos)}  ·  gastos ${reais(a.gastosCentavos)}'
+                      '${a.gastosDinheiroCentavos > 0 ? ' (${reais(a.gastosDinheiroCentavos)} em dinheiro)' : ''}',
                 ),
                 if ((a.observacao ?? '').isNotEmpty) ...[const SizedBox(height: 8), Nota('Observação: ${a.observacao}')],
                 if (a.fechadoEm != null) ...[

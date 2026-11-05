@@ -102,12 +102,23 @@ class _DetalheAcertoState extends ConsumerState<DetalheAcerto> {
             detalhe: a.descontaVales ? 'Você já recebeu adiantado, então desconta' : 'Só histórico, não desconta',
             corValor: a.descontaVales ? cores.negativo : cores.textoFraco,
           ),
+          if (a.descontaVales && !a.descontaGastos && a.gastosDinheiroCentavos > 0)
+            LinhaValor(
+              rotulo: 'Gastos pagos em dinheiro',
+              valor: '+ ${reais(a.gastosDinheiroCentavos)}',
+              detalhe: 'Você pagou com o dinheiro do vale, então voltam para você',
+              corValor: cores.positivo,
+            ),
           LinhaValor(
             rotulo: 'Diesel e gastos',
             valor: a.descontaGastos
-                ? '$menos ${reais(a.dieselCentavos + a.gastosCentavos)}'
+                ? '$menos ${reais(a.dieselCentavos + a.gastosCentavos - a.gastosDinheiroCentavos)}'
                 : reais(a.dieselCentavos + a.gastosCentavos),
-            detalhe: a.descontaGastos ? 'Saem do seu bolso, então descontam' : 'A empresa paga, não descontam',
+            detalhe: a.descontaGastos
+                ? (a.gastosDinheiroCentavos > 0
+                    ? 'Saem do seu bolso. Os ${reais(a.gastosDinheiroCentavos)} pagos em dinheiro já saíram do vale'
+                    : 'Saem do seu bolso, então descontam')
+                : 'A empresa paga, não descontam',
             corValor: a.descontaGastos ? cores.negativo : cores.textoFraco,
           ),
           if ((a.observacao ?? '').trim().isNotEmpty) ...[

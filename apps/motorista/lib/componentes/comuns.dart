@@ -188,10 +188,13 @@ extension ComToque on Widget {
 
 /// Etiqueta dos lançamentos que ainda não chegaram na nuvem ou que o gestor corrigiu.
 class MarcasLancamento extends StatelessWidget {
-  const MarcasLancamento({super.key, required this.pendente, required this.ajustado, this.placa});
+  const MarcasLancamento({super.key, required this.pendente, required this.ajustado, this.placa, this.forma});
   final bool pendente;
   final bool ajustado;
   final String? placa;
+
+  /// Só nos gastos: pago em dinheiro (do vale) ou na nota.
+  final FormaPagamento? forma;
 
   @override
   Widget build(BuildContext context) {
@@ -202,6 +205,9 @@ class MarcasLancamento extends StatelessWidget {
       children: [
         if (placa != null && placa!.isNotEmpty)
           Text(placaTexto(placa!), style: estiloNumero(13.5, cor: cores.textoFraco)),
+        if (forma != null)
+          Text(forma == FormaPagamento.dinheiro ? 'Pago em dinheiro' : 'Na nota',
+              style: TextStyle(fontSize: 13.5, color: cores.textoFraco)),
         if (ajustado) const Etiqueta('Corrigido pelo gestor'),
         if (pendente) const Etiqueta('Não enviado', atencao: false),
       ],
@@ -260,3 +266,69 @@ class CampoCaminhao extends ConsumerWidget {
     );
   }
 }
+
+/// "Como você pagou?": dinheiro (do vale) ou nota assinada. Nada vem marcado:
+/// o motorista escolhe toda vez (escolha do Evandro em 23/10/2026).
+class EscolhaFormaPagamento extends StatelessWidget {
+  const EscolhaFormaPagamento({super.key, required this.valor, required this.aoMudar, this.erro});
+  final FormaPagamento? valor;
+  final ValueChanged<FormaPagamento> aoMudar;
+  final String? erro;
+
+  @override
+  Widget build(BuildContext context) {
+    final cores = context.cores;
+    Widget opcao(FormaPagamento f, IconData icone, String explicacao) {
+      final marcada = valor == f;
+      final cor = Theme.of(context).colorScheme.primary;
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 8),
+        child: Material(
+          color: marcada ? cor.withValues(alpha: 0.14) : Colors.transparent,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+            side: BorderSide(color: marcada ? cor : (erro == null ? cores.divisor : cores.negativo), width: marcada ? 2 : 1),
+          ),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(14),
+            onTap: () => aoMudar(f),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+              child: Row(
+                children: [
+                  Icon(icone, size: 28, color: marcada ? cor : cores.textoFraco),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(f.rotulo, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w600)),
+                        const SizedBox(height: 2),
+                        Text(explicacao, style: TextStyle(fontSize: 14, color: cores.textoFraco)),
+                      ],
+                    ),
+                  ),
+                  Icon(marcada ? Icons.radio_button_checked : Icons.radio_button_off,
+                      color: marcada ? cor : cores.textoFraco),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text('Como você pagou?',
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: erro == null ? null : cores.negativo)),
+        const SizedBox(height: 8),
+        opcao(FormaPagamento.dinheiro, Icons.payments_outlined, 'Com o dinheiro do vale. Abate do vale no acerto.'),
+        opcao(FormaPagamento.nota, Icons.receipt_long_outlined, 'A empresa paga direto. Não mexe no vale.'),
+        if (erro != null) Text(erro!, style: TextStyle(color: cores.negativo, fontSize: 13.5)),
+      ],
+    );
+  }
+}
+

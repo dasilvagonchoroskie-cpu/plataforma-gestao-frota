@@ -24,6 +24,7 @@ class _Item {
     required this.valor,
     required this.abrir,
     this.placa,
+    this.forma,
   });
 
   final Categoria tipo;
@@ -34,6 +35,9 @@ class _Item {
   final String detalhe;
   final String valor;
   final String? placa;
+
+  /// Só nos gastos: dinheiro (do vale) ou nota.
+  final FormaPagamento? forma;
   final Widget Function() abrir;
 }
 
@@ -109,6 +113,7 @@ class _TelaLancamentosState extends ConsumerState<TelaLancamentos> {
         detalhe: ['Gasto', if ((g.observacao ?? '').isNotEmpty) g.observacao!].join(' · '),
         valor: reais(g.valorCentavos),
         placa: d.placaDe(g.caminhaoId),
+        forma: g.formaPagamento,
         abrir: () => FormGasto(editando: g),
       ),
     for (final v in d.vales)
@@ -250,10 +255,15 @@ class _Linha extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(fontSize: 14, color: cores.textoFraco),
                   ),
-                  if (pendente || ajustado || (comPlaca && (i.placa ?? '').isNotEmpty))
+                  if (pendente || ajustado || i.forma != null || (comPlaca && (i.placa ?? '').isNotEmpty))
                     Padding(
                       padding: const EdgeInsets.only(top: 4),
-                      child: MarcasLancamento(pendente: pendente, ajustado: ajustado, placa: comPlaca ? i.placa : null),
+                      child: MarcasLancamento(
+                        pendente: pendente,
+                        ajustado: ajustado,
+                        placa: comPlaca ? i.placa : null,
+                        forma: i.forma,
+                      ),
                     ),
                 ],
               ),

@@ -13,7 +13,10 @@ import 'paradas_test.dart' show servidorComParadas;
 void main() {
   test('o arquivo da empresa leva caminhões e cada motorista com todo o histórico', () async {
     final s = servidorComParadas();
-    final agora = DateTime.now();
+    // Fim do mês: a amostra tem lançamentos até o dia 28 deste mês (no começo
+    // do mês, "agora" deixaria de fora os que ainda não chegaram).
+    final hoje = DateTime.now();
+    final agora = DateTime(hoje.year, hoje.month + 1).subtract(const Duration(minutes: 1));
     final e = Equipe.montar(situacao: await s.situacao(), tabelas: await s.carregar(), pedidos: const [], agora: agora);
     final d = e.arquivoDeDados(agora: agora);
     expect(d.daEmpresaToda, isTrue);

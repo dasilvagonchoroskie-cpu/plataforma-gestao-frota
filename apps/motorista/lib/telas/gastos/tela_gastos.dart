@@ -70,6 +70,7 @@ class TelaGastos extends ConsumerWidget {
                                 pendente: dados.estaPendente(Tabelas.gastos, g.itens[i].id),
                                 ajustado: g.itens[i].ajustado,
                                 placa: dados.placaDe(g.itens[i].caminhaoId),
+                                forma: g.itens[i].formaPagamento,
                               ),
                             ],
                           ),
@@ -103,8 +104,10 @@ class _FormGastoState extends ConsumerState<FormGasto> {
   late DateTime _data;
   String? _categoriaId;
   String? _caminhaoId;
+  FormaPagamento? _forma;
   String? _erroValor;
   String? _erroCategoria;
+  String? _erroForma;
   String? _erroCaminhao;
   Rascunho? _rascunho;
 
@@ -121,6 +124,7 @@ class _FormGastoState extends ConsumerState<FormGasto> {
       _observacao.text = g.observacao ?? '';
       _categoriaId = g.categoriaId;
       _caminhaoId = g.caminhaoId;
+      _forma = g.formaPagamento;
     } else {
       _caminhaoId = ref.read(dadosProvider).requireValue.caminhaoAtualId;
       final r = Rascunho(ref.read(armazenamentoProvider), 'gasto');
@@ -131,6 +135,8 @@ class _FormGastoState extends ConsumerState<FormGasto> {
           _valor.text = (m['valor'] as String?) ?? '';
           _observacao.text = (m['observacao'] as String?) ?? '';
           _categoriaId = m['categoria'] as String?;
+          final f = m['forma'] as String?;
+          if (f != null) _forma = FormaPagamento.doCodigo(f);
           final d = DateTime.tryParse((m['data'] as String?) ?? '');
           if (d != null) _data = d;
         });
@@ -149,12 +155,14 @@ class _FormGastoState extends ConsumerState<FormGasto> {
     setState(() {
       _erroValor = null;
       _erroCategoria = null;
+      _erroForma = null;
     });
     if (_novo) {
       _rascunho?.gravar({
         'valor': _valor.text,
         'observacao': _observacao.text,
         'categoria': _categoriaId,
+        'forma': _forma?.codigo,
         'data': _data.toIso8601String(),
       });
     }
@@ -166,8 +174,9 @@ class _FormGastoState extends ConsumerState<FormGasto> {
       _erroValor = valor <= 0 ? 'Falta o valor do gasto.' : null;
       _erroCategoria = _categoriaId == null ? 'Escolha o que foi.' : null;
       _erroCaminhao = _caminhaoId == null ? 'Escolha o caminhão.' : null;
+      _erroForma = _forma == null ? 'Escolha como você pagou.' : null;
     });
-    if (_erroValor != null || _erroCategoria != null || _erroCaminhao != null) return;
+    if (_erroValor != null || _erroCategoria != null || _erroCaminhao != null || _erroForma != null) return;
     final d = ref.read(dadosProvider).requireValue;
     final base = widget.editando;
     final gasto = base?.copyWith(
@@ -176,6 +185,7 @@ class _FormGastoState extends ConsumerState<FormGasto> {
           categoriaId: _categoriaId,
           valorCentavos: valor,
           observacao: _observacao.text.trim(),
+          formaPagamento: _forma,
         ) ??
         Gasto(
           id: novoId(),
@@ -185,6 +195,7 @@ class _FormGastoState extends ConsumerState<FormGasto> {
           categoriaId: _categoriaId!,
           valorCentavos: valor,
           observacao: _observacao.text.trim().isEmpty ? null : _observacao.text.trim(),
+          formaPagamento: _forma!,
           criadoNoAparelhoEm: DateTime.now(),
         );
     await ref.read(dadosProvider.notifier).salvarGasto(gasto);
@@ -270,6 +281,15 @@ class _FormGastoState extends ConsumerState<FormGasto> {
                 child: Text(_erroCategoria!, style: TextStyle(color: context.cores.negativo, fontSize: 13.5)),
               ),
             const SizedBox(height: 18),
+            EscolhaFormaPagamento(
+              valor: _forma,
+              erro: _erroForma,
+              aoMudar: (f) {
+                _forma = f;
+                _mudou();
+              },
+            ),
+            const SizedBox(height: 10),
             Campo(controle: _observacao, rotulo: 'Observação', ajuda: 'Opcional', aoMudar: _mudou),
             const SizedBox(height: 20),
             const Nota('Diesel vai na aba Diesel. Pedágio pago no cartão ou tag da empresa vai no próprio frete.'),

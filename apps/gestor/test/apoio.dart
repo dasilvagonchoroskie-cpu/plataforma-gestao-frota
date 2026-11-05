@@ -298,6 +298,11 @@ class ServidorFalso implements Servidor {
     final vales = soma(Fontes.vales);
     final diesel = soma(Fontes.abastecimentos, semPartida: true);
     final gastos = soma(Fontes.gastos);
+    final gastosDinheiro = [
+      for (final m in t(Fontes.gastos))
+        if (m['motorista_id'] == motoristaId && noPeriodo(m['data']) && m['forma_pagamento'] == 'dinheiro')
+          lerInt(m['valor_centavos']),
+    ].fold(0, (s, v) => s + v);
     final regras = Regras.daEmpresa(ConfiguracaoEmpresa.deMapa(empresa));
     final lista = [for (final d in descontos) DescontoAcerto.deMapa(d)];
     final a = {
@@ -312,6 +317,7 @@ class ServidorFalso implements Servidor {
       'vales_centavos': vales,
       'diesel_centavos': diesel,
       'gastos_centavos': gastos,
+      'gastos_dinheiro_centavos': gastosDinheiro,
       'desconta_vales': regras.valeDescontaDoLiquido,
       'desconta_gastos': regras.gastosDescontamDoLiquido,
       'para_receber_centavos': calcularParaReceber(
@@ -320,6 +326,7 @@ class ServidorFalso implements Servidor {
         valesCentavos: vales,
         dieselCentavos: diesel,
         gastosCentavos: gastos,
+        gastosDinheiroCentavos: gastosDinheiro,
         regras: regras,
       ),
       'quantidade_viagens': t(Fontes.viagens)
