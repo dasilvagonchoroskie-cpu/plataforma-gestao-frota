@@ -303,6 +303,25 @@ apagar o e-mail do registro (aprovação na migration); prazo de 15 dias mantido
   `20261023200000` aplicada, gatilhos e índice criados, nenhum desligado com login, nenhum registro (nem
   histórico) com e-mail. APKs oficiais 0.7.2 (certificado 9c6ec010…22d2) entregues.
 
+## Gasto pago em dinheiro ou na nota — 05/11/2026
+
+Pedido do Evandro (23/10/2026): o motorista paga pátio, limpeza, manutenção com o dinheiro do vale; isso
+não pode sair da comissão dele. Escolhas: só nos gastos; "Paguei em dinheiro" ou "Assinei a nota"; nada vem
+marcado.
+
+- **feito e testado** — Banco (migration `20261105120000_gasto_forma_pagamento`): `gastos_viagem.forma_pagamento`
+  (padrão nota), `acertos.gastos_dinheiro_centavos`, função `para_receber_acerto`, correção pelo gestor,
+  sincronização com app antigo. `rodar.sh` → `total de verificações que passaram: 466` (teste 13 novo: 19).
+- **feito e testado** — Núcleo e visual: modelo, resumo, acerto, PDF e planilha com a mesma conta; linha
+  "Gastos pagos em dinheiro". `dart test` → 73 testes.
+- **feito e testado** — Frota Motorista 0.8.0 (escolha obrigatória no gasto novo, marca na lista, acerto) →
+  `flutter test --exclude-tags capturas` 54 testes; Frota Gestor 0.8.0 (etiqueta, correção da forma, acerto do
+  Baú/Sider) → 64 testes; `flutter analyze` sem problemas nos dois. O teste do arquivo da empresa dependia do
+  dia do mês (falhava nos primeiros dias); passou a usar o fim do mês.
+- **feito e testado** — Esteira fc00283 aprovada (`success`, inclusive o emulador) e banco da nuvem atualizado
+  (`success`; registro: `Applying migration 20261105120000_gasto_forma_pagamento.sql`, lista local = nuvem).
+  APKs oficiais 0.8.0 (certificado 9c6ec010…22d2) entregues.
+
 ## Fase 7 — acabamento e piloto
 
 - **em andamento** — SMTP próprio (Brevo, configuração no painel do Supabase pelo dono).

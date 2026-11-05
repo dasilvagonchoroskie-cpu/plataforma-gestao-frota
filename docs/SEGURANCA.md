@@ -64,6 +64,11 @@ limitado), **Baixa** (defesa em profundidade).
   `motoristas_ativo_tem_login_ck`, teste 06) e não tem acesso para redefinir. Mensagens de erro claras para
   código, aprovação e redefinição (teste 06 e teste das funções).
 
+### Forma de pagamento do gasto (05/11/2026)
+
+- Sem apagar dados. A forma é conferida no banco (só `dinheiro` ou `nota`, teste 13); a correção do gestor
+  passa pela mesma validação dos outros ajustes; o motorista não corrige pelo gestor.
+
 ### Motorista que sai fica com o login livre (23/10/2026)
 
 - Entrou com a linha `aprovado-por` do dono (apaga o e-mail do registro e do histórico na saída). O gatilho

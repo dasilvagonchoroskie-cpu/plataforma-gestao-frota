@@ -342,3 +342,18 @@ Decisões tomadas na construção (confirmar no piloto):
 - **Ideia para depois (não feita):** botão "Sair da empresa" no app do motorista; hoje ele sai sendo desligado
   ou excluindo a conta.
 
+## Gasto pago em dinheiro ou na nota (pedido do Evandro em 23/10/2026; feito em 05/11/2026)
+
+- **Problema relatado:** o motorista paga pátio, limpeza, manutenção com o dinheiro do vale, mas o app
+  descontava o vale inteiro da comissão.
+- **Escolhas dele:** só nos gastos (o diesel não muda); duas formas, "Paguei em dinheiro" e "Assinei a nota";
+  nada vem marcado, o motorista escolhe toda vez.
+- **Conta (igual no banco, no app e no PDF):** se o vale desconta e a empresa paga os gastos, o que foi pago
+  em dinheiro volta para o motorista (abate do vale; o que passa do vale também volta). Se os gastos são do
+  motorista, descontam só os da nota (o dinheiro já saiu do vale). Se o vale não desconta, a forma não mexe
+  na conta.
+- **Gastos antigos e app antigo:** contam como nota. App antigo editando um gasto não muda a forma.
+- **O gestor corrige** a forma de pagamento como qualquer outro campo (com motivo).
+- **Decidido por mim (dá para mudar):** gasto já salvo, ao abrir para mudar, vem com a forma que tem (os
+  antigos vêm como "Assinei a nota"); só o gasto novo exige a escolha.
+

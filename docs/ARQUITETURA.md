@@ -106,7 +106,7 @@ Regras gerais: id uuid em todas as tabelas, gerado no celular quando o registro 
 - `fretes`: empresa_id, motorista_id, caminhao_id, origem, destino, embarcador, data_carga, peso_carga_kg, valor_tonelada_centavos, adiantamento_centavos, saldo_centavos, percentual_comissao, comissao_sobre_bruto, pedagio_centavos, peso_descarga_kg, desconto_quebra_centavos
 - `abastecimentos`: empresa_id, motorista_id, caminhao_id, frete_id (opcional), data, cidade, posto, litros, valor_centavos, km_odometro, tanque_cheio, ponto_de_partida
 - `categorias_gasto`: empresa_id, nome, ativa (iniciar com as categorias do Meu Frete)
-- `gastos_viagem`: empresa_id, motorista_id, caminhao_id, frete_id (opcional), data, categoria_id, valor_centavos, observacao
+- `gastos_viagem`: empresa_id, motorista_id, caminhao_id, frete_id (opcional), data, categoria_id, valor_centavos, observacao, forma_pagamento (`dinheiro` = pago com o dinheiro do vale; `nota` = nota assinada, a empresa paga; gasto antigo conta como nota — pedido do dono em 23/10/2026)
 - `vales`: empresa_id, motorista_id, data, valor_centavos, observacao
 - `ajustes_km`: empresa_id, caminhao_id, motorista_id, quando, km_anterior, km_novo, motivo
 - `ajustes_gestor`: empresa_id, tabela_alvo, registro_id, campo, valor_antigo, valor_novo, motivo, autor_id, criado_em
@@ -126,7 +126,7 @@ Todo lançamento de frete, abastecimento e gasto guarda `motorista_id` e `caminh
 - `motoristas.modalidade` (vazia = o motorista escolhe no app; com uma só ligada, fica nela) e `convites_motorista.modalidade`.
 - `fretes.modalidade` e `fretes.extras`.
 - `viagens` (Baú, Sider): motorista_id, caminhao_id (o cavalo), modalidade, placa_carreta, engate_local, engate_em, desengate_local, desengate_em (vazio = em andamento), entregas_quantidade, entregas_cidades, observacao, extras. Uma viagem por carreta; sem dinheiro do frete.
-- `acertos`: motorista_id, período (dias de Brasília), comissao_centavos e descontos lançados pelo gestor; vales, diesel e gastos somados pelo servidor no fechamento; para_receber = comissão − descontos − vales (se a regra manda) − diesel e gastos (se a regra manda). O motorista vê o acerto fechado.
+- `acertos`: motorista_id, período (dias de Brasília), comissao_centavos e descontos lançados pelo gestor; vales, diesel, gastos e gastos em dinheiro somados pelo servidor no fechamento; para_receber (função `para_receber_acerto`, a mesma conta do resumo no app) = comissão − descontos − vales + gastos pagos em dinheiro (se o vale desconta e a empresa paga os gastos) − diesel e gastos na nota (se os gastos são do motorista). Gasto em dinheiro que passa do vale volta para o motorista. O motorista vê o acerto fechado.
 
 ### Registro de paradas (pedido do dono em 22/10/2026)
 
