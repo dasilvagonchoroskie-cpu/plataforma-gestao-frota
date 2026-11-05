@@ -36,7 +36,9 @@ String textoDoCampo(String campo, TipoAjuste tipo, Object? v, Equipe e) {
     case TipoAjuste.logico:
       final b = lerBool(v);
       if (campo == 'tanque_cheio') return b ? 'Encheu o tanque' : 'Não encheu';
-      if (campo == 'comissao_sobre_bruto') return b ? 'Frete + pedágio' : 'Só o frete';
+      if (campo == 'comissao_sobre_bruto') return b ? 'Frete cheio' : 'O que caiu na conta';
+      if (campo == 'comissao_com_pedagio') return b ? 'Com pedágio' : 'Sem pedágio';
+      if (campo == 'frete_cheio') return b ? 'Frete cheio (valor fechado)' : 'Por tonelada';
       return b ? 'Sim' : 'Não';
     case TipoAjuste.caminhao:
       final p = e.placa(v.toString());
@@ -329,19 +331,19 @@ class _FormAjusteState extends ConsumerState<FormAjuste> {
       case TipoAjuste.percentual:
         return Campo(controle: _texto, rotulo: 'Comissão certa', tipo: TipoCampo.decimal, sufixo: '%', autofoco: true);
       case TipoAjuste.logico:
-        return widget.campo == 'tanque_cheio'
-            ? EscolhaDupla(
-                valor: _logico,
-                textoSim: 'Encheu',
-                textoNao: 'Não encheu',
-                aoMudar: (v) => setState(() => _logico = v),
-              )
-            : EscolhaDupla(
-                valor: _logico,
-                textoSim: 'Frete + pedágio',
-                textoNao: 'Só o frete',
-                aoMudar: (v) => setState(() => _logico = v),
-              );
+        final (sim, nao) = switch (widget.campo) {
+          'tanque_cheio' => ('Encheu', 'Não encheu'),
+          'comissao_sobre_bruto' => ('Frete cheio', 'O que caiu na conta'),
+          'comissao_com_pedagio' => ('Com pedágio', 'Sem pedágio'),
+          'frete_cheio' => ('Frete cheio', 'Por tonelada'),
+          _ => ('Sim', 'Não'),
+        };
+        return EscolhaDupla(
+          valor: _logico,
+          textoSim: sim,
+          textoNao: nao,
+          aoMudar: (v) => setState(() => _logico = v),
+        );
       case TipoAjuste.data:
         return CampoData(rotulo: 'Data certa', valor: _data, aoMudar: (d) => setState(() => _data = d));
       case TipoAjuste.caminhao:

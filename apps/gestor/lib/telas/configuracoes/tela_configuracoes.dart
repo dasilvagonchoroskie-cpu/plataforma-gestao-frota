@@ -14,6 +14,7 @@ import '../../dados/provedores.dart';
 import '../acesso/telas_acesso.dart';
 import '../casca.dart';
 import '../plataforma/tela_plataforma.dart';
+import 'combinado.dart';
 import 'tela_config_paradas.dart';
 import 'tela_modalidades.dart';
 
@@ -71,8 +72,7 @@ class TelaConfiguracoes extends ConsumerWidget {
             leading: const Icon(Icons.rule),
             title: const Text('Regras de acerto com o motorista'),
             subtitle: Text(
-              'Comissão padrão ${percentualTexto(cfg.percentualComissaoPadrao)}% '
-              '${cfg.comissaoSobreBrutoPadrao ? 'sobre frete + pedágio' : 'sobre o frete'}; '
+              '${CombinadoEditavel.texto(cfg)}; '
               '${cfg.gastosDescontamDoLiquido ? 'gastos por conta do motorista' : 'gastos pagos pela empresa'}; '
               '${cfg.valeDescontaDoLiquido ? 'vale desconta' : 'vale não desconta'}.',
             ),
@@ -277,21 +277,28 @@ class TelaRegras extends ConsumerStatefulWidget {
 
 class _TelaRegrasState extends ConsumerState<TelaRegras> {
   late final ConfiguracaoEmpresa _c = ref.read(equipeProvider).requireValue.empresa.configuracao;
-  late final _percentual = TextEditingController(text: textoDecimal(_c.percentualComissaoPadrao));
-  late bool _sobreBruto = _c.comissaoSobreBrutoPadrao;
+  late final _combinado = CombinadoEditavel(_c);
   late bool _gastos = _c.gastosDescontamDoLiquido;
   late bool _vale = _c.valeDescontaDoLiquido;
   String? _erro;
 
+  @override
+  void dispose() {
+    _combinado.dispose();
+    super.dispose();
+  }
+
   Future<void> _salvar() async {
-    final p = lerNumero(_percentual.text);
-    if (p < 0 || p > 100) return setState(() => _erro = 'A comissão fica entre 0 e 100%.');
+    final erro = _combinado.erro;
+    if (erro != null) return setState(() => _erro = erro);
     final navegador = Navigator.of(context);
     final ok = await executar(
       context,
       () => ref.read(equipeProvider.notifier).salvarEmpresa({
-        'percentual_comissao_padrao': p,
-        'comissao_sobre_bruto_padrao': _sobreBruto,
+        'percentual_comissao_padrao': _combinado.percentualEscolhido,
+        'comissao_sobre_bruto_padrao': _combinado.sobreBruto,
+        'comissao_com_pedagio_padrao': _combinado.comPedagio,
+        'salario_fixo_centavos': _combinado.fixoEscolhido,
         'gastos_descontam_do_liquido': _gastos,
         'vale_desconta_do_liquido': _vale,
       }),
@@ -319,24 +326,11 @@ class _TelaRegrasState extends ConsumerState<TelaRegras> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 Text(
-                  'Como a empresa acerta com os motoristas. Vale para as contas do painel e do app de cada motorista.',
+                  'Como a empresa acerta com os motoristas. Vale para as contas do painel e do app de cada motorista. '
+                  'Para um motorista que acertou diferente, abra o nome dele em Motoristas > "Como ele ganha".',
                   style: TextStyle(fontSize: 15.5, color: cores.textoFraco),
                 ),
-                pergunta('Comissão padrão do motorista'),
-                Campo(
-                  controle: _percentual,
-                  rotulo: 'Comissão',
-                  tipo: TipoCampo.decimal,
-                  sufixo: '%',
-                  ajuda: 'O motorista pode mudar em cada frete. Fretes já lançados não mudam.',
-                ),
-                pergunta('A comissão é sobre'),
-                EscolhaDupla(
-                  valor: _sobreBruto,
-                  textoSim: 'Frete + pedágio',
-                  textoNao: 'Só o frete',
-                  aoMudar: (v) => setState(() => _sobreBruto = v),
-                ),
+                PerguntasDoCombinado(combinado: _combinado, aoMudar: () => setState(() => _erro = null)),
                 pergunta('Diesel e gastos da viagem'),
                 OpcaoEscolha<bool>(
                   valor: false,

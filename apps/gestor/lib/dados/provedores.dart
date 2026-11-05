@@ -226,6 +226,10 @@ class EquipeNotifier extends AsyncNotifier<Equipe> {
   Future<void> ativarMotorista(String motoristaId, bool ativo) =>
       _eRecarregar(() => _s.alterar('motoristas', motoristaId, {'ativo': ativo}));
 
+  /// Combinado só deste motorista; nulo em cada campo = padrão da empresa.
+  Future<void> salvarCombinado(String motoristaId, Map<String, Object?> campos) =>
+      _eRecarregar(() => _s.alterar('motoristas', motoristaId, {for (final k in camposDoCombinado) k: campos[k]}));
+
   Future<Map<String, Object?>> redefinirAcesso(String motoristaId) => _s.redefinirAcesso(motoristaId);
 
   /// Cadastra o motorista (nome e CPF) e devolve o código individual dele.

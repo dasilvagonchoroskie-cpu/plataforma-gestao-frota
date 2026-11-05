@@ -114,9 +114,7 @@ class _DetalheFreteState extends ConsumerState<DetalheFrete> {
           Placa(
             rotulo: 'Sua parte neste frete',
             valor: reais(f.minhaParteCentavos),
-            detalhe:
-                '${percentualTexto(f.percentualComissao)}% sobre ${reais(f.baseComissaoCentavos)}'
-                '${f.comissaoSobreBruto ? ' (frete + pedágio)' : ''}',
+            detalhe: '${percentualTexto(f.percentualComissao)}% sobre ${reais(f.baseComissaoCentavos)} (${f.explicacaoDaBase})',
             tamanhoValor: 40,
           ),
           if (f.aguardandoSaldo && ajustes.isEmpty) ...[

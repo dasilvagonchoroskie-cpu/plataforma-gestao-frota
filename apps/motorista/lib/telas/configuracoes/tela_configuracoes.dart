@@ -153,8 +153,18 @@ class TelaConfiguracoes extends ConsumerWidget {
               children: [
                 if (d.porViagem)
                   const LinhaValor(rotulo: 'Comissão', valor: 'no acerto')
-                else
-                  LinhaValor(rotulo: 'Comissão padrão', valor: '${percentualTexto(config.percentualComissaoPadrao)}%'),
+                else ...[
+                  LinhaValor(rotulo: 'Como você ganha', valor: config.formaDeGanhar.rotulo),
+                  if (config.salarioFixoCentavos > 0)
+                    LinhaValor(rotulo: 'Salário fixo', valor: reais(config.salarioFixoCentavos), detalhe: 'Por mês'),
+                  if (config.percentualComissaoPadrao > 0)
+                    LinhaValor(
+                      rotulo: config.salarioFixoCentavos > 0 ? 'Mais' : 'Comissão',
+                      valor: '${percentualTexto(config.percentualComissaoPadrao)}%',
+                      detalhe: 'Sobre ${config.comissaoSobreBrutoPadrao ? 'o frete cheio' : 'o que caiu na conta'}'
+                          '${config.comissaoComPedagioPadrao ? ' + pedágio' : ', sem o pedágio'}',
+                    ),
+                ],
                 LinhaValor(
                   rotulo: 'Diesel e gastos',
                   valor: config.gastosDescontamDoLiquido ? 'por sua conta' : 'a empresa paga',

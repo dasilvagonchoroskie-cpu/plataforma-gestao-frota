@@ -118,7 +118,8 @@ class InfoMotorista {
       empresaNome: lerTexto(empresa?['nome']),
       empresaStatus: lerTexto(empresa?['status']),
       motoristaAtivo: motorista != null && lerBool(motorista['ativo'], true) && lerBool(perfil['ativo'], true),
-      configuracao: ConfiguracaoEmpresa.deMapa(empresa),
+      // O combinado dele: o que o gestor mudou só para ele e, no resto, o padrão da empresa.
+      configuracao: ConfiguracaoEmpresa.deMapa(empresa).doMotorista(motorista),
       modalidadeCodigo: lerTextoOuNulo(motorista?['modalidade']),
       modalidades: modalidadesDaEmpresa(empresa),
       paradas: ConfiguracaoParadas.deMapa(empresa),
@@ -297,6 +298,7 @@ class EstadoDados {
   }
 
   DadosRelatorio dadosDoPeriodo(Periodo periodo, {ConteudoRelatorio conteudo = ConteudoRelatorio.tudo}) => montarDados(
+    salarioFixoMensalCentavos: info.configuracao.salarioFixoCentavos,
     fretes: fretes,
     abastecimentos: abastecimentos,
     vales: vales,
@@ -616,6 +618,7 @@ class Dados extends AsyncNotifier<EstadoDados> {
       dataCarga: inicioDoDia(_agora()),
       percentualComissao: c.percentualComissaoPadrao,
       comissaoSobreBruto: c.comissaoSobreBrutoPadrao,
+      comissaoComPedagio: c.comissaoComPedagioPadrao,
       modalidade: _atual.info.modalidades.isEmpty ? null : _atual.modalidade.codigo,
       criadoNoAparelhoEm: _agora(),
     );

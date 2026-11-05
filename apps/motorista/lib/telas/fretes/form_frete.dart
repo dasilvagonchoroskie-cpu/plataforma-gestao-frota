@@ -30,10 +30,13 @@ class _FormFreteState extends ConsumerState<FormFrete> {
   final _pedagio = TextEditingController();
   final _pesoDescarga = TextEditingController();
   final _descontoQuebra = TextEditingController();
+  final _valorCheio = TextEditingController();
 
   late Frete _base;
   late DateTime _dataCarga;
   late bool _sobreBruto;
+  late bool _comPedagio;
+  late bool _freteCheio;
   String? _caminhaoId;
   Rascunho? _rascunho;
   String? _erroOrigem;
@@ -61,6 +64,7 @@ class _FormFreteState extends ConsumerState<FormFrete> {
     _pedagio,
     _pesoDescarga,
     _descontoQuebra,
+    _valorCheio,
   ];
 
   @override
@@ -70,6 +74,9 @@ class _FormFreteState extends ConsumerState<FormFrete> {
     _base = f;
     _dataCarga = f.dataCarga;
     _sobreBruto = f.comissaoSobreBruto;
+    _comPedagio = f.comissaoComPedagio;
+    _freteCheio = f.freteCheio;
+    _valorCheio.text = textoDinheiro(f.valorFreteCheioCentavos);
     _caminhaoId = f.caminhaoId.isEmpty ? null : f.caminhaoId;
     _origem.text = f.origem;
     _destino.text = f.destino;
@@ -108,6 +115,11 @@ class _FormFreteState extends ConsumerState<FormFrete> {
       if (d != null) _dataCarga = d;
       final b = m['sobreBruto'];
       if (b is bool) _sobreBruto = b;
+      final p = m['comPedagio'];
+      if (p is bool) _comPedagio = p;
+      final c = m['freteCheio'];
+      if (c is bool) _freteCheio = c;
+      _valorCheio.text = s('valorCheio');
       final x = m['extras'];
       if (x is Map) {
         _extras = x.cast<String, Object?>();
@@ -136,6 +148,9 @@ class _FormFreteState extends ConsumerState<FormFrete> {
         'descontoQuebra': _descontoQuebra.text,
         'dataCarga': _dataCarga.toIso8601String(),
         'sobreBruto': _sobreBruto,
+        'comPedagio': _comPedagio,
+        'freteCheio': _freteCheio,
+        'valorCheio': _valorCheio.text,
         'extras': _extras,
       });
     }
@@ -156,12 +171,15 @@ class _FormFreteState extends ConsumerState<FormFrete> {
     embarcador: _embarcador.text.trim(),
     dataCarga: _dataCarga,
     pesoCargaKg: lerNumero(_peso.text),
-    valorToneladaCentavos: lerCentavos(_tonelada.text),
+    valorToneladaCentavos: _freteCheio ? 0 : lerCentavos(_tonelada.text),
+    freteCheio: _freteCheio,
+    valorFreteCheioCentavos: _freteCheio ? lerCentavos(_valorCheio.text) : 0,
     adiantamentoCentavos: lerCentavos(_adiantamento.text),
     saldoCentavos: lerCentavos(_saldo.text),
     percentualComissao: lerNumero(_percentual.text),
     pedagioCentavos: lerCentavos(_pedagio.text),
     comissaoSobreBruto: _sobreBruto,
+    comissaoComPedagio: _comPedagio,
     pesoDescargaKg: lerNumero(_pesoDescarga.text),
     descontoQuebraCentavos: lerCentavos(_descontoQuebra.text),
     extras: _extras,
@@ -174,7 +192,9 @@ class _FormFreteState extends ConsumerState<FormFrete> {
     final preenchido = <String, bool>{
       'embarcador': f.embarcador.isNotEmpty,
       'peso_carga_kg': f.pesoCargaKg > 0,
-      'valor_tonelada_centavos': f.valorToneladaCentavos > 0,
+      'valor_tonelada_centavos': f.freteCheio
+          ? f.valorFreteCheioCentavos > 0
+          : f.valorToneladaCentavos > 0,
       'adiantamento_centavos': f.adiantamentoCentavos > 0,
       'saldo_centavos': f.saldoCentavos > 0,
       'pedagio_centavos': f.pedagioCentavos > 0,
@@ -183,8 +203,12 @@ class _FormFreteState extends ConsumerState<FormFrete> {
       'desconto_quebra_centavos': f.descontoQuebraCentavos > 0,
     };
     setState(() {
-      _erroOrigem = f.origem.isEmpty ? 'Falta ${m.rotulo('origem', 'de onde saiu a carga').toLowerCase()}.' : null;
-      _erroDestino = f.destino.isEmpty ? 'Falta ${m.rotulo('destino', 'para onde vai a carga').toLowerCase()}.' : null;
+      _erroOrigem = f.origem.isEmpty
+          ? 'Falta ${m.rotulo('origem', 'de onde saiu a carga').toLowerCase()}.'
+          : null;
+      _erroDestino = f.destino.isEmpty
+          ? 'Falta ${m.rotulo('destino', 'para onde vai a carga').toLowerCase()}.'
+          : null;
       _erroCaminhao = f.caminhaoId.isEmpty ? 'Escolha o caminhão.' : null;
       _erros
         ..clear()
@@ -195,7 +219,10 @@ class _FormFreteState extends ConsumerState<FormFrete> {
         })
         ..addAll(errosDosExtras(m.extras(), _extras));
     });
-    if (_erroOrigem != null || _erroDestino != null || _erroCaminhao != null || _erros.isNotEmpty) {
+    if (_erroOrigem != null ||
+        _erroDestino != null ||
+        _erroCaminhao != null ||
+        _erros.isNotEmpty) {
       mostrarMensagem(context, 'Preencha o que está marcado para salvar.');
       return;
     }
@@ -210,7 +237,9 @@ class _FormFreteState extends ConsumerState<FormFrete> {
     Navigator.pop(context, true);
     mensageiro
       ..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(content: Text(_novo ? 'Frete salvo.' : 'Alteração salva.')));
+      ..showSnackBar(
+        SnackBar(content: Text(_novo ? 'Frete salvo.' : 'Alteração salva.')),
+      );
   }
 
   Widget _dupla(Widget a, Widget b) => Row(
@@ -235,13 +264,29 @@ class _FormFreteState extends ConsumerState<FormFrete> {
     final m = dados.modalidade;
     String rotulo(String chave, String padrao) => m.rotulo(chave, padrao);
     bool ver(String chave) => m.visivel(chave);
-    String? opcional(String chave, String? padrao) => m.obrigatorio(chave) ? null : padrao;
+    String? opcional(String chave, String? padrao) =>
+        m.obrigatorio(chave) ? null : padrao;
     final f = _montar();
     final ajustes = _novo ? const <AjusteGestor>[] : dados.ajustesDe(_base.id);
     final bloqueado = ajustes.isNotEmpty;
     const espaco = SizedBox(height: 14);
+    final combinado = dados.info.configuracao;
+    // Só salário fixo (sem %): o frete não tem comissão para mostrar.
+    final soFixo =
+        combinado.formaDeGanhar == FormaDeGanhar.fixo &&
+        f.percentualComissao == 0;
+    Widget pergunta(String texto) => Padding(
+      padding: const EdgeInsets.only(top: 12, bottom: 6),
+      child: Text(
+        texto,
+        style: TextStyle(fontSize: 15, color: context.cores.textoFraco),
+      ),
+    );
 
-    if (_novo && dados.caminhaoAtual == null && dados.caminhoesAtivos.isEmpty && _caminhaoId == null) {
+    if (_novo &&
+        dados.caminhaoAtual == null &&
+        dados.caminhoesAtivos.isEmpty &&
+        _caminhaoId == null) {
       return Scaffold(
         appBar: AppBar(title: const Text('Novo frete')),
         body: EstadoVazio(
@@ -249,8 +294,12 @@ class _FormFreteState extends ConsumerState<FormFrete> {
           titulo: 'Escolha o caminhão primeiro',
           texto: 'Os lançamentos ficam ligados ao caminhão em que você está.',
           acao: FilledButton(
-            onPressed: () =>
-                Navigator.push(context, MaterialPageRoute(builder: (_) => const TelaTrocarCaminhao(primeiraVez: true))),
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => const TelaTrocarCaminhao(primeiraVez: true),
+              ),
+            ),
             child: const Text('Escolher o caminhão'),
           ),
         ),
@@ -261,7 +310,10 @@ class _FormFreteState extends ConsumerState<FormFrete> {
       appBar: AppBar(title: Text(_novo ? 'Novo frete' : 'Mudar frete')),
       bottomNavigationBar: bloqueado
           ? null
-          : RodapeBotao(texto: _novo ? 'Salvar frete' : 'Salvar alteração', aoTocar: _salvar),
+          : RodapeBotao(
+              texto: _novo ? 'Salvar frete' : 'Salvar alteração',
+              aoTocar: _salvar,
+            ),
       body: AbsorbPointer(
         absorbing: bloqueado,
         child: ListView(
@@ -274,7 +326,11 @@ class _FormFreteState extends ConsumerState<FormFrete> {
                 'O que digitar fica guardado mesmo se o app fechar.',
               ),
             const TituloSecao('Carga', espacoAcima: 16),
-            CampoCaminhao(valor: _caminhaoId, erro: _erroCaminhao, aoMudar: (v) => setState(() => _caminhaoId = v)),
+            CampoCaminhao(
+              valor: _caminhaoId,
+              erro: _erroCaminhao,
+              aoMudar: (v) => setState(() => _caminhaoId = v),
+            ),
             espaco,
             CampoData(
               rotulo: rotulo('data_carga', 'Data da carga'),
@@ -316,28 +372,66 @@ class _FormFreteState extends ConsumerState<FormFrete> {
             ],
             if (ver('peso_carga_kg') || ver('valor_tonelada_centavos')) ...[
               const TituloSecao('Peso e preço'),
-              _par([
-                if (ver('peso_carga_kg'))
+              if (ver('valor_tonelada_centavos')) ...[
+                EscolhaDupla(
+                  valor: !_freteCheio,
+                  textoSim: 'Por tonelada',
+                  textoNao: 'Frete cheio',
+                  aoMudar: (v) {
+                    _freteCheio = !v;
+                    _mudou();
+                  },
+                ),
+                const SizedBox(height: 12),
+              ],
+              if (_freteCheio && ver('valor_tonelada_centavos'))
+                _par([
+                  if (ver('peso_carga_kg'))
+                    Campo(
+                      controle: _peso,
+                      rotulo: rotulo('peso_carga_kg', 'Peso na carga'),
+                      tipo: TipoCampo.inteiro,
+                      sufixo: 'kg',
+                      ajuda: 'Opcional',
+                      aoMudar: _mudou,
+                    ),
                   Campo(
-                    controle: _peso,
-                    rotulo: rotulo('peso_carga_kg', 'Peso na carga'),
-                    tipo: TipoCampo.inteiro,
-                    sufixo: 'kg',
-                    dica: '33.040',
-                    erro: _erros['peso_carga_kg'],
-                    aoMudar: _mudou,
-                  ),
-                if (ver('valor_tonelada_centavos'))
-                  Campo(
-                    controle: _tonelada,
-                    rotulo: rotulo('valor_tonelada_centavos', 'Valor da tonelada'),
+                    controle: _valorCheio,
+                    rotulo: 'Valor do frete cheio',
                     tipo: TipoCampo.dinheiro,
+                    ajuda: 'O valor fechado do frete',
                     erro: _erros['valor_tonelada_centavos'],
                     aoMudar: _mudou,
                   ),
-              ]),
+                ])
+              else
+                _par([
+                  if (ver('peso_carga_kg'))
+                    Campo(
+                      controle: _peso,
+                      rotulo: rotulo('peso_carga_kg', 'Peso na carga'),
+                      tipo: TipoCampo.inteiro,
+                      sufixo: 'kg',
+                      dica: '33.040',
+                      erro: _erros['peso_carga_kg'],
+                      aoMudar: _mudou,
+                    ),
+                  if (ver('valor_tonelada_centavos'))
+                    Campo(
+                      controle: _tonelada,
+                      rotulo: rotulo(
+                        'valor_tonelada_centavos',
+                        'Valor da tonelada',
+                      ),
+                      tipo: TipoCampo.dinheiro,
+                      erro: _erros['valor_tonelada_centavos'],
+                      aoMudar: _mudou,
+                    ),
+                ]),
             ],
-            if (ver('adiantamento_centavos') || ver('saldo_centavos') || ver('pedagio_centavos'))
+            if (ver('adiantamento_centavos') ||
+                ver('saldo_centavos') ||
+                ver('pedagio_centavos'))
               const TituloSecao('Pagamento'),
             _par([
               if (ver('adiantamento_centavos'))
@@ -364,13 +458,28 @@ class _FormFreteState extends ConsumerState<FormFrete> {
                 controle: _pedagio,
                 rotulo: rotulo('pedagio_centavos', 'Pedágio no cartão ou tag'),
                 tipo: TipoCampo.dinheiro,
-                ajuda: 'O que a empresa pagou de pedágio. Pedágio do seu bolso vai em Gastos.',
+                ajuda:
+                    'O que a empresa pagou de pedágio. Pedágio do seu bolso vai em Gastos.',
                 erro: _erros['pedagio_centavos'],
                 aoMudar: _mudou,
               ),
             ],
-            if (ver('percentual_comissao')) ...[
+            if (ver('percentual_comissao') && soFixo) ...[
               const TituloSecao('Comissão'),
+              Nota(
+                'Você ganha salário fixo (${reais(combinado.salarioFixoCentavos)} por mês). '
+                'Este frete não tem comissão.',
+              ),
+            ] else if (ver('percentual_comissao')) ...[
+              const TituloSecao('Comissão'),
+              if (combinado.salarioFixoCentavos > 0)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 10),
+                  child: Nota(
+                    'Você ganha ${reais(combinado.salarioFixoCentavos)} por mês mais esta porcentagem '
+                    'dos fretes. O fixo aparece no Resumo.',
+                  ),
+                ),
               Campo(
                 controle: _percentual,
                 rotulo: rotulo('percentual_comissao', 'Sua comissão'),
@@ -379,18 +488,28 @@ class _FormFreteState extends ConsumerState<FormFrete> {
                 erro: _erros['percentual_comissao'],
                 aoMudar: _mudou,
               ),
-              const SizedBox(height: 12),
-              Text('A comissão é sobre', style: TextStyle(fontSize: 15, color: context.cores.textoFraco)),
-              const SizedBox(height: 6),
+              pergunta('A comissão é sobre'),
               EscolhaDupla(
                 valor: _sobreBruto,
-                textoSim: 'Frete + pedágio',
-                textoNao: 'Só o frete',
+                textoSim: 'Frete cheio',
+                textoNao: 'O que caiu na conta',
                 aoMudar: (v) {
                   _sobreBruto = v;
                   _mudou();
                 },
               ),
+              if (ver('pedagio_centavos')) ...[
+                pergunta('E o pedágio?'),
+                EscolhaDupla(
+                  valor: _comPedagio,
+                  textoSim: 'Entra na comissão',
+                  textoNao: 'Não entra',
+                  aoMudar: (v) {
+                    _comPedagio = v;
+                    _mudou();
+                  },
+                ),
+              ],
             ],
             if (ver('peso_descarga_kg') || ver('desconto_quebra_centavos')) ...[
               const TituloSecao('Descarga'),
@@ -409,7 +528,10 @@ class _FormFreteState extends ConsumerState<FormFrete> {
                 if (ver('desconto_quebra_centavos'))
                   Campo(
                     controle: _descontoQuebra,
-                    rotulo: rotulo('desconto_quebra_centavos', 'Desconto de quebra'),
+                    rotulo: rotulo(
+                      'desconto_quebra_centavos',
+                      'Desconto de quebra',
+                    ),
                     tipo: TipoCampo.dinheiro,
                     erro: _erros['desconto_quebra_centavos'],
                     aoMudar: _mudou,
@@ -463,7 +585,8 @@ class Conferencia extends StatelessWidget {
         mensagem = 'Entrou ${reais(dif)} a mais que o combinado. Confira.';
         corMensagem = cores.atencao;
       } else {
-        mensagem = 'Desconto da transportadora: ${reais(dif.abs())} (INSS, SEST/SENAT, seguro, pedágio, quebra).';
+        mensagem =
+            'Desconto da transportadora: ${reais(dif.abs())} (INSS, SEST/SENAT, seguro, pedágio, quebra).';
         corMensagem = cores.textoFraco;
       }
     }
@@ -471,26 +594,41 @@ class Conferencia extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        LinhaValor(rotulo: 'Frete real (o que entrou)', valor: reais(f.freteRealCentavos)),
+        LinhaValor(
+          rotulo: 'Frete real (o que entrou)',
+          valor: reais(f.freteRealCentavos),
+        ),
         if (f.descontoQuebraCentavos > 0)
-          LinhaValor(rotulo: 'Sem a quebra teria dado', valor: reais(f.freteSemQuebraCentavos)),
+          LinhaValor(
+            rotulo: 'Sem a quebra teria dado',
+            valor: reais(f.freteSemQuebraCentavos),
+          ),
         LinhaValor(
           rotulo: 'Valor contratado',
           valor: contratado > 0 ? reais(contratado) : '—',
-          detalhe: contratado > 0
-              ? '${toneladas(f.pesoCargaKg)} t × ${reais(f.valorToneladaCentavos)}'
-              : 'Peso vezes o valor da tonelada',
+          detalhe: f.freteCheio
+              ? 'Frete cheio (valor fechado)'
+              : (contratado > 0
+                    ? '${toneladas(f.pesoCargaKg)} t × ${reais(f.valorToneladaCentavos)}'
+                    : 'Peso vezes o valor da tonelada'),
         ),
-        LinhaValor(
-          rotulo: f.comissaoSobreBruto ? 'Base da comissão (bruto)' : 'Base da comissão (o que entrou)',
-          valor: f.baseComissaoCentavos > 0 ? reais(f.baseComissaoCentavos) : '—',
-        ),
-        LinhaValor(
-          rotulo: 'Sua parte (${percentualTexto(f.percentualComissao)}%)',
-          valor: reais(f.minhaParteCentavos),
-          destaque: true,
-          corValor: cores.positivo,
-        ),
+        if (f.percentualComissao > 0) ...[
+          LinhaValor(
+            rotulo: 'Base da comissão',
+            valor: f.baseComissaoCentavos > 0
+                ? reais(f.baseComissaoCentavos)
+                : '—',
+            detalhe:
+                f.explicacaoDaBase[0].toUpperCase() +
+                f.explicacaoDaBase.substring(1),
+          ),
+          LinhaValor(
+            rotulo: 'Sua parte (${percentualTexto(f.percentualComissao)}%)',
+            valor: reais(f.minhaParteCentavos),
+            destaque: true,
+            corValor: cores.positivo,
+          ),
+        ],
         if (mensagem != null)
           Padding(
             padding: const EdgeInsets.only(top: 6),

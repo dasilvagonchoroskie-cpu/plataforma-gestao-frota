@@ -71,9 +71,13 @@ class ServidorFalso implements Servidor {
       'motorista': {
         ...(s['motorista'] as Map).cast<String, Object?>(),
         if (modalidades.isNotEmpty) 'modalidade': modalidadeDoMotorista,
+        ...combinado,
       },
     };
   }
+
+  /// O combinado só deste motorista (percentual_comissao, salario_fixo_centavos...).
+  Map<String, Object?> combinado = const {};
 
   /// Registro de paradas (a empresa liga; desligado por padrão).
   bool paradasAtivas = false;

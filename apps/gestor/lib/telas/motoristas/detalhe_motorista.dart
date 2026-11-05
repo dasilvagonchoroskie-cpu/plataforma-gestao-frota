@@ -11,6 +11,7 @@ import '../../dados/equipe.dart';
 import '../../dados/modelos.dart';
 import '../../dados/provedores.dart';
 import '../../relatorio/compartilhar.dart';
+import '../configuracoes/combinado.dart';
 import '../paradas/tela_paradas.dart';
 import 'tela_acerto.dart';
 import 'tela_motoristas.dart' show mostrarConvite;
@@ -555,6 +556,34 @@ class _Cadastro extends ConsumerWidget {
                     ),
                 ],
               ),
+              if (!porViagem && !m.semLogin) ...[
+                const TituloSecao('Como ele ganha'),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(CombinadoEditavel.texto(e.combinadoDe(m)), style: const TextStyle(fontSize: 16.5)),
+                          Text(
+                            m.temCombinadoProprio ? 'Combinado só dele' : 'Padrão da empresa',
+                            style: TextStyle(fontSize: 14, color: cores.textoFraco),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    OutlinedButton.icon(
+                      onPressed: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (_) => TelaCombinadoMotorista(motoristaId: m.id)),
+                      ),
+                      icon: const Icon(Icons.edit_outlined),
+                      label: const Text('Mudar'),
+                    ),
+                  ],
+                ),
+              ],
               TituloSecao(porViagem ? 'Cavalo' : 'Caminhão'),
               Row(
                 children: [

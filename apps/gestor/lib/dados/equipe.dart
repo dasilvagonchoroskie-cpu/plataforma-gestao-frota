@@ -251,6 +251,23 @@ class Equipe {
   bool get souDono => eu.dono;
   Regras get regras => Regras.daEmpresa(empresa.configuracao);
 
+  /// O combinado de pagamento do motorista: o que o gestor mudou só para ele
+  /// e, no resto, o padrão da empresa.
+  ConfiguracaoEmpresa combinadoDe(Motorista m) => empresa.configuracao.doMotorista(m.excecoes);
+
+  /// Salário fixo por mês que entra num relatório: o do motorista, ou a soma
+  /// dos motoristas na empresa (frota toda). Por caminhão ou embarcador não
+  /// entra (o fixo é do motorista, não do caminhão). Baú e Sider: no acerto.
+  int salarioFixoDoRelatorio({String? motoristaId, String? caminhaoId, String? embarcador}) {
+    if (caminhaoId != null || embarcador != null) return 0;
+    int doMotorista(Motorista m) => !m.ativo || porViagem(m.id) ? 0 : combinadoDe(m).salarioFixoCentavos;
+    if (motoristaId != null) {
+      final m = motorista(motoristaId);
+      return m == null ? 0 : doMotorista(m);
+    }
+    return motoristas.fold(0, (s, m) => s + doMotorista(m));
+  }
+
   // ----------------------------------------------------- últimos lançamentos
 
   /// Os lançamentos mais recentes de todos os motoristas (pela data do lançamento).
@@ -525,6 +542,8 @@ class Equipe {
       viagens: l.viagens,
       porViagem: motoristaId != null && porViagem(motoristaId),
       modalidade: motoristaId == null ? null : modalidadeDe(motorista(motoristaId)!),
+      salarioFixoMensalCentavos:
+          salarioFixoDoRelatorio(motoristaId: motoristaId, caminhaoId: caminhaoId, embarcador: embarcador),
     );
   }
 

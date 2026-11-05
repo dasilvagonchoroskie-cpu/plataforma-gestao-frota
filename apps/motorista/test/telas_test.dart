@@ -126,7 +126,8 @@ void main() {
     await preencher('Valor da tonelada', '18500');
     await preencher('Adiantamento', '480000');
     await preencher('Saldo', '195000');
-    await tester.scrollUntilVisible(find.text('Sua parte (13%)'), 300, scrollable: find.byType(Scrollable).last);
+    // A lista da tela (os campos de texto também rolam, por isso a primeira).
+    await tester.scrollUntilVisible(find.text('Sua parte (13%)'), 300, scrollable: find.byType(Scrollable).first);
     expect(find.text('R\$ 877,50'), findsOneWidget);
   });
 

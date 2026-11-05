@@ -140,9 +140,17 @@ class Motorista {
     this.modalidade,
     this.exclusaoPedidaEm,
     this.desligadoEm,
+    this.excecoes = const {},
   });
 
   final String id;
+
+  /// O combinado só dele (percentual_comissao, comissao_sobre_bruto,
+  /// comissao_com_pedagio, salario_fixo_centavos); vazio = padrão da empresa.
+  final Map<String, Object?> excecoes;
+
+  /// Tem um combinado diferente do padrão da empresa.
+  bool get temCombinadoProprio => excecoes.values.any((v) => v != null);
 
   /// Vazio quando o motorista saiu da empresa (desligado ou conta excluída):
   /// o login dele fica livre e aqui fica só o registro.
@@ -180,6 +188,10 @@ class Motorista {
     modalidade: lerTextoOuNulo(m['modalidade']),
     exclusaoPedidaEm: lerDataOuNula(m['exclusao_pedida_em']),
     desligadoEm: lerDataOuNula(m['desligado_em']),
+    excecoes: {
+      for (final k in camposDoCombinado)
+        if (m[k] != null) k: m[k],
+    },
   );
 }
 
@@ -263,6 +275,9 @@ class AcessoAutorizado {
   );
 }
 
+/// Colunas do combinado que o gestor muda só para um motorista.
+const camposDoCombinado = ['percentual_comissao', 'comissao_sobre_bruto', 'comissao_com_pedagio', 'salario_fixo_centavos'];
+
 /// Tipo de valor de cada campo que o gestor pode corrigir (igual à função
 /// campo_ajustavel_tipo do banco).
 enum TipoAjuste { texto, data, centavos, numero, percentual, logico, caminhao, categoria, formaPagamento }
@@ -283,6 +298,9 @@ const camposAjustaveis = <String, Map<String, TipoAjuste>>{
     'desconto_quebra_centavos': TipoAjuste.centavos,
     'percentual_comissao': TipoAjuste.percentual,
     'comissao_sobre_bruto': TipoAjuste.logico,
+    'comissao_com_pedagio': TipoAjuste.logico,
+    'frete_cheio': TipoAjuste.logico,
+    'valor_frete_cheio_centavos': TipoAjuste.centavos,
   },
   'abastecimentos': {
     'data': TipoAjuste.data,
