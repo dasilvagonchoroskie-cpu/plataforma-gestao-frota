@@ -63,13 +63,22 @@ class CorpoResumo extends StatelessWidget {
           tipo: r.liquido < 0 ? TipoPlaca.vermelha : TipoPlaca.verde,
         ),
         const SizedBox(height: 10),
-        LinhaValor(
-          rotulo: 'Comissão',
-          valor: '+ ${reais(r.comissao)}',
-          detalhe: detalheComissao,
-          corValor: cores.positivo,
-          corDetalhe: r.percentuaisDiferentes ? cores.atencao : null,
-        ),
+        // Só fixo (sem %): a linha da comissão some; o fixo aparece sozinho.
+        if (!(r.salarioFixo > 0 && r.comissao == 0))
+          LinhaValor(
+            rotulo: 'Comissão',
+            valor: '+ ${reais(r.comissao)}',
+            detalhe: detalheComissao,
+            corValor: cores.positivo,
+            corDetalhe: r.percentuaisDiferentes ? cores.atencao : null,
+          ),
+        if (r.salarioFixo > 0)
+          LinhaValor(
+            rotulo: 'Salário fixo',
+            valor: '+ ${reais(r.salarioFixo)}',
+            detalhe: 'Combinado por mês. Num pedaço do mês, entra a parte dos dias',
+            corValor: cores.positivo,
+          ),
         LinhaGastosEVales(resultado: r, regras: regras),
         if (d.vazio) ...[
           const SizedBox(height: 16),
@@ -97,6 +106,8 @@ class CorpoResumo extends StatelessWidget {
           LinhaValor(rotulo: 'Diesel', valor: '$menos ${reais(r.totalAbastecimento)}'),
           LinhaValor(rotulo: 'Outros gastos', valor: '$menos ${reais(r.totalGastos)}'),
           LinhaValor(rotulo: 'Comissão do motorista', valor: '$menos ${reais(r.comissaoDoCaminhao)}'),
+          if (r.salarioFixo > 0)
+            LinhaValor(rotulo: 'Salário fixo do motorista', valor: '$menos ${reais(r.salarioFixo)}'),
           const Divider(height: 18),
           LinhaValor(
             rotulo: r.sobraDoCaminhao >= 0 ? 'Sobrou para o caminhão' : 'Faltou',
