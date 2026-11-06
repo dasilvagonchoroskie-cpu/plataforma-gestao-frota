@@ -357,3 +357,20 @@ Decisões tomadas na construção (confirmar no piloto):
 - **Decidido por mim (dá para mudar):** gasto já salvo, ao abrir para mudar, vem com a forma que tem (os
   antigos vêm como "Assinei a nota"); só o gasto novo exige a escolha.
 
+## Combinado de pagamento do motorista (pedido do Evandro em 05/11/2026)
+
+- **Erro encontrado no PDF do Jorge:** a tela dizia que a comissão era sobre "Frete + pedágio", mas a conta só
+  trocava o frete pelo peso descarregado × tonelada e não somava o pedágio. Agora são duas escolhas: a base
+  (frete cheio ou o que caiu na conta) e o pedágio (entra ou não). Os fretes já lançados com "Frete + pedágio"
+  passaram a somar o pedágio (escolha dele: "Sim, recalcular").
+- **Escolhas dele:** padrão da empresa + exceção por motorista; o % do "fixo + %" é sobre os fretes dele no
+  mês; fixo proporcional aos dias quando o período não é um mês fechado.
+- **Como ficou:** Configurações > Regras de acerto (dono) e Motoristas > nome > Cadastro > "Como ele ganha"
+  (gestor ou dono). Formas: comissão, salário fixo, fixo + %. Frete por tonelada ou frete cheio (valor fechado).
+  "Frete contratado" usa o que caiu na conta quando o frete não tem o valor contratado.
+- **Decidido por mim (dá para mudar):** o fixo entra no relatório do motorista e no da empresa toda (soma dos
+  motoristas na empresa); não entra no relatório por caminhão nem por embarcador (o fixo é do motorista).
+  Motorista que saiu da empresa não leva fixo no relatório. Baú e Sider: o combinado continua no acerto do
+  gestor (ele lança o valor). O motorista ainda muda a % e a base em cada frete (como antes).
+- **App antigo (0.8.0):** frete novo com "Frete + pedágio" marcado entra com o pedágio na comissão.
+

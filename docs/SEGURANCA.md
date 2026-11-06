@@ -64,6 +64,12 @@ limitado), **Baixa** (defesa em profundidade).
   `motoristas_ativo_tem_login_ck`, teste 06) e não tem acesso para redefinir. Mensagens de erro claras para
   código, aprovação e redefinição (teste 06 e teste das funções).
 
+### Combinado de pagamento (05/11/2026)
+
+- Sem apagar dados. O combinado da empresa só o dono muda (política `empresas_dono_atualizar`); o do motorista,
+  dono ou gestor da empresa (política `motoristas_gestor_alterar_ativo` + `grant update` só nas colunas novas);
+  o motorista não muda o próprio. Limites no banco: % entre 0 e 100, fixo entre 0 e R$ 1 milhão (teste 14).
+
 ### Forma de pagamento do gasto (05/11/2026)
 
 - Sem apagar dados. A forma é conferida no banco (só `dinheiro` ou `nota`, teste 13); a correção do gestor

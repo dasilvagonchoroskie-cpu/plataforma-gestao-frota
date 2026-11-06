@@ -322,6 +322,27 @@ marcado.
   (`success`; registro: `Applying migration 20261105120000_gasto_forma_pagamento.sql`, lista local = nuvem).
   APKs oficiais 0.8.0 (certificado 9c6ec010…22d2) entregues.
 
+## Combinado de pagamento do motorista — 05/11/2026
+
+Pedido do Evandro: cada patrão paga de um jeito (comissão, fixo, fixo + %; com ou sem pedágio; frete por
+tonelada ou cheio). No PDF do Jorge apareceu o erro: "Frete + pedágio" não somava o pedágio. Escolhas dele:
+padrão da empresa + exceção por motorista; % sobre os fretes dele no mês; fixo proporcional aos dias;
+recalcular os fretes já lançados.
+
+- **feito e testado** — Banco (migration `20261105200000_combinado_pagamento`): padrão na empresa, exceção no
+  motorista, frete cheio e pedágio na comissão por frete; fretes antigos com "Frete + pedágio" passam a somar o
+  pedágio (teste à parte com dados como os da nuvem, inclusive correção do gestor). `rodar.sh` →
+  `total de verificações que passaram: 486` (teste 14 novo: 20).
+- **feito e testado** — Núcleo: base (frete cheio ou o que caiu na conta) + pedágio, frete cheio, fixo
+  proporcional aos dias, contratado sem ficar menor que o recebido, PDF e planilha. `dart test` → 83 testes
+  (o frete do Jorge: de R$ 2.011,01 para R$ 2.159,99 com o pedágio).
+- **feito e testado** — Frota Motorista 0.9.0 (frete por tonelada ou cheio, base e pedágio, fixo no Resumo e em
+  Configurações) → 58 testes; Frota Gestor 0.9.0 (regras da empresa e "Como ele ganha" por motorista) → 67
+  testes; `flutter analyze` sem problemas.
+- **feito e testado** — Esteira 64ff1cf aprovada (`success`, inclusive o emulador) e banco da nuvem atualizado
+  (`success`; registro: `Applying migration 20261105200000_combinado_pagamento.sql`, lista local = nuvem).
+  APKs oficiais 0.9.0 (certificado 9c6ec010…22d2) entregues.
+
 ## Fase 7 — acabamento e piloto
 
 - **em andamento** — SMTP próprio (Brevo, configuração no painel do Supabase pelo dono).
